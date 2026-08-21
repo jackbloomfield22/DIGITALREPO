@@ -14,7 +14,7 @@
     "test": "vitest run",
     "postinstall": "prisma generate",
     "db:deploy": "prisma migrate deploy",
-    "vercel-build": "prisma migrate deploy && SEED_IF_EMPTY=1 tsx prisma/seed.ts && next build"
+    "vercel-build": "node scripts/vercel-build.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

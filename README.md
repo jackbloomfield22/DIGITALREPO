@@ -51,6 +51,15 @@ discover.
 | `AUTH_SECRET`       | yes      | Signs session cookies (set a strong value in production)       |
 | `ANTHROPIC_API_KEY` | no       | Enables AI Search + Research Inbox parsing. **The app is fully functional without it** — AI Search degrades to structured keyword search. |
 | `AI_MODEL`          | no       | Override the Claude model (default `claude-opus-5`)            |
+| `SIGNUP_CODE`       | no       | When set, self-serve sign-up at `/signup` requires this invite code |
+
+Anyone can create their own account at `/signup` (new members join as editors; admins can
+adjust roles under Admin → Users). Everyone shares the one Digital Bible, and every change
+is attributed to the account that made it in the audit history and Activity feed.
+
+On Vercel, the build (`scripts/vercel-build.mjs`) auto-detects the database connection
+string from Neon, Supabase, or Vercel/Prisma Postgres marketplace integrations, runs
+migrations, and seeds a fresh database automatically.
 
 ### Scripts
 

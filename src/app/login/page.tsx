@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { login } from "./actions";
@@ -55,6 +56,12 @@ export default async function LoginPage({
           <button type="submit" className="btn btn-primary w-full">
             Sign in
           </button>
+          <p className="text-center text-xs text-muted">
+            New here?{" "}
+            <Link href="/signup" className="underline underline-offset-2 hover:text-accent">
+              Create an account
+            </Link>
+          </p>
           <p className="text-center text-xs text-faint">
             Internal tool · 4.4.Forty Media
           </p>
