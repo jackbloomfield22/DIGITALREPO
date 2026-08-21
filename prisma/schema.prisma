@@ -1,0 +1,680 @@
+// 4.4.FORTY DIGITAL BIBLE — relational data model
+// Postgres. Taxonomy values (statuses, roles, relationship types) are strings
+// validated at the app layer (src/lib/taxonomy.ts) so vocabulary can evolve
+// without migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Users & auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         String   @default("VIEWER") // VIEWER | EDITOR | ADMIN
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  favorites    Favorite[]
+  recentViews  RecentView[]
+  savedViews   SavedView[]
+  collections  Collection[]
+  auditLogs    AuditLog[]
+  aiThreads    AiThread[]
+  inboxItems   ResearchInboxItem[]
+  ownedFormats Format[]            @relation("FormatOwner")
+  ownedOpps    Opportunity[]       @relation("OpportunityOwner")
+}
+
+// ---------------------------------------------------------------------------
+// Primary objects
+// ---------------------------------------------------------------------------
+
+model Creator {
+  id               String    @id @default(cuid())
+  slug             String    @unique
+  name             String
+  aliases          String[]  @default([])
+  imageUrl         String?
+  headline         String?
+  status           String    @default("active") // active | watch | archived
+  miniBio          String?
+  digitalSummary   String?
+  opportunityNotes String?
+  internalNotes    String?
+  birthday         DateTime?
+  age              Int? // used when only an approximate age is known
+  lastVerifiedAt   DateTime?
+  archived         Boolean   @default(false)
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  socialProfiles SocialProfile[]
+  entityLinks    CreatorEntityLink[]
+  credits        CreatorProjectCredit[]
+  organizations  CreatorOrganization[]
+  people         CreatorPerson[]
+  formats        CreatorFormat[]
+  relationshipsA CreatorRelationship[]  @relation("RelA")
+  relationshipsB CreatorRelationship[]  @relation("RelB")
+  opportunities  OpportunityCreator[]
+
+  @@index([name])
+  @@index([updatedAt])
+}
+
+model SocialProfile {
+  id             String    @id @default(cuid())
+  creatorId      String
+  platform       String // instagram | tiktok | youtube | x | twitch | ...
+  handle         String?
+  url            String?
+  followerCount  Int?
+  countUpdatedAt DateTime?
+  notes          String?
+
+  creator   Creator          @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  snapshots SocialSnapshot[]
+
+  @@index([creatorId])
+  @@index([platform])
+}
+
+model SocialSnapshot {
+  id              String   @id @default(cuid())
+  socialProfileId String
+  followerCount   Int
+  recordedAt      DateTime @default(now())
+
+  socialProfile SocialProfile @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
+
+  @@index([socialProfileId])
+}
+
+model Project {
+  id             String    @id @default(cuid())
+  slug           String    @unique
+  title          String
+  aliases        String[]  @default([])
+  imageUrl       String?
+  projectType    String? // tv_series | documentary | podcast | ...
+  status         String    @default("released") // released | airing | in_production | ended | announced
+  logline        String?
+  description    String?
+  premiereYear   Int?
+  endYear        Int?
+  seasons        Int?
+  episodes       Int?
+  runtimeMinutes Int?
+  country        String?
+  trailerUrl     String?
+  officialUrl    String?
+  imdbUrl        String?
+  youtubeUrl     String?
+  internalNotes  String?
+  lastVerifiedAt DateTime?
+  archived       Boolean   @default(false)
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  credits       CreatorProjectCredit[]
+  organizations ProjectOrganization[]
+  entityLinks   ProjectEntityLink[]
+  people        PersonProject[]
+  opportunities OpportunityProject[]
+
+  @@index([title])
+  @@index([projectType])
+}
+
+model Organization {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  aliases       String[] @default([])
+  types         String[] @default([]) // production_company | brand | network | ...
+  imageUrl      String?
+  description   String?
+  website       String?
+  location      String?
+  internalNotes String?
+  archived      Boolean  @default(false)
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  projects      ProjectOrganization[]
+  creators      CreatorOrganization[]
+  people        PersonOrganization[]
+  opportunities OpportunityOrganization[]
+  formats       FormatOrganization[]
+
+  @@index([name])
+}
+
+model IndustryPerson {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  title     String?
+  roleType  String? // agent | manager | publicist | executive | producer | ...
+  notes     String?
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organizations PersonOrganization[]
+  creators      CreatorPerson[]
+  projects      PersonProject[]
+
+  @@index([name])
+}
+
+model Format {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  title            String
+  logline          String?
+  description      String?
+  formatType       String? // competition | docuseries | podcast | ...
+  status           String   @default("idea")
+  targetPlatform   String?
+  episodeStructure String?
+  episodeLength    String?
+  productionScale  String?
+  location         String?
+  sponsorFit       String?
+  notes            String?
+  ownerId          String?
+  archived         Boolean  @default(false)
+  version          Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  owner         User?                @relation("FormatOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  creators      CreatorFormat[]
+  entityLinks   FormatEntityLink[]
+  organizations FormatOrganization[]
+  opportunities OpportunityFormat[]
+
+  @@index([title])
+  @@index([status])
+}
+
+model Opportunity {
+  id                   String    @id @default(cuid())
+  slug                 String    @unique
+  title                String
+  type                 String? // brand_brief | casting_need | ...
+  status               String    @default("researching")
+  description          String?
+  audienceRequirements String?
+  platformRequirements String?
+  outcome              String?
+  notes                String?
+  deadline             DateTime?
+  ownerId              String?
+  archived             Boolean   @default(false)
+  version              Int       @default(1)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  owner         User?                     @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  creators      OpportunityCreator[]
+  formats       OpportunityFormat[]
+  projects      OpportunityProject[]
+  organizations OpportunityOrganization[]
+  entityLinks   OpportunityEntityLink[]
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Taxonomy — reusable canonical entities
+// ---------------------------------------------------------------------------
+
+model Entity {
+  id          String   @id @default(cuid())
+  kind        String // interest | hobby | sport | location | genre | creator_category | skill | vertical | audience_type | tag
+  slug        String
+  name        String
+  aliases     String[] @default([])
+  description String?
+  createdAt   DateTime @default(now())
+
+  creatorLinks     CreatorEntityLink[]
+  formatLinks      FormatEntityLink[]
+  projectLinks     ProjectEntityLink[]
+  opportunityLinks OpportunityEntityLink[]
+
+  @@unique([kind, slug])
+  @@index([name])
+  @@index([kind])
+}
+
+model CreatorEntityLink {
+  id           String  @id @default(cuid())
+  creatorId    String
+  entityId     String
+  relationship String  @default("") // for locations: based_in | hometown | born_in | works_in
+  confidence   String? // confirmed | reported | internal | unverified
+  note         String?
+
+  creator Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  entity  Entity  @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([creatorId, entityId, relationship])
+  @@index([entityId])
+}
+
+model FormatEntityLink {
+  id       String @id @default(cuid())
+  formatId String
+  entityId String
+
+  format Format @relation(fields: [formatId], references: [id], onDelete: Cascade)
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([formatId, entityId])
+  @@index([entityId])
+}
+
+model ProjectEntityLink {
+  id        String @id @default(cuid())
+  projectId String
+  entityId  String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entity  Entity  @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, entityId])
+  @@index([entityId])
+}
+
+model OpportunityEntityLink {
+  id            String @id @default(cuid())
+  opportunityId String
+  entityId      String
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  entity      Entity      @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([opportunityId, entityId])
+  @@index([entityId])
+}
+
+// ---------------------------------------------------------------------------
+// Relationships between primary objects (all carry metadata)
+// ---------------------------------------------------------------------------
+
+model CreatorProjectCredit {
+  id         String  @id @default(cuid())
+  creatorId  String
+  projectId  String
+  role       String // host | executive_producer | cast | ...
+  note       String?
+  confidence String?
+
+  creator Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([creatorId, projectId, role])
+  @@index([projectId])
+  @@index([role])
+}
+
+model ProjectOrganization {
+  id             String  @id @default(cuid())
+  projectId      String
+  organizationId String
+  relationship   String // production_company | network | distributor | ...
+  note           String?
+
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, organizationId, relationship])
+  @@index([organizationId])
+}
+
+model CreatorOrganization {
+  id             String  @id @default(cuid())
+  creatorId      String
+  organizationId String
+  relationship   String // brand_partner | founder | investor | ambassador | ...
+  status         String? // active | past
+  startYear      Int?
+  endYear        Int?
+  note           String?
+  confidence     String?
+
+  creator      Creator      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([creatorId, organizationId, relationship])
+  @@index([organizationId])
+}
+
+model CreatorPerson {
+  id           String  @id @default(cuid())
+  creatorId    String
+  personId     String
+  relationship String // agent | manager | publicist | attorney | other
+  note         String?
+  confidence   String?
+
+  creator Creator        @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  person  IndustryPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([creatorId, personId, relationship])
+  @@index([personId])
+}
+
+model PersonOrganization {
+  id             String  @id @default(cuid())
+  personId       String
+  organizationId String
+  role           String?
+  current        Boolean @default(true)
+
+  person       IndustryPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, organizationId])
+  @@index([organizationId])
+}
+
+model PersonProject {
+  id        String  @id @default(cuid())
+  personId  String
+  projectId String
+  role      String // director | showrunner | executive_producer | ...
+  note      String?
+
+  person  IndustryPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, projectId, role])
+  @@index([projectId])
+}
+
+model CreatorFormat {
+  id        String  @id @default(cuid())
+  creatorId String
+  formatId  String
+  isPrimary Boolean @default(false)
+  note      String?
+
+  creator Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  format  Format  @relation(fields: [formatId], references: [id], onDelete: Cascade)
+
+  @@unique([creatorId, formatId])
+  @@index([formatId])
+}
+
+model FormatOrganization {
+  id             String  @id @default(cuid())
+  formatId       String
+  organizationId String
+  relationship   String  @default("associated") // sponsor_target | partner | ...
+  note           String?
+
+  format       Format       @relation(fields: [formatId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([formatId, organizationId, relationship])
+  @@index([organizationId])
+}
+
+// Symmetric creator-to-creator connection. Stored once with creatorAId < creatorBId
+// (enforced at the app layer); queries always check both directions.
+model CreatorRelationship {
+  id           String  @id @default(cuid())
+  creatorAId   String
+  creatorBId   String
+  relationship String // collaborated_with | co_host | business_partner | ...
+  note         String?
+  confidence   String?
+
+  creatorA Creator @relation("RelA", fields: [creatorAId], references: [id], onDelete: Cascade)
+  creatorB Creator @relation("RelB", fields: [creatorBId], references: [id], onDelete: Cascade)
+
+  @@unique([creatorAId, creatorBId, relationship])
+  @@index([creatorBId])
+}
+
+model OpportunityCreator {
+  id            String  @id @default(cuid())
+  opportunityId String
+  creatorId     String
+  status        String  @default("candidate") // candidate | shortlist | contacted | passed
+  note          String?
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  creator     Creator     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@unique([opportunityId, creatorId])
+  @@index([creatorId])
+}
+
+model OpportunityFormat {
+  id            String  @id @default(cuid())
+  opportunityId String
+  formatId      String
+  note          String?
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  format      Format      @relation(fields: [formatId], references: [id], onDelete: Cascade)
+
+  @@unique([opportunityId, formatId])
+  @@index([formatId])
+}
+
+model OpportunityProject {
+  id            String  @id @default(cuid())
+  opportunityId String
+  projectId     String
+  note          String?
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([opportunityId, projectId])
+  @@index([projectId])
+}
+
+model OpportunityOrganization {
+  id             String  @id @default(cuid())
+  opportunityId  String
+  organizationId String
+  note           String?
+
+  opportunity  Opportunity  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([opportunityId, organizationId])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Collections, saved views, favorites, recents
+// ---------------------------------------------------------------------------
+
+model Collection {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  ownerId     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  items CollectionItem[]
+}
+
+model CollectionItem {
+  id           String   @id @default(cuid())
+  collectionId String
+  targetType   String // creator | format | project | organization
+  targetId     String
+  note         String?
+  addedAt      DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, targetType, targetId])
+  @@index([targetType, targetId])
+}
+
+model SavedView {
+  id         String   @id @default(cuid())
+  name       String
+  ownerId    String
+  targetType String // creators | projects | formats | ...
+  query      String // URL querystring encoding filters/sort
+  createdAt  DateTime @default(now())
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  userId     String
+  targetType String
+  targetId   String
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([targetType, targetId])
+}
+
+model RecentView {
+  id         String   @id @default(cuid())
+  userId     String
+  targetType String
+  targetId   String
+  viewedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId, viewedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Provenance, attachments, audit
+// ---------------------------------------------------------------------------
+
+model Source {
+  id          String    @id @default(cuid())
+  title       String?
+  url         String?
+  sourceType  String? // public | representative | internal | social | official | research
+  publication String?
+  publishedAt DateTime?
+  notes       String?
+  addedById   String?
+  verifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  records RecordSource[]
+}
+
+model RecordSource {
+  id         String  @id @default(cuid())
+  sourceId   String
+  targetType String
+  targetId   String
+  note       String?
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetType, targetId])
+  @@index([targetType, targetId])
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  targetType   String
+  targetId     String
+  filename     String
+  storedPath   String
+  mimeType     String?
+  sizeBytes    Int?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([targetType, targetId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  userName    String? // denormalized for display
+  targetType  String
+  targetId    String
+  targetLabel String // denormalized display name
+  action      String // created | updated | linked | unlinked | archived | restored | merged
+  field       String?
+  oldValue    String?
+  newValue    String?
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// AI & research inbox
+// ---------------------------------------------------------------------------
+
+model AiThread {
+  id        String   @id @default(cuid())
+  userId    String?
+  title     String?
+  createdAt DateTime @default(now())
+
+  user     User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages AiMessage[]
+}
+
+model AiMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  role      String // user | assistant
+  content   String
+  results   Json? // structured result cards
+  createdAt DateTime @default(now())
+
+  thread AiThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+}
+
+model ResearchInboxItem {
+  id          String   @id @default(cuid())
+  rawText     String
+  status      String   @default("pending") // pending | proposed | applied | dismissed
+  proposal    Json?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+}
