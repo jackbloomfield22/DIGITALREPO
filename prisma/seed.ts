@@ -10,6 +10,15 @@ import { slugify } from "../src/lib/slug";
 const db = new PrismaClient();
 
 async function main() {
+  // On hosted deploys the seed runs on every build with SEED_IF_EMPTY=1:
+  // it bootstraps a fresh database once, then never touches an in-use one.
+  if (process.env.SEED_IF_EMPTY) {
+    const existingUsers = await db.user.count();
+    if (existingUsers > 0) {
+      console.log("Database already initialized — skipping seed.");
+      return;
+    }
+  }
   console.log("Seeding Digital Bible demo data...");
 
   // --- Users -----------------------------------------------------------------

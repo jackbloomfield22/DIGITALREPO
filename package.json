@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "postinstall": "prisma generate",
-    "db:deploy": "prisma migrate deploy"
+    "db:deploy": "prisma migrate deploy",
+    "vercel-build": "prisma migrate deploy && SEED_IF_EMPTY=1 tsx prisma/seed.ts && next build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
