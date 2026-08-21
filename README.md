@@ -223,3 +223,21 @@ project↔organization symmetry, derived hosting experience, combined AND filter
 duplicate suggestion scoring, entity merges preserving relationships, dynamic saved views,
 role gating, optimistic-concurrency conflict rejection, and AI tool safety (read-only
 surface, schema-validated inputs, clamped result sizes).
+
+## Backups
+
+The entire Digital Bible — users, creators, every relationship, notes, sources, and
+history — is snapshotted automatically **every day** (Vercel Cron → `/api/cron/backup`;
+the newest 14 daily snapshots are kept). Admins can also take and download backups any
+time under **Admin → Backups**; manual backups are kept until deleted. A downloaded
+backup file restores a complete database:
+
+```bash
+DATABASE_URL="postgresql://..." npx prisma migrate deploy   # if the target is empty
+DATABASE_URL="postgresql://..." node scripts/restore-backup.mjs backup.json
+```
+
+A test guards backup coverage: every model added to the schema must be included in the
+dump or the suite fails. Hosted Postgres providers (e.g. Neon) additionally keep their
+own point-in-time recovery as an independent safety net. Optional: set a `CRON_SECRET`
+env var on Vercel to require authentication on the cron endpoint.

@@ -671,6 +671,21 @@ model AiMessage {
   @@index([threadId])
 }
 
+// Full-database snapshot: every table serialized to JSON. Written by the
+// daily cron and the admin "Back Up Now" button; downloadable for offline
+// safekeeping; restorable with scripts/restore-backup.mjs.
+model Snapshot {
+  id        String   @id @default(cuid())
+  kind      String   @default("manual") // manual | scheduled
+  label     String?
+  counts    Json // { creators: 20, users: 3, ... } summary for display
+  data      Json // the complete dump
+  sizeBytes Int
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model ResearchInboxItem {
   id          String   @id @default(cuid())
   rawText     String
