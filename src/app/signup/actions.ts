@@ -30,9 +30,14 @@ export async function signup(formData: FormData) {
   }
   const { name, email, password } = parsed.data;
 
-  // Optional lockdown: when SIGNUP_CODE is set, the matching code is required.
-  const requiredCode = process.env.SIGNUP_CODE;
-  if (requiredCode && formData.get("code") !== requiredCode) {
+  // Sign-up requires the team invite code. The SIGNUP_CODE env var overrides
+  // the built-in default; with the default, the trailing "!" is optional.
+  const requiredCode = process.env.SIGNUP_CODE || "44Forty2026!";
+  const submitted = String(formData.get("code") ?? "").trim();
+  const codeOk =
+    submitted === requiredCode ||
+    (!process.env.SIGNUP_CODE && submitted === "44Forty2026");
+  if (!codeOk) {
     redirect(`/signup?error=${encodeURIComponent("That invite code isn't right.")}`);
   }
 

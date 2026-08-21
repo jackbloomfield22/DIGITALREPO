@@ -13,7 +13,6 @@ export default async function SignupPage({
   const user = await getSessionUser();
   if (user) redirect("/creators");
   const { error } = await searchParams;
-  const codeRequired = !!process.env.SIGNUP_CODE;
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -52,12 +51,11 @@ export default async function SignupPage({
             />
             <p className="mt-1 text-xs text-faint">At least 8 characters.</p>
           </div>
-          {codeRequired && (
-            <div>
-              <label htmlFor="code">Invite code</label>
-              <input id="code" name="code" type="text" required className="mt-1" />
-            </div>
-          )}
+          <div>
+            <label htmlFor="code">Invite code</label>
+            <input id="code" name="code" type="text" required className="mt-1" />
+            <p className="mt-1 text-xs text-faint">Ask your team for the invite code.</p>
+          </div>
           <button type="submit" className="btn btn-primary w-full">
             Create Account
           </button>
