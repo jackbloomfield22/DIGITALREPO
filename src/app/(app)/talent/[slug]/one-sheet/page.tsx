@@ -46,7 +46,7 @@ export default async function OneSheetPage({
   return (
     <div className="mx-auto max-w-2xl bg-white print:max-w-none">
       <div className="no-print mb-4 flex items-center justify-between">
-        <Link href={`/creators/${creator.slug}`} className="text-sm text-muted hover:text-accent">
+        <Link href={`/talent/${creator.slug}`} className="text-sm text-muted hover:text-accent">
           ← Back to profile
         </Link>
         <PrintButton />

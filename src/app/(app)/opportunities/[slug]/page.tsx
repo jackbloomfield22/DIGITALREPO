@@ -145,11 +145,11 @@ export default async function OpportunityPage({
             )}
           </Section>
 
-          <Section title="Creators Under Consideration">
+          <Section title="Talent Under Consideration">
             <div className="space-y-2">
               {opp.creators.map((oc) => (
                 <div key={oc.id} className="card flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                  <Link href={`/creators/${oc.creator.slug}`} className="flex min-w-0 items-center gap-2.5 hover:text-accent-deep">
+                  <Link href={`/talent/${oc.creator.slug}`} className="flex min-w-0 items-center gap-2.5 hover:text-accent-deep">
                     <Portrait name={oc.creator.name} imageUrl={oc.creator.imageUrl} className="h-8 w-8 shrink-0 rounded" textClass="text-[11px]" />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{oc.creator.name}</span>
@@ -180,9 +180,9 @@ export default async function OpportunityPage({
                   lookupType: "creator",
                   roleField: "status",
                   roleOptions: CANDIDATE_STATUSES,
-                  buttonLabel: "+ Add Creator",
+                  buttonLabel: "+ Add Talent",
                 }}
-                emptyMessage={opp.creators.length ? "" : "No creators under consideration yet."}
+                emptyMessage={opp.creators.length ? "" : "No talent under consideration yet."}
               />
             </div>
           </Section>
@@ -193,7 +193,7 @@ export default async function OpportunityPage({
                 {matches.map((m) => (
                   <div key={m.creator.id} className="card p-3">
                     <div className="flex items-start justify-between gap-2">
-                      <Link href={`/creators/${m.creator.slug}`} className="flex min-w-0 items-center gap-2 hover:text-accent-deep">
+                      <Link href={`/talent/${m.creator.slug}`} className="flex min-w-0 items-center gap-2 hover:text-accent-deep">
                         <Portrait name={m.creator.name} imageUrl={m.creator.imageUrl} className="h-9 w-9 shrink-0 rounded" textClass="text-xs" />
                         <span className="min-w-0">
                           <span className="block truncate font-semibold">{m.creator.name}</span>

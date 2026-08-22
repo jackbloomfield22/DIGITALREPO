@@ -5,17 +5,17 @@ import {
   parseCreatorFilters,
   queryCreators,
   resolveFilterLabels,
-} from "@/lib/queries/creators";
+} from "@/lib/queries/talent";
 import { toCreatorCardVM } from "@/lib/creator-vm";
 import {
   CreatorDirectoryControls,
   type ActiveChip,
-} from "@/components/creators/directory-controls";
-import { CreatorCardGrid, CreatorTable } from "@/components/creators/creator-views";
+} from "@/components/talent/directory-controls";
+import { CreatorCardGrid, CreatorTable } from "@/components/talent/creator-views";
 import { labelFor } from "@/lib/taxonomy";
 import { compactNumber } from "@/lib/format";
 
-export const metadata = { title: "Creators" };
+export const metadata = { title: "Talent" };
 
 export default async function CreatorsPage({
   searchParams,
@@ -76,7 +76,7 @@ export default async function CreatorsPage({
     }
     if (page > 1) p.set("page", String(page));
     const qs = p.toString();
-    return `/creators${qs ? `?${qs}` : ""}`;
+    return `/talent${qs ? `?${qs}` : ""}`;
   };
 
   return (
@@ -85,11 +85,11 @@ export default async function CreatorsPage({
 
       {vms.length === 0 ? (
         <div className="rounded-md border border-dashed border-line-strong bg-wash/50 px-6 py-10 text-center text-sm text-muted">
-          No creators match these filters.
+          No talent matches these filters.
           {canEdit && (
             <div className="mt-3">
-              <Link href="/creators/new" className="btn btn-secondary btn-sm">
-                + Add Creator
+              <Link href="/talent/new" className="btn btn-secondary btn-sm">
+                + Add Talent
               </Link>
             </div>
           )}

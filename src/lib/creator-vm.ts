@@ -1,5 +1,5 @@
-import type { CreatorCardData } from "@/lib/queries/creators";
-import type { CreatorCardVM } from "@/components/creators/types";
+import type { CreatorCardData } from "@/lib/queries/talent";
+import type { CreatorCardVM } from "@/components/talent/types";
 import { compactNumber, relativeTime, totalAudience } from "@/lib/format";
 import { socialLabel } from "@/lib/taxonomy";
 

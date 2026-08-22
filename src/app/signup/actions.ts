@@ -48,7 +48,7 @@ export async function signup(formData: FormData) {
     );
   }
 
-  // Everyone shares the one Digital Bible; new members join as editors so they
+  // Everyone shares the one shared Repo; new members join as editors so they
   // can contribute immediately. Admins can adjust roles under /admin.
   const user = await db.user.create({
     data: {
@@ -71,5 +71,5 @@ export async function signup(formData: FormData) {
   });
 
   await createSession(user.id);
-  redirect("/creators");
+  redirect("/talent");
 }

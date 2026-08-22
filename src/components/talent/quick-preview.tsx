@@ -29,7 +29,7 @@ export function QuickPreviewDrawer({
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
-    fetch(`/api/creators/${slug}`)
+    fetch(`/api/talent/${slug}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!cancelled) setData(d);
@@ -144,7 +144,7 @@ export function QuickPreviewDrawer({
             </div>
           )}
 
-          <Link href={`/creators/${data.slug}`} className="btn btn-primary w-full">
+          <Link href={`/talent/${data.slug}`} className="btn btn-primary w-full">
             Open Full Profile
           </Link>
         </div>

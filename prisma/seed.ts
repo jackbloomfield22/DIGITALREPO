@@ -6,6 +6,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { slugify } from "../src/lib/slug";
+import { SPORTS_CALENDAR } from "../src/lib/sports-calendar-data";
 
 const db = new PrismaClient();
 
@@ -47,7 +48,7 @@ async function main() {
     ["interest", ["Fashion", "Entrepreneurship", "Cooking", "Travel", "Gaming", "Tech", "Survival", "Wildlife", "Fitness", "Wellness", "Music", "Beauty", "Cars", "Pop Culture", "True Crime", "Comedy", "BBQ", "Sustainability", "Grilling", "Aviation", "Food", "Magic", "Photography", "Ocean Conservation", "Sneakers", "Startups", "Country Music", "Investing"]],
     ["hobby", ["DIY", "Vintage Cars", "Chess", "Hiking", "Thrifting"]],
     ["location", ["Los Angeles", "New York", "Atlanta", "Austin", "Denver", "Miami", "Nashville", "Las Vegas", "Houston", "Portland", "Dallas", "San Diego", "Scottsdale", "Chicago"]],
-    ["creator_category", ["Athlete", "Retired Athlete", "Host", "Podcaster", "YouTuber", "Streamer", "Chef", "Comedian", "Influencer", "Entrepreneur", "Reality Personality", "Musician", "Media Personality", "Entertainer", "Journalist"]],
+    ["creator_category", ["Creator", "Athlete", "Retired Athlete", "Host", "Podcaster", "YouTuber", "Streamer", "Chef", "Comedian", "Influencer", "Entrepreneur", "Reality Personality", "Musician", "Media Personality", "Entertainer", "Journalist", "Actor"]],
     ["vertical", ["Sports", "Food", "Comedy", "Travel", "Business", "Outdoors", "Gaming", "Music", "Fashion", "Wellness", "Aviation", "Culture"]],
     ["genre", ["Competition", "Documentary", "Reality", "Talk", "Adventure", "Lifestyle"]],
     ["audience_type", ["Gen Z", "Millennial", "Sports Fans", "Foodies", "Families"]],
@@ -1119,6 +1120,33 @@ async function main() {
         { userId: admin.id, userName: "Jordan Avery", targetType: "format", targetId: F[slugify("Athlete Boardroom")].id, targetLabel: "Athlete Boardroom", action: "updated", field: "status", oldValue: "developing", newValue: "pitched" },
       ],
     });
+  }
+
+  // --- Sports calendar -------------------------------------------------------
+  const eventCount = await db.sportsEvent.count();
+  if (eventCount === 0) {
+    for (const def of SPORTS_CALENDAR) {
+      const sportSlug = slugify(def.sport);
+      const sport = await db.entity.upsert({
+        where: { kind_slug: { kind: "sport", slug: sportSlug } },
+        update: {},
+        create: { kind: "sport", slug: sportSlug, name: def.sport },
+      });
+      await db.sportsEvent.create({
+        data: {
+          slug: slugify(`${def.title} ${def.start.slice(0, 4)}`),
+          title: def.title,
+          league: def.league ?? null,
+          sportId: sport.id,
+          startDate: new Date(def.start),
+          endDate: def.end ? new Date(def.end) : null,
+          location: def.location ?? null,
+          notes: def.notes ?? null,
+          approximate: !!def.approximate,
+        },
+      });
+    }
+    console.log(`Seeded ${SPORTS_CALENDAR.length} sports calendar events.`);
   }
 
   console.log("Seed complete.");

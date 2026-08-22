@@ -111,8 +111,8 @@ export default async function ProjectsPage({
         filters={[
           { param: "type", label: "Project Type", kind: "select", options: PROJECT_TYPES },
           { param: "status", label: "Status", kind: "select", options: PROJECT_STATUSES },
-          { param: "creator", label: "Creator", kind: "lookup", lookupType: "creator" },
-          { param: "role", label: "Creator Role", kind: "select", options: PROJECT_ROLES },
+          { param: "creator", label: "Talent", kind: "lookup", lookupType: "creator" },
+          { param: "role", label: "Talent Role", kind: "select", options: PROJECT_ROLES },
           { param: "org", label: "Company / Network / Brand", kind: "lookup", lookupType: "organization" },
           { param: "entity", label: "Genre / Topic", kind: "lookup", lookupType: "entity" },
         ]}

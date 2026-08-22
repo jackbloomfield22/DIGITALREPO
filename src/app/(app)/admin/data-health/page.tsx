@@ -60,21 +60,21 @@ export default async function DataHealthPage() {
       <Section title="Needs Review (not verified in 180+ days)">
         <div className="flex flex-wrap gap-1.5">
           {health.staleCreators.map((c) => (
-            <Link key={c.id} href={`/creators/${c.slug}`} className="chip">
+            <Link key={c.id} href={`/talent/${c.slug}`} className="chip">
               {c.name}
               <span className="text-xs text-faint">
                 {c.lastVerifiedAt ? relativeTime(c.lastVerifiedAt) : "never verified"}
               </span>
             </Link>
           ))}
-          {health.staleCreators.length === 0 && <span className="text-sm text-faint">All creators recently verified.</span>}
+          {health.staleCreators.length === 0 && <span className="text-sm text-faint">All talent recently verified.</span>}
         </div>
       </Section>
 
       <Section title="Stale Social Counts (120+ days)">
         <div className="flex flex-wrap gap-1.5">
           {health.staleSocials.map((s) => (
-            <Link key={s.id} href={`/creators/${s.creator.slug}`} className="chip">
+            <Link key={s.id} href={`/talent/${s.creator.slug}`} className="chip">
               {s.creator.name}
               <span className="text-xs text-faint">{s.platform}</span>
             </Link>
@@ -83,9 +83,9 @@ export default async function DataHealthPage() {
         </div>
       </Section>
 
-      <Section title="Creators Without Interests">{list(health.noInterests, "/creators")}</Section>
-      <Section title="Creators Without Projects">{list(health.noProjects, "/creators")}</Section>
-      <Section title="Creators Without Sources">{list(health.noSources, "/creators")}</Section>
+      <Section title="Talent Without Interests">{list(health.noInterests, "/talent")}</Section>
+      <Section title="Talent Without Projects">{list(health.noProjects, "/talent")}</Section>
+      <Section title="Talent Without Sources">{list(health.noSources, "/talent")}</Section>
       <Section title="Orphaned Projects (no talent, no organizations)">
         {list(health.orphanProjects, "/projects")}
       </Section>

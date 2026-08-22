@@ -27,7 +27,7 @@ export default async function AdminPage() {
       <Section title="Database">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            ["Creators", creators],
+            ["Talent", creators],
             ["Projects", projects],
             ["Organizations", orgs],
             ["Formats", formats],

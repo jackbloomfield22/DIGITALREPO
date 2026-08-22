@@ -8,7 +8,7 @@ import {
   updateSocialProfiles,
   findSimilarCreators,
   type CreatorScalarInput,
-} from "@/lib/actions/creators";
+} from "@/lib/actions/talent";
 import { CREATOR_STATUSES, SOCIAL_PLATFORMS } from "@/lib/taxonomy";
 import { createEntityInline } from "@/lib/actions/create-inline";
 import { useToast } from "@/components/toast";
@@ -264,9 +264,9 @@ export function CreatorForm({ initial }: { initial?: CreatorFormInitial }) {
         toast(socialRes.error, { tone: "error" });
         return;
       }
-      toast("Creator updated");
+      toast("Talent profile updated");
       setDirty(false);
-      router.push(`/creators/${res.slug}`);
+      router.push(`/talent/${res.slug}`);
       router.refresh();
     } else {
       const entityIds = [
@@ -283,7 +283,7 @@ export function CreatorForm({ initial }: { initial?: CreatorFormInitial }) {
       }
       toast(`Created ${scalars.name}`);
       setDirty(false);
-      router.push(`/creators/${res.slug}`);
+      router.push(`/talent/${res.slug}`);
       router.refresh();
     }
   }, [name, imageUrl, headline, status, age, birthday, miniBio, digitalSummary, opportunityNotes, internalNotes, aliases, socials, categories, location, interests, sports, isEdit, initial, router, toast]);
@@ -321,7 +321,7 @@ export function CreatorForm({ initial }: { initial?: CreatorFormInitial }) {
     <div className="mx-auto max-w-3xl pb-24">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold tracking-tight">
-          {isEdit ? `Editing ${initial!.scalars.name}` : "New Creator"}
+          {isEdit ? `Editing ${initial!.scalars.name}` : "New Talent"}
         </h1>
         {dirty && <span className="text-sm font-medium text-warn">Unsaved changes</span>}
       </div>
@@ -380,7 +380,7 @@ export function CreatorForm({ initial }: { initial?: CreatorFormInitial }) {
                     {duplicates.map((d, i) => (
                       <span key={d.slug}>
                         {i > 0 && ", "}
-                        <Link className="font-semibold underline" href={`/creators/${d.slug}`}>
+                        <Link className="font-semibold underline" href={`/talent/${d.slug}`}>
                           {d.name}
                         </Link>
                       </span>
@@ -590,13 +590,13 @@ export function CreatorForm({ initial }: { initial?: CreatorFormInitial }) {
               onClick={() => {
                 if (dirty && !window.confirm("Discard unsaved changes?")) return;
                 setDirty(false);
-                router.push(isEdit ? `/creators/${initial!.slug}` : "/creators");
+                router.push(isEdit ? `/talent/${initial!.slug}` : "/talent");
               }}
             >
               Cancel
             </button>
             <button type="button" className="btn btn-primary" disabled={saving || (!dirty && isEdit)} onClick={save}>
-              {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Creator"}
+              {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Talent"}
             </button>
           </div>
         </div>

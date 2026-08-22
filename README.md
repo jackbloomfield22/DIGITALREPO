@@ -1,6 +1,6 @@
-# 4.4.FORTY DIGITAL BIBLE
+# 4.4.FORTY REPO
 
-The living intelligence system for 4.4.Forty Media: creators, digital talent, existing
+The one-stop information repository for 4.4.Forty Media: talent, existing
 projects, companies, formats, relationships, interests, opportunities, and institutional
 knowledge — deeply interconnected so that nearly every useful piece of information leads
 naturally to another discovery.
@@ -54,7 +54,7 @@ discover.
 | `SIGNUP_CODE`       | no       | Overrides the built-in invite code required at `/signup`        |
 
 Team members create their own accounts at `/signup` with the team invite code (new members
-join as editors; admins can adjust roles under Admin → Users). Everyone shares the one Digital Bible, and every change
+join as editors; admins can adjust roles under Admin → Users). Everyone shares the one Repo, and every change
 is attributed to the account that made it in the audit history and Activity feed.
 
 On Vercel, the build (`scripts/vercel-build.mjs`) auto-detects the database connection
@@ -81,9 +81,9 @@ migrations, and seeds a fresh database automatically.
 
 ### The object model
 
-Seven first-class objects, all relational, all clickable in both directions:
+Eight first-class sections, all relational, all clickable in both directions:
 
-- **Creators** — athletes, hosts, chefs, streamers, comedians, entrepreneurs… a person can
+- **Talent** — athletes, hosts, chefs, streamers, comedians, entrepreneurs… a person can
   hold multiple categories. Only a name is required to create one; profiles enrich gradually.
 - **Projects** — *real existing productions* (series, podcasts, docs, competition shows).
   Creator↔Project links always carry **roles** (Host, EP, Contestant, Subject…), which power
@@ -99,6 +99,9 @@ Seven first-class objects, all relational, all clickable in both directions:
 - **Opportunities** — brand briefs, casting needs, development targets. Criteria are taxonomy
   entities, so the system suggests matching creators deterministically **with explained
   reasons**, never mystery percentages.
+- **Sports Calendar** — upcoming US professional and major world sports events,
+  month-by-month, filterable by sport, fully editable, with a curated standard calendar
+  one click away.
 - **Collections & Saved Views** — hand-picked static lists vs. live filters that update as
   the database changes; both clearly labeled.
 
@@ -109,12 +112,12 @@ status, years, confidence, source).
 
 ### The experience
 
-- **Creator directory is the homepage** — premium image cards (with rich hover
+- **Talent directory is the homepage** — premium image cards (with rich hover
   intelligence + quick actions) or a dense, column-customizable table with bulk actions
   (add to collection, tag, status, CSV export, archive). Filters combine (interest AND
   location AND "has hosted") and live in the URL, so Back always restores your filters,
   sort, view, and position.
-- **Creator profiles are dossiers** — bio, digital notes, socials with per-count freshness,
+- **Talent profiles are dossiers** — bio, digital notes, socials with per-count freshness,
   interests/sports as clickable chips, projects with roles, formats, business & investments,
   brand relationships, collaborators, representation, sources, attachments, opportunity
   notes, version history — plus a right rail with derived experience, opportunity
@@ -207,7 +210,7 @@ prisma/schema.prisma        # the knowledge-graph schema (start here)
 prisma/seed.ts              # fictional demo world
 src/lib/taxonomy.ts         # every controlled vocabulary (roles, statuses, kinds)
 src/lib/actions/            # all mutations (server actions, role-gated, audited)
-src/lib/queries/creators.ts # directory filter/sort engine
+src/lib/queries/talent.ts # directory filter/sort engine
 src/lib/related.ts          # explainable related-record scoring
 src/lib/ai/                 # AI tools, agent loop, research-inbox parsing
 src/app/(app)/              # all authenticated pages
@@ -217,7 +220,7 @@ tests/core.test.ts          # the core product guarantees
 
 ## Testing
 
-`npm test` covers the product's core guarantees: name-only creator creation, canonical
+`npm test` covers the product's core guarantees: name-only talent creation, canonical
 (non-duplicating) interests, bidirectional creator↔format and creator↔project-role links,
 project↔organization symmetry, derived hosting experience, combined AND filtering,
 duplicate suggestion scoring, entity merges preserving relationships, dynamic saved views,
@@ -226,7 +229,7 @@ surface, schema-validated inputs, clamped result sizes).
 
 ## Backups
 
-The entire Digital Bible — users, creators, every relationship, notes, sources, and
+The entire Repo — users, creators, every relationship, notes, sources, and
 history — is snapshotted automatically **every day** (Vercel Cron → `/api/cron/backup`;
 the newest 14 daily snapshots are kept). Admins can also take and download backups any
 time under **Admin → Backups**; manual backups are kept until deleted. A downloaded

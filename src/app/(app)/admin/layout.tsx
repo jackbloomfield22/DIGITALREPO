@@ -4,7 +4,7 @@ import { requireUser, hasRole } from "@/lib/auth";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  if (!hasRole(user, "ADMIN")) redirect("/creators");
+  if (!hasRole(user, "ADMIN")) redirect("/talent");
   return (
     <div>
       <nav className="mb-6 flex flex-wrap gap-1.5 border-b border-line pb-3 text-sm" aria-label="Admin">

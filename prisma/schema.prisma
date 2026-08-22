@@ -261,6 +261,7 @@ model Entity {
   formatLinks      FormatEntityLink[]
   projectLinks     ProjectEntityLink[]
   opportunityLinks OpportunityEntityLink[]
+  sportsEvents     SportsEvent[]
 
   @@unique([kind, slug])
   @@index([name])
@@ -669,6 +670,28 @@ model AiMessage {
   thread AiThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([threadId])
+}
+
+// Upcoming sports calendar: US professional and major world sports events.
+// Curated + fully editable; optionally linked to a sport taxonomy entity so
+// events connect into the knowledge graph.
+model SportsEvent {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  league      String? // NFL, NBA, FIFA, F1, ...
+  sportId     String?
+  startDate   DateTime
+  endDate     DateTime?
+  location    String?
+  notes       String?
+  approximate Boolean   @default(false) // dates not yet officially fixed
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sport Entity? @relation(fields: [sportId], references: [id], onDelete: SetNull)
+
+  @@index([startDate])
 }
 
 // Full-database snapshot: every table serialized to JSON. Written by the

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 
 // Full-database backup engine. A backup captures every table — users,
 // creators, all relationships, notes, sources, audit history, AI threads —
-// so the complete state of the Digital Bible can be restored or kept offline.
+// so the complete state of the Repo can be restored or kept offline.
 //
 // TABLE_ORDER is parent-before-child (safe insert order for restore);
 // restores delete in reverse. scripts/restore-backup.mjs consumes this
@@ -16,6 +16,7 @@ export const BACKUP_VERSION = 1;
 export const TABLE_ORDER = [
   "user",
   "entity",
+  "sportsEvent",
   "creator",
   "socialProfile",
   "socialSnapshot",

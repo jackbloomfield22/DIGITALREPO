@@ -143,7 +143,7 @@ export function CreatorDirectoryControls({
             ["rep", "Representative"],
             ["format", "Format"],
             ["platform", "Social Platform & Reach"],
-            ["status", "Creator Status"],
+            ["status", "Talent Status"],
           ].map(([key, filterLabel]) => (
             <button
               key={key}
@@ -287,12 +287,12 @@ export function CreatorDirectoryControls({
     <div className="mb-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
-          <h1 className="font-display text-3xl font-bold tracking-tight">CREATORS</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">TALENT</h1>
           <span className="text-sm text-muted">{total}</span>
         </div>
         {canEdit && (
-          <Link href="/creators/new" className="btn btn-accent">
-            + Add Creator
+          <Link href="/talent/new" className="btn btn-accent">
+            + Add Talent
           </Link>
         )}
       </div>
@@ -301,10 +301,10 @@ export function CreatorDirectoryControls({
         <div className="w-full max-w-xs">
           <input
             type="search"
-            placeholder="Search creators…"
+            placeholder="Search talent…"
             value={q}
             onChange={(e) => onSearch(e.target.value)}
-            aria-label="Search creators"
+            aria-label="Search talent"
           />
         </div>
 

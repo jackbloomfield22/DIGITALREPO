@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Drawer } from "@/components/overlay";
 import { LinkChips } from "@/components/link-editor";
-import { updateCreator, updateSocialProfiles } from "@/lib/actions/creators";
+import { updateCreator, updateSocialProfiles } from "@/lib/actions/talent";
 import { CREATOR_STATUSES } from "@/lib/taxonomy";
 import { useToast } from "@/components/toast";
 import type { CreatorDetailVM } from "./types";
@@ -43,7 +43,7 @@ export function QuickEditDrawer({
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
-    fetch(`/api/creators/${slug}`)
+    fetch(`/api/talent/${slug}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d: CreatorDetailVM | null) => {
         if (cancelled || !d) return;
@@ -102,7 +102,7 @@ export function QuickEditDrawer({
     }
     setSaving(false);
     if (ok) {
-      toast("Creator updated");
+      toast("Talent profile updated");
       setDirty(false);
       onClose();
       router.refresh();
@@ -248,7 +248,7 @@ export function QuickEditDrawer({
 
           <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
             <Link
-              href={`/creators/${data.slug}/edit`}
+              href={`/talent/${data.slug}/edit`}
               className="text-sm text-muted underline underline-offset-2 hover:text-accent"
             >
               Open Full Editor

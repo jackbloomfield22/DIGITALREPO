@@ -11,16 +11,16 @@ export type ChatMessage = {
 };
 
 const EXAMPLES = [
-  "Which creators are interested in soccer?",
+  "Who on our talent roster is interested in soccer?",
   "Who has worked with Ironbark Pictures?",
   "Which athletes have hosting experience?",
-  "Find LA creators who have hosted competition shows.",
-  "Which creators are represented by the same agents?",
-  "Find entrepreneurship creators who haven't been attached to a format yet.",
+  "Find LA talent who have hosted competition shows.",
+  "Which talent are represented by the same agents?",
+  "Find entrepreneurship talent not yet attached to a format.",
 ];
 
 const TYPE_LABEL: Record<string, string> = {
-  creator: "Creator",
+  creator: "Talent",
   project: "Project",
   organization: "Organization",
   format: "Format",
@@ -100,7 +100,7 @@ export function AiChat({
       <div className="flex min-h-[70vh] flex-col">
         <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">AI SEARCH</h1>
         <p className="mb-6 text-sm text-muted">
-          Ask the Digital Bible anything — answers come from the database itself, with links back
+          Ask the Repo anything — answers come from the database itself, with links back
           into it.
           {!available && (
             <span className="ml-1 rounded bg-[#f5efdd] px-1.5 py-0.5 text-xs font-medium text-warn">
@@ -158,7 +158,7 @@ export function AiChat({
           {busy && (
             <div className="flex items-center gap-2 text-sm text-muted">
               <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />
-              Searching the Digital Bible…
+              Searching the Repo…
             </div>
           )}
           <div ref={bottomRef} />
@@ -173,10 +173,10 @@ export function AiChat({
         >
           <input
             type="text"
-            placeholder="Ask the Digital Bible anything…"
+            placeholder="Ask the Repo anything…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            aria-label="Ask the Digital Bible"
+            aria-label="Ask the Repo"
             className="shadow-card"
           />
           <button type="submit" className="btn btn-primary" disabled={busy || !input.trim()}>

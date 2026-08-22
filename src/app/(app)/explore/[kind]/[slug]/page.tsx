@@ -90,12 +90,12 @@ export default async function EntityPage({
         <div className="overline">{ENTITY_KIND_LABELS[entity.kind as EntityKind] ?? labelFor(entity.kind)}</div>
         <h1 className="mt-1 font-display text-3xl font-bold uppercase tracking-tight sm:text-4xl">{entity.name}</h1>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-          <span><strong className="text-ink">{uniqueCreators.length}</strong> Creators</span>
+          <span><strong className="text-ink">{uniqueCreators.length}</strong> Talent</span>
           <span><strong className="text-ink">{projects.length}</strong> Projects</span>
           <span><strong className="text-ink">{formats.length}</strong> Formats</span>
         </div>
         {uniqueCreators.length > 0 && (
-          <Link href={`/creators?entity=${entity.id}`} className="btn btn-secondary btn-sm mt-3">
+          <Link href={`/talent?entity=${entity.id}`} className="btn btn-secondary btn-sm mt-3">
             Open in Creator Directory →
           </Link>
         )}
@@ -103,10 +103,10 @@ export default async function EntityPage({
 
       <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0">
-          <Section title="Creators">
+          <Section title="Talent">
             <div className="grid gap-2 sm:grid-cols-2">
               {uniqueCreators.map((c) => (
-                <Link key={c.id} href={`/creators/${c.slug}`} className="card flex items-center gap-3 p-3 transition-shadow hover:shadow-pop">
+                <Link key={c.id} href={`/talent/${c.slug}`} className="card flex items-center gap-3 p-3 transition-shadow hover:shadow-pop">
                   <Portrait name={c.name} imageUrl={c.imageUrl} className="h-10 w-10 shrink-0 rounded" textClass="text-xs" />
                   <div className="min-w-0">
                     <div className="truncate font-semibold">{c.name}</div>
@@ -117,7 +117,7 @@ export default async function EntityPage({
                   </div>
                 </Link>
               ))}
-              {uniqueCreators.length === 0 && <p className="text-sm text-faint">No creators linked yet.</p>}
+              {uniqueCreators.length === 0 && <p className="text-sm text-faint">No talent linked yet.</p>}
             </div>
           </Section>
 

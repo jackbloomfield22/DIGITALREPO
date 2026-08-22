@@ -63,7 +63,7 @@ export function CsvImport() {
     <div className="max-w-3xl">
       <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">CSV IMPORT</h1>
       <p className="mb-6 text-sm text-muted">
-        Bulk-import creators. Only <code>name</code> is required; multi-value columns
+        Bulk-import talent. Only <code>name</code> is required; multi-value columns
         (categories, interests, sports) use <code>;</code> separators. Duplicate names are
         skipped automatically.
       </p>
@@ -76,7 +76,7 @@ export function CsvImport() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "creator-import-template.csv";
+            a.download = "talent-import-template.csv";
             a.click();
             URL.revokeObjectURL(url);
           }}
@@ -140,12 +140,12 @@ export function CsvImport() {
                 setBusy(false);
                 if (res.ok) {
                   setResult({ imported: res.imported ?? 0, skipped: res.skipped ?? [] });
-                  toast(`Imported ${res.imported} creators`);
+                  toast(`Imported ${res.imported} talent profiles`);
                   router.refresh();
                 } else toast(res.error ?? "Import failed", { tone: "error" });
               }}
             >
-              {busy ? "Importing…" : `Import ${valid.length} Creators`}
+              {busy ? "Importing…" : `Import ${valid.length} Talent Profiles`}
             </button>
             <button className="btn btn-ghost" onClick={() => setRows([])}>Cancel</button>
           </div>

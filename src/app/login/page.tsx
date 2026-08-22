@@ -11,7 +11,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const user = await getSessionUser();
-  if (user) redirect("/creators");
+  if (user) redirect("/talent");
   const { error } = await searchParams;
 
   return (
@@ -21,7 +21,7 @@ export default async function LoginPage({
           <div className="font-display text-3xl font-bold tracking-tight">
             4.4.FORTY
           </div>
-          <div className="overline mt-2">Digital Bible</div>
+          <div className="overline mt-2">The Repo</div>
         </div>
         <form action={login} className="card space-y-4 p-6">
           {error && (

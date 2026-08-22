@@ -45,7 +45,7 @@ const creatorSummary = async (
   }[],
 ) =>
   creators.map((c) => {
-    registry.add({ type: "creator", id: c.id, name: c.name, slug: c.slug, href: `/creators/${c.slug}`, sub: c.headline ?? undefined });
+    registry.add({ type: "creator", id: c.id, name: c.name, slug: c.slug, href: `/talent/${c.slug}`, sub: c.headline ?? undefined });
     const kind = (k: string) => c.entityLinks.filter((l) => l.entity.kind === k).map((l) => l.entity.name);
     return {
       name: c.name,
@@ -178,7 +178,7 @@ export const AI_TOOLS: ToolDef[] = [
         },
       });
       if (!creator) return { error: `No creator matching "${input.name}" in the database.` };
-      registry.add({ type: "creator", id: creator.id, name: creator.name, slug: creator.slug, href: `/creators/${creator.slug}` });
+      registry.add({ type: "creator", id: creator.id, name: creator.name, slug: creator.slug, href: `/talent/${creator.slug}` });
       for (const c of creator.credits) registry.add({ type: "project", id: c.project.id, name: c.project.title, slug: c.project.slug, href: `/projects/${c.project.slug}` });
       for (const f of creator.formats) registry.add({ type: "format", id: f.format.id, name: f.format.title, slug: f.format.slug, href: `/formats/${f.format.slug}` });
       for (const o of creator.organizations) registry.add({ type: "organization", id: o.organization.id, name: o.organization.name, slug: o.organization.slug, href: `/organizations/${o.organization.slug}` });
@@ -350,7 +350,7 @@ export const AI_TOOLS: ToolDef[] = [
         where: { project: { organizations: { some: { organizationId: org.id } } } },
         include: { creator: { select: { id: true, name: true, slug: true } }, project: { select: { title: true } } },
       });
-      for (const t of viaProjects) registry.add({ type: "creator", id: t.creator.id, name: t.creator.name, slug: t.creator.slug, href: `/creators/${t.creator.slug}` });
+      for (const t of viaProjects) registry.add({ type: "creator", id: t.creator.id, name: t.creator.name, slug: t.creator.slug, href: `/talent/${t.creator.slug}` });
       return {
         name: org.name,
         types: org.types,
@@ -474,8 +474,8 @@ export const AI_TOOLS: ToolDef[] = [
         });
       const [a, b] = await Promise.all([load(input.creatorA), load(input.creatorB)]);
       if (!a || !b) return { error: `Could not find ${!a ? input.creatorA : input.creatorB} in the database.` };
-      registry.add({ type: "creator", id: a.id, name: a.name, slug: a.slug, href: `/creators/${a.slug}` });
-      registry.add({ type: "creator", id: b.id, name: b.name, slug: b.slug, href: `/creators/${b.slug}` });
+      registry.add({ type: "creator", id: a.id, name: a.name, slug: a.slug, href: `/talent/${a.slug}` });
+      registry.add({ type: "creator", id: b.id, name: b.name, slug: b.slug, href: `/talent/${b.slug}` });
       const intersect = <T, K>(xs: T[], ys: T[], key: (x: T) => K, label: (x: T) => string) => {
         const setB = new Set(ys.map(key));
         return [...new Set(xs.filter((x) => setB.has(key(x))).map(label))];
@@ -508,7 +508,7 @@ export const AI_TOOLS: ToolDef[] = [
       });
       if (!creator) return { error: `No creator matching "${input.name}".` };
       const related = await findRelatedCreators(creator.id, 8);
-      for (const r of related) registry.add({ type: "creator", id: r.id, name: r.name, slug: r.slug, href: `/creators/${r.slug}` });
+      for (const r of related) registry.add({ type: "creator", id: r.id, name: r.name, slug: r.slug, href: `/talent/${r.slug}` });
       return related.map((r) => ({ name: r.name, reasons: r.reasons }));
     },
   ),
