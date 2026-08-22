@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// The default logged-in experience is the creator roster.
+// The default logged-in experience is the talent roster.
 export default function Home() {
-  redirect("/creators");
+  redirect("/talent");
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { markVerified } from "@/lib/actions/creators";
+import { markVerified } from "@/lib/actions/talent";
 import { useToast } from "@/components/toast";
 
 export function VerifyButton({ creatorId }: { creatorId: string }) {

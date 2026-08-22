@@ -13,7 +13,7 @@ import type { Proposal, ProposalOp } from "@/lib/ai/inbox";
 
 function opLabel(op: ProposalOp): string {
   switch (op.op) {
-    case "create_creator": return `Create creator “${op.name}” (or use existing)`;
+    case "create_creator": return `Create talent “${op.name}” (or use existing)`;
     case "create_project": return `Create project “${op.title}”${op.projectType ? ` (${op.projectType.replace(/_/g, " ")})` : ""}`;
     case "create_organization": return `Create organization “${op.name}”${op.orgType ? ` (${op.orgType.replace(/_/g, " ")})` : ""}`;
     case "create_entity": return `Create ${op.kind.replace(/_/g, " ")} “${op.name}”`;
@@ -59,7 +59,7 @@ export function InboxClient({
     <div className="max-w-3xl">
       <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">RESEARCH INBOX</h1>
       <p className="mb-6 text-sm text-muted">
-        Paste anything you learn — an announcement, a paragraph from a call, a whole creator
+        Paste anything you learn — an announcement, a paragraph from a call, a whole talent
         one-sheet. {available ? "AI turns it into proposed database changes you review before anything is saved." : "AI parsing is not configured, but notes are kept here for manual entry."}
       </p>
 

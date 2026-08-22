@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const PRIMARY = [
-  { href: "/creators", label: "Creators" },
+  { href: "/talent", label: "Talent" },
   { href: "/formats", label: "Formats" },
   { href: "/projects", label: "Projects" },
   { href: "/opportunities", label: "Opportunities" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/explore", label: "Explore" },
   { href: "/ai", label: "AI Search" },
 ];
@@ -22,7 +23,7 @@ const SECONDARY = [
 ];
 
 const CREATE_ITEMS = [
-  { href: "/creators/new", label: "New Creator" },
+  { href: "/talent/new", label: "New Talent" },
   { href: "/formats/new", label: "New Format" },
   { href: "/projects/new", label: "New Project" },
   { href: "/opportunities/new", label: "New Opportunity" },
@@ -65,11 +66,11 @@ function NavLinks({
 
   return (
     <div className="flex h-full flex-col">
-      <Link href="/creators" onClick={onNavigate} className="block px-3 pb-5 pt-4">
+      <Link href="/talent" onClick={onNavigate} className="block px-3 pb-5 pt-4">
         <div className="font-display text-lg font-bold leading-none tracking-tight">
           4.4.FORTY
         </div>
-        <div className="overline mt-1">Digital Bible</div>
+        <div className="overline mt-1">The Repo</div>
       </Link>
 
       {isEditor && (
@@ -170,8 +171,8 @@ export function Sidebar(props: {
         >
           ☰
         </button>
-        <Link href="/creators" className="font-display text-sm font-bold">
-          4.4.FORTY DIGITAL BIBLE
+        <Link href="/talent" className="font-display text-sm font-bold">
+          4.4.FORTY REPO
         </Link>
         <button
           aria-label="Search"

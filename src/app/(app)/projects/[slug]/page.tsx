@@ -151,7 +151,7 @@ export default async function ProjectPage({
             <div className="space-y-2">
               {[...talentMap.values()].map(({ creator, roles }) => (
                 <div key={creator.id} className="card flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                  <Link href={`/creators/${creator.slug}`} className="flex min-w-0 items-center gap-2.5 font-semibold hover:text-accent-deep">
+                  <Link href={`/talent/${creator.slug}`} className="flex min-w-0 items-center gap-2.5 font-semibold hover:text-accent-deep">
                     <Portrait name={creator.name} imageUrl={creator.imageUrl} className="h-8 w-8 shrink-0 rounded" textClass="text-[11px]" />
                     <span className="truncate">{creator.name}</span>
                   </Link>

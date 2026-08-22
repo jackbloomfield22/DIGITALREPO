@@ -4,11 +4,11 @@ import { ToastProvider } from "@/components/toast";
 
 export const metadata: Metadata = {
   title: {
-    default: "4.4.FORTY Digital Bible",
-    template: "%s · 4.4.FORTY Digital Bible",
+    default: "4.4.FORTY Repo",
+    template: "%s · 4.4.FORTY Repo",
   },
   description:
-    "Creator and entertainment intelligence system for 4.4.Forty Media.",
+    "The 4.4.Forty Repo — one-stop information repository for 4.4.Forty Media: talent, projects, companies, formats, and opportunities.",
 };
 
 export default function RootLayout({

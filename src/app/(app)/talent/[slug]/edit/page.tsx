@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser, hasRole } from "@/lib/auth";
-import { CreatorForm } from "@/components/creators/creator-form";
+import { CreatorForm } from "@/components/talent/creator-form";
 
-export const metadata = { title: "Edit Creator" };
+export const metadata = { title: "Edit Talent" };
 
 export default async function EditCreatorPage({
   params,
@@ -12,7 +12,7 @@ export default async function EditCreatorPage({
 }) {
   const user = await requireUser();
   const { slug } = await params;
-  if (!hasRole(user, "EDITOR")) redirect(`/creators/${slug}`);
+  if (!hasRole(user, "EDITOR")) redirect(`/talent/${slug}`);
 
   const creator = await db.creator.findUnique({
     where: { slug },

@@ -38,6 +38,15 @@ export function relativeTime(d: Date | string | null | undefined): string {
   return `${Math.floor(months / 12)}y ago`;
 }
 
+/** A Date `days` in the past (helper so server components stay lint-pure). */
+export function daysAgo(days: number): Date {
+  return new Date(Date.now() - days * 86_400_000);
+}
+
+export function nowDate(): Date {
+  return new Date();
+}
+
 /** True when a verification timestamp is missing or older than `days`. */
 export function isStale(date: Date | null | undefined, days: number): boolean {
   if (!date) return true;

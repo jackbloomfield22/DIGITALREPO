@@ -82,14 +82,14 @@ export async function GET(request: Request) {
 
   const groups = [
     {
-      group: "Creators",
+      group: "Talent",
       items: creators.map((c) => ({
         label: c.name,
         sub:
           totalAudience(c.socialProfiles) > 0
             ? `${compactNumber(totalAudience(c.socialProfiles))} audience`
             : c.headline ?? undefined,
-        href: `/creators/${c.slug}`,
+        href: `/talent/${c.slug}`,
       })),
     },
     {

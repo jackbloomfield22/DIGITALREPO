@@ -12,7 +12,7 @@ import { PrismaClient } from "@prisma/client";
 
 // Keep in sync with TABLE_ORDER in src/lib/backup.ts (parent-before-child).
 const TABLE_ORDER = [
-  "user", "entity", "creator", "socialProfile", "socialSnapshot", "project",
+  "user", "entity", "sportsEvent", "creator", "socialProfile", "socialSnapshot", "project",
   "organization", "industryPerson", "format", "opportunity",
   "creatorEntityLink", "formatEntityLink", "projectEntityLink",
   "opportunityEntityLink", "creatorProjectCredit", "projectOrganization",

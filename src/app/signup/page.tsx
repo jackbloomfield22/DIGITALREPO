@@ -11,7 +11,7 @@ export default async function SignupPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const user = await getSessionUser();
-  if (user) redirect("/creators");
+  if (user) redirect("/talent");
   const { error } = await searchParams;
 
   return (
@@ -19,12 +19,12 @@ export default async function SignupPage({
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="font-display text-3xl font-bold tracking-tight">4.4.FORTY</div>
-          <div className="overline mt-2">Digital Bible</div>
+          <div className="overline mt-2">The Repo</div>
         </div>
         <form action={signup} className="card space-y-4 p-6">
           <h1 className="text-base font-semibold">Create your account</h1>
           <p className="text-xs text-muted">
-            Everyone works in the same shared Digital Bible — every change you make is
+            Everyone works in the same shared 4.4.Forty Repo — every change you make is
             recorded under your name.
           </p>
           {error && (

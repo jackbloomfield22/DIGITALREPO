@@ -9,7 +9,8 @@ import { LinkChips } from "@/components/link-editor";
 import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
 import { StickyMiniHeader, CopySummaryButton } from "@/components/profile-chrome";
 import { SourceList, AttachmentList } from "@/components/sources-attachments";
-import { VerifyButton } from "@/components/creators/verify-button";
+import { VerifyButton } from "@/components/talent/verify-button";
+import { TalentTypeSelect } from "@/components/talent/talent-type-select";
 import {
   CREATOR_ORG_RELATIONSHIPS,
   CREATOR_PERSON_RELATIONSHIPS,
@@ -65,6 +66,14 @@ export default async function CreatorProfilePage({
 
   const canEdit = hasRole(user, "EDITOR");
   await recordRecentView(user.id, "creator", creator.id);
+
+  const allTalentTypes = (
+    await db.entity.findMany({
+      where: { kind: "creator_category" },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    })
+  ).map((e) => ({ id: e.id, name: e.name }));
 
   const [favorite, recordSources, attachments, auditEntries, related] = await Promise.all([
     db.favorite.findUnique({
@@ -150,7 +159,7 @@ export default async function CreatorProfilePage({
 
   // Copy Summary text
   const summary = [
-    `${creator.name.toUpperCase()} | ${categories.map((c) => c.entity.name).join(" / ") || "Creator"}`,
+    `${creator.name.toUpperCase()} | ${categories.map((c) => c.entity.name).join(" / ") || "Talent"}`,
     [age, basedIn?.entity.name].filter(Boolean).join(" | "),
     "",
     "SOCIAL",
@@ -189,7 +198,7 @@ export default async function CreatorProfilePage({
           <FavoriteButton small targetType="creator" targetId={creator.id} favorited={!!favorite} />
           <AddToCollectionButton compact targetType="creator" targetId={creator.id} targetLabel={creator.name} />
           {canEdit && (
-            <Link href={`/creators/${creator.slug}/edit`} className="btn btn-primary btn-sm">
+            <Link href={`/talent/${creator.slug}/edit`} className="btn btn-primary btn-sm">
               Edit
             </Link>
           )}
@@ -220,7 +229,12 @@ export default async function CreatorProfilePage({
           </div>
           {creator.headline && <p className="mt-1 text-muted">{creator.headline}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-            <span>{categories.map((c) => c.entity.name).join(" · ") || "Creator"}</span>
+            <TalentTypeSelect
+              creatorId={creator.id}
+              canEdit={canEdit}
+              selected={categories.map((c) => ({ id: c.entityId, name: c.entity.name }))}
+              allTypes={allTalentTypes}
+            />
             {age != null && <span>{age}</span>}
             {basedIn && (
               <Link href={`/explore/location/${basedIn.entity.slug}`} className="hover:text-accent-deep hover:underline">
@@ -231,14 +245,14 @@ export default async function CreatorProfilePage({
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {canEdit && (
-              <Link href={`/creators/${creator.slug}/edit`} className="btn btn-primary btn-sm">
+              <Link href={`/talent/${creator.slug}/edit`} className="btn btn-primary btn-sm">
                 Edit
               </Link>
             )}
             <FavoriteButton targetType="creator" targetId={creator.id} favorited={!!favorite} />
             <AddToCollectionButton targetType="creator" targetId={creator.id} targetLabel={creator.name} />
             <CopySummaryButton summary={summary} />
-            <Link href={`/creators/${creator.slug}/one-sheet`} className="btn btn-secondary btn-sm">
+            <Link href={`/talent/${creator.slug}/one-sheet`} className="btn btn-secondary btn-sm">
               One-Sheet
             </Link>
             {canEdit && <VerifyButton creatorId={creator.id} />}
@@ -256,7 +270,7 @@ export default async function CreatorProfilePage({
               ) : (
                 <EmptyState
                   message="No bio yet."
-                  action={<Link className="chip border-dashed" href={`/creators/${creator.slug}/edit`}>+ Add Bio</Link>}
+                  action={<Link className="chip border-dashed" href={`/talent/${creator.slug}/edit`}>+ Add Bio</Link>}
                 />
               )}
             </Section>
@@ -465,7 +479,7 @@ export default async function CreatorProfilePage({
                 key: `${c.other.id}-${c.relationship}`,
                 label: c.other.name,
                 sub: labelFor(c.relationship),
-                href: `/creators/${c.other.slug}`,
+                href: `/talent/${c.other.slug}`,
                 removePayload: { kind: "creator_creator", creatorAId: c.aId, creatorBId: c.bId, relationship: c.relationship },
               }))}
               addConfig={{
@@ -533,7 +547,7 @@ export default async function CreatorProfilePage({
               {creator.opportunityNotes ? (
                 <p className="whitespace-pre-line text-[15px] leading-relaxed">{creator.opportunityNotes}</p>
               ) : (
-                <EmptyState message="Why is this person interesting creatively or commercially?" action={<Link className="chip border-dashed" href={`/creators/${creator.slug}/edit`}>+ Add Notes</Link>} />
+                <EmptyState message="Why is this person interesting creatively or commercially?" action={<Link className="chip border-dashed" href={`/talent/${creator.slug}/edit`}>+ Add Notes</Link>} />
               )}
             </Section>
           )}
@@ -629,11 +643,11 @@ export default async function CreatorProfilePage({
 
           {related.length > 0 && (
             <div className="card p-4">
-              <div className="overline mb-2">Related Creators</div>
+              <div className="overline mb-2">Related Talent</div>
               <ul className="space-y-3">
                 {related.map((r) => (
                   <li key={r.id}>
-                    <Link href={`/creators/${r.slug}`} className="flex items-center gap-2 font-medium hover:text-accent-deep">
+                    <Link href={`/talent/${r.slug}`} className="flex items-center gap-2 font-medium hover:text-accent-deep">
                       <Portrait name={r.name} imageUrl={r.imageUrl} className="h-7 w-7 shrink-0 rounded" textClass="text-[10px]" />
                       <span className="truncate">{r.name}</span>
                     </Link>

@@ -10,7 +10,7 @@ import { labelFor } from "@/lib/taxonomy";
 import { relativeTime } from "@/lib/format";
 
 const GROUPS: [string, string][] = [
-  ["creator", "Creators"],
+  ["creator", "Talent"],
   ["format", "Formats"],
   ["project", "Projects"],
   ["organization", "Organizations"],
@@ -103,7 +103,7 @@ export default async function CollectionPage({
 
       {collection.items.length === 0 && (
         <p className="text-sm text-faint">
-          Nothing here yet — add creators, formats, projects, or organizations from their pages
+          Nothing here yet — add talent, formats, projects, or organizations from their pages
           with “+ Collection”.
         </p>
       )}

@@ -8,7 +8,7 @@ type ResultItem = { label: string; sub?: string; href: string };
 type ResultGroup = { group: string; items: ResultItem[] };
 
 const ACTIONS: ResultItem[] = [
-  { label: "Create Creator", href: "/creators/new" },
+  { label: "Add Talent", href: "/talent/new" },
   { label: "Create Project", href: "/projects/new" },
   { label: "Add Format", href: "/formats/new" },
   { label: "Create Opportunity", href: "/opportunities/new" },
@@ -129,7 +129,7 @@ export function CommandBar() {
           role="combobox"
           aria-expanded={flat.length > 0}
           aria-controls="command-results"
-          placeholder="Search creators, projects, companies, interests…"
+          placeholder="Search talent, projects, companies, interests…"
           className="w-full border-0 border-b border-line !rounded-none px-4 !py-3 text-base outline-none"
           value={q}
           onChange={(e) => setQ(e.target.value)}

@@ -1,4 +1,4 @@
-// Canonical vocabulary for the Digital Bible. Values are stored as snake_case
+// Canonical vocabulary for the 4.4.Forty Repo. Values are stored as snake_case
 // strings in the database; labels are how they render in the UI. Adding a new
 // value here is all that's needed to extend the vocabulary — no migration.
 
@@ -38,7 +38,7 @@ export const ENTITY_KIND_LABELS: Record<EntityKind, string> = {
   sport: "Sport",
   location: "Location",
   genre: "Genre",
-  creator_category: "Creator Category",
+  creator_category: "Talent Category",
   skill: "Skill",
   vertical: "Content Vertical",
   audience_type: "Audience Type",
@@ -51,7 +51,7 @@ export const ENTITY_KIND_PLURALS: Record<EntityKind, string> = {
   sport: "Sports",
   location: "Locations",
   genre: "Genres",
-  creator_category: "Creator Categories",
+  creator_category: "Talent Categories",
   skill: "Skills",
   vertical: "Content Verticals",
   audience_type: "Audience Types",
@@ -336,10 +336,14 @@ export const TARGET_TYPES = [
 ] as const;
 export type TargetType = (typeof TARGET_TYPES)[number];
 
+/** Display label for a record type ("creator" records are branded as Talent). */
+export const targetTypeLabel = (targetType: string): string =>
+  targetType === "creator" ? "Talent" : labelFor(targetType);
+
 export const targetPath = (targetType: string, slug: string): string => {
   switch (targetType) {
     case "creator":
-      return `/creators/${slug}`;
+      return `/talent/${slug}`;
     case "project":
       return `/projects/${slug}`;
     case "organization":

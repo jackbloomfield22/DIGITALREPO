@@ -7,7 +7,7 @@ import { Portrait, Section } from "@/components/ui";
 export const metadata = { title: "Favorites" };
 
 const GROUPS: [string, string][] = [
-  ["creator", "Creators"],
+  ["creator", "Talent"],
   ["format", "Formats"],
   ["project", "Projects"],
   ["organization", "Organizations"],
@@ -26,7 +26,7 @@ export default async function FavoritesPage() {
       <h1 className="mb-6 font-display text-3xl font-bold tracking-tight">FAVORITES</h1>
       {favorites.length === 0 && (
         <p className="text-sm text-faint">
-          Nothing favorited yet — use the ☆ on any creator, format, project, or organization.
+          Nothing favorited yet — use the ☆ on any talent profile, format, project, or organization.
         </p>
       )}
       {GROUPS.map(([type, title]) => {

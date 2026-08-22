@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { buildCreatorWhere } from "@/lib/queries/creators";
+import { buildCreatorWhere } from "@/lib/queries/talent";
 import { mergeEntitiesCore } from "@/lib/merge";
 import { hasRole } from "@/lib/roles";
 import { nameSimilarity, slugify, uniqueSlug } from "@/lib/slug";

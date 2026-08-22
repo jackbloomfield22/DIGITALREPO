@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { resolveTargets } from "@/lib/resolve-targets";
 import { Portrait } from "@/components/ui";
-import { labelFor } from "@/lib/taxonomy";
+import { targetTypeLabel } from "@/lib/taxonomy";
 import { relativeTime } from "@/lib/format";
 
 export const metadata = { title: "Recently Viewed" };
@@ -34,7 +34,7 @@ export default async function RecentPage() {
               {recent.targetType === "creator" ? (
                 <Portrait name={r.label} imageUrl={r.imageUrl} className="h-8 w-8 shrink-0 rounded" textClass="text-[11px]" />
               ) : (
-                <span className="kind-badge kind-project w-20 shrink-0 text-center">{labelFor(recent.targetType)}</span>
+                <span className="kind-badge kind-project w-20 shrink-0 text-center">{targetTypeLabel(recent.targetType)}</span>
               )}
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{r.label}</span>

@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { resolveTargets } from "@/lib/resolve-targets";
-import { labelFor } from "@/lib/taxonomy";
+import { targetTypeLabel } from "@/lib/taxonomy";
 
 export const metadata = { title: "Activity" };
 
@@ -60,13 +60,13 @@ export default async function ActivityPage({
   return (
     <div>
       <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">RECENT ACTIVITY</h1>
-      <p className="mb-5 text-sm text-muted">Every change to the Digital Bible, newest first.</p>
+      <p className="mb-5 text-sm text-muted">Every change to the Repo, newest first.</p>
 
       <div className="mb-6 flex flex-wrap items-center gap-1.5 text-sm">
         <Link href={link({ type: undefined })} className={`chip ${!params.type ? "bg-wash font-semibold" : ""}`}>All types</Link>
         {TYPE_OPTIONS.map((t) => (
           <Link key={t} href={link({ type: t, id: undefined })} className={`chip ${params.type === t ? "bg-wash font-semibold" : ""}`}>
-            {labelFor(t)}
+            {targetTypeLabel(t)}
           </Link>
         ))}
         <span className="mx-2 text-faint">·</span>
@@ -98,7 +98,7 @@ export default async function ActivityPage({
                   ) : (
                     <span className="font-medium">{e.targetLabel}</span>
                   )}
-                  <span className="text-xs text-faint">{labelFor(e.targetType)}</span>
+                  <span className="text-xs text-faint">{targetTypeLabel(e.targetType)}</span>
                   {e.field && <span className="text-xs text-muted">· {e.field}</span>}
                   {(e.oldValue || e.newValue) && (
                     <span className="text-xs text-muted">

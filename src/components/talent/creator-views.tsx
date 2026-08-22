@@ -7,7 +7,7 @@ import { Portrait } from "@/components/ui";
 import { FavoriteButton } from "@/components/action-buttons";
 import { QuickPreviewDrawer } from "./quick-preview";
 import { QuickEditDrawer } from "./quick-edit";
-import { bulkAddEntity, bulkAddToCollection, bulkArchive, bulkSetStatus } from "@/lib/actions/creators";
+import { bulkAddEntity, bulkAddToCollection, bulkArchive, bulkSetStatus } from "@/lib/actions/talent";
 import { createCollectionInline, createEntityInline } from "@/lib/actions/create-inline";
 import { CREATOR_STATUSES } from "@/lib/taxonomy";
 import { useToast } from "@/components/toast";
@@ -103,7 +103,7 @@ export function CreatorCardGrid({
         {creators.map((creator) => (
           <Link
             key={creator.id}
-            href={`/creators/${creator.slug}`}
+            href={`/talent/${creator.slug}`}
             className="card group relative block overflow-hidden transition-shadow hover:shadow-pop focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <div className="relative aspect-[4/4.4]">
@@ -344,7 +344,7 @@ export function CreatorTable({
     a.download = "creators.csv";
     a.click();
     URL.revokeObjectURL(url);
-    toast(`Exported ${rows.length} creators`);
+    toast(`Exported ${rows.length} talent records`);
   };
 
   const cell = (creator: CreatorCardVM, key: ColumnKey) => {
@@ -419,7 +419,7 @@ export function CreatorTable({
                   />
                 </th>
               )}
-              <th className="px-3 py-2 font-semibold">Creator</th>
+              <th className="px-3 py-2 font-semibold">Talent</th>
               {ALL_COLUMNS.filter((c) => columns.includes(c.key)).map((col) => (
                 <th key={col.key} className="px-3 py-2 font-semibold">{col.label}</th>
               ))}
@@ -442,7 +442,7 @@ export function CreatorTable({
                 )}
                 <td className="px-3 py-2">
                   <Link
-                    href={`/creators/${creator.slug}`}
+                    href={`/talent/${creator.slug}`}
                     className="flex items-center gap-2 font-medium hover:text-accent-deep"
                   >
                     <Portrait
@@ -501,7 +501,7 @@ export function CreatorTable({
             allowCreate="entity"
             onPick={async (entityId, name) => {
               const res = await bulkAddEntity(ids, entityId);
-              toast(res.ok ? `Added ${name} to ${ids.length} creators` : res.error, res.ok ? {} : { tone: "error" });
+              toast(res.ok ? `Added ${name} to ${ids.length} talent records` : res.error, res.ok ? {} : { tone: "error" });
               router.refresh();
             }}
           />
@@ -523,7 +523,7 @@ export function CreatorTable({
             onChange={async (e) => {
               if (!e.target.value) return;
               const res = await bulkSetStatus(ids, e.target.value);
-              toast(res.ok ? `Status updated for ${ids.length} creators` : res.error, res.ok ? {} : { tone: "error" });
+              toast(res.ok ? `Status updated for ${ids.length} talent records` : res.error, res.ok ? {} : { tone: "error" });
               e.target.value = "";
               router.refresh();
             }}
@@ -542,7 +542,7 @@ export function CreatorTable({
               onClick={async () => {
                 if (!window.confirm(`Archive ${ids.length} creators? They can be restored from Admin.`)) return;
                 const res = await bulkArchive(ids);
-                toast(res.ok ? `Archived ${ids.length} creators` : res.error, res.ok ? {} : { tone: "error" });
+                toast(res.ok ? `Archived ${ids.length} talent records` : res.error, res.ok ? {} : { tone: "error" });
                 setSelected(new Set());
                 router.refresh();
               }}

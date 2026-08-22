@@ -15,7 +15,7 @@ export default async function BackupsPage() {
     <div className="max-w-3xl">
       <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">BACKUPS</h1>
       <p className="mb-6 max-w-2xl text-sm text-muted">
-        Complete snapshots of everything in the Digital Bible — users, creators, every
+        Complete snapshots of everything in the 4.4.Forty Repo — users, creators, every
         relationship, notes, and history. A snapshot is taken automatically every day
         (the newest 14 daily snapshots are kept; manual backups are kept until you delete
         them). Download copies periodically and keep them somewhere safe — a downloaded

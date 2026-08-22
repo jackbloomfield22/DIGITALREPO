@@ -86,7 +86,7 @@ export default async function FormatsPage({
         filters={[
           { param: "status", label: "Status", kind: "select", options: FORMAT_STATUSES },
           { param: "type", label: "Format Type", kind: "select", options: FORMAT_TYPES },
-          { param: "creator", label: "Creator", kind: "lookup", lookupType: "creator" },
+          { param: "creator", label: "Talent", kind: "lookup", lookupType: "creator" },
           { param: "entity", label: "Interest / Sport / Topic", kind: "lookup", lookupType: "entity" },
           { param: "org", label: "Organization / Brand", kind: "lookup", lookupType: "organization" },
         ]}
@@ -104,7 +104,7 @@ export default async function FormatsPage({
                 <th className="px-3 py-2 font-semibold">Format</th>
                 <th className="px-3 py-2 font-semibold">Type</th>
                 <th className="px-3 py-2 font-semibold">Status</th>
-                <th className="px-3 py-2 font-semibold">Creators</th>
+                <th className="px-3 py-2 font-semibold">Talent</th>
                 <th className="px-3 py-2 font-semibold">Topics</th>
                 <th className="px-3 py-2 font-semibold">Updated</th>
               </tr>

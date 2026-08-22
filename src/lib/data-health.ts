@@ -47,7 +47,7 @@ export async function computeDataHealth() {
   const duplicates: DuplicateGroup[] = [
     ...pairs(creators.map((c) => ({ id: c.id, label: c.name, slug: c.slug, norm: "" }))).map((g) => ({
       kind: "creator" as const,
-      items: g.map((c) => ({ id: c.id, label: c.label, href: `/creators/${(c as unknown as { slug: string }).slug}` })),
+      items: g.map((c) => ({ id: c.id, label: c.label, href: `/talent/${(c as unknown as { slug: string }).slug}` })),
     })),
     ...pairs(organizations.map((o) => ({ id: o.id, label: o.name, slug: o.slug, norm: "" }))).map((g) => ({
       kind: "organization" as const,

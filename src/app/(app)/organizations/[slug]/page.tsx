@@ -122,9 +122,9 @@ export default async function OrganizationPage({
             </div>
           </Section>
 
-          <Section title="Creators">
+          <Section title="Talent">
             {directIds.size === 0 && viaProjects.size === 0 && viaRep.size === 0 && (
-              <p className="text-sm text-faint">No creators connected yet.</p>
+              <p className="text-sm text-faint">No talent connected yet.</p>
             )}
             {org.creators.length > 0 && (
               <div className="mb-4">
@@ -135,7 +135,7 @@ export default async function OrganizationPage({
                     key: co.id,
                     label: co.creator.name,
                     sub: [labelFor(co.relationship), co.status === "past" ? "past" : null].filter(Boolean).join(" · "),
-                    href: `/creators/${co.creator.slug}`,
+                    href: `/talent/${co.creator.slug}`,
                     removePayload: { kind: "creator_org", creatorId: co.creatorId, organizationId: org.id, relationship: co.relationship },
                   }))}
                 />
@@ -147,7 +147,7 @@ export default async function OrganizationPage({
                 <div className="space-y-1.5">
                   {[...viaProjects.values()].map(({ creator, projects }) => (
                     <div key={creator.id} className="flex flex-wrap items-baseline gap-2 text-sm">
-                      <Link href={`/creators/${creator.slug}`} className="font-medium hover:text-accent-deep hover:underline">
+                      <Link href={`/talent/${creator.slug}`} className="font-medium hover:text-accent-deep hover:underline">
                         {creator.name}
                       </Link>
                       <span className="text-xs text-muted">{[...projects].join(", ")}</span>
@@ -162,7 +162,7 @@ export default async function OrganizationPage({
                 <div className="space-y-1.5">
                   {[...viaRep.values()].map(({ creator, reps }) => (
                     <div key={creator.id} className="flex flex-wrap items-baseline gap-2 text-sm">
-                      <Link href={`/creators/${creator.slug}`} className="font-medium hover:text-accent-deep hover:underline">
+                      <Link href={`/talent/${creator.slug}`} className="font-medium hover:text-accent-deep hover:underline">
                         {creator.name}
                       </Link>
                       <span className="text-xs text-muted">via {[...reps].join(", ")}</span>
@@ -231,18 +231,18 @@ export default async function OrganizationPage({
             <div className="overline mb-2">At a Glance</div>
             <ul className="space-y-1 text-sm">
               <li className="flex justify-between"><span className="text-muted">Projects</span><span className="font-semibold">{org.projects.length}</span></li>
-              <li className="flex justify-between"><span className="text-muted">Creators (direct)</span><span className="font-semibold">{directIds.size}</span></li>
-              <li className="flex justify-between"><span className="text-muted">Creators (via projects)</span><span className="font-semibold">{viaProjects.size}</span></li>
+              <li className="flex justify-between"><span className="text-muted">Talent (direct)</span><span className="font-semibold">{directIds.size}</span></li>
+              <li className="flex justify-between"><span className="text-muted">Talent (via projects)</span><span className="font-semibold">{viaProjects.size}</span></li>
               {viaRep.size > 0 && (
                 <li className="flex justify-between"><span className="text-muted">Represented talent</span><span className="font-semibold">{viaRep.size}</span></li>
               )}
               <li className="flex justify-between"><span className="text-muted">Formats</span><span className="font-semibold">{org.formats.length}</span></li>
             </ul>
             <Link
-              href={`/creators?org=${org.id}`}
+              href={`/talent?org=${org.id}`}
               className="mt-3 inline-block text-xs underline underline-offset-2 hover:text-accent"
             >
-              View all connected creators in directory →
+              View all connected talent in directory →
             </Link>
           </div>
 

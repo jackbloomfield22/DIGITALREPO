@@ -49,18 +49,18 @@ export default async function PersonPage({
       </div>
 
       <div className="max-w-3xl">
-        <Section title="Represented / Connected Creators">
+        <Section title="Represented / Connected Talent">
           <div className="space-y-2">
             {person.creators.map((cp) => (
               <div key={cp.id} className="card flex items-center justify-between gap-2 px-4 py-2.5">
-                <Link href={`/creators/${cp.creator.slug}`} className="flex min-w-0 items-center gap-2.5 font-semibold hover:text-accent-deep">
+                <Link href={`/talent/${cp.creator.slug}`} className="flex min-w-0 items-center gap-2.5 font-semibold hover:text-accent-deep">
                   <Portrait name={cp.creator.name} imageUrl={cp.creator.imageUrl} className="h-8 w-8 shrink-0 rounded" textClass="text-[11px]" />
                   <span className="truncate">{cp.creator.name}</span>
                 </Link>
                 <span className="text-xs text-muted">{labelFor(cp.relationship)}</span>
               </div>
             ))}
-            {person.creators.length === 0 && <p className="text-sm text-faint">No creators connected yet.</p>}
+            {person.creators.length === 0 && <p className="text-sm text-faint">No talent connected yet.</p>}
           </div>
         </Section>
 

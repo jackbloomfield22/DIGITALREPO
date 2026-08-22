@@ -81,11 +81,11 @@ export default async function FormatPage({
             </Section>
           )}
 
-          <Section title="Creators">
+          <Section title="Talent">
             <div className="space-y-2">
               {format.creators.map((cf) => (
                 <div key={cf.id} className="card flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                  <Link href={`/creators/${cf.creator.slug}`} className="flex min-w-0 items-center gap-2.5 hover:text-accent-deep">
+                  <Link href={`/talent/${cf.creator.slug}`} className="flex min-w-0 items-center gap-2.5 hover:text-accent-deep">
                     <Portrait name={cf.creator.name} imageUrl={cf.creator.imageUrl} className="h-8 w-8 shrink-0 rounded" textClass="text-[11px]" />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{cf.creator.name}</span>
@@ -112,9 +112,9 @@ export default async function FormatPage({
                   template: { kind: "creator_format", formatId: format.id },
                   idField: "creatorId",
                   lookupType: "creator",
-                  buttonLabel: "+ Attach Creator",
+                  buttonLabel: "+ Attach Talent",
                 }}
-                emptyMessage={format.creators.length ? "" : "No creators attached yet."}
+                emptyMessage={format.creators.length ? "" : "No talent attached yet."}
               />
             </div>
           </Section>
