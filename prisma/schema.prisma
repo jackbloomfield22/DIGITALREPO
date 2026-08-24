@@ -59,6 +59,8 @@ model Creator {
   age              Int? // used when only an approximate age is known
   lastVerifiedAt   DateTime?
   archived         Boolean   @default(false)
+  archivedReason String?
+  archivedAt     DateTime?
   version          Int       @default(1)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -128,6 +130,8 @@ model Project {
   internalNotes  String?
   lastVerifiedAt DateTime?
   archived       Boolean   @default(false)
+  archivedReason String?
+  archivedAt     DateTime?
   version        Int       @default(1)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -154,6 +158,8 @@ model Organization {
   location      String?
   internalNotes String?
   archived      Boolean  @default(false)
+  archivedReason String?
+  archivedAt     DateTime?
   version       Int      @default(1)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -175,6 +181,8 @@ model IndustryPerson {
   roleType  String? // agent | manager | publicist | executive | producer | ...
   notes     String?
   archived  Boolean  @default(false)
+  archivedReason String?
+  archivedAt     DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -202,6 +210,8 @@ model Format {
   notes            String?
   ownerId          String?
   archived         Boolean  @default(false)
+  archivedReason String?
+  archivedAt     DateTime?
   version          Int      @default(1)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -230,6 +240,8 @@ model Opportunity {
   deadline             DateTime?
   ownerId              String?
   archived             Boolean   @default(false)
+  archivedReason String?
+  archivedAt     DateTime?
   version              Int       @default(1)
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt

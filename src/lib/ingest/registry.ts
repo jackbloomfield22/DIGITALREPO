@@ -54,6 +54,8 @@ export type RecordSpec = {
   createFields: string[];
   /** Fields ingest may update. */
   fields: EditableField[];
+  /** Where "note" ops append when attached to this record type. */
+  notesField?: string;
 };
 
 const text = (name: string, label: string, maxLength: number): EditableField => ({
@@ -69,6 +71,7 @@ const vocab = (name: string, label: string, source: () => LabeledValue[]): Edita
 export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
   creator: {
     targetType: "creator",
+    notesField: "internalNotes",
     prismaModel: "creator",
     displayName: "Talent",
     nameField: "name",
@@ -87,6 +90,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
   },
   project: {
     targetType: "project",
+    notesField: "internalNotes",
     prismaModel: "project",
     displayName: "Project",
     nameField: "title",
@@ -107,6 +111,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
   },
   organization: {
     targetType: "organization",
+    notesField: "internalNotes",
     prismaModel: "organization",
     displayName: "Organization",
     nameField: "name",
@@ -122,6 +127,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
   },
   format: {
     targetType: "format",
+    notesField: "notes",
     prismaModel: "format",
     displayName: "Format",
     nameField: "title",
@@ -142,6 +148,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
   },
   person: {
     targetType: "person",
+    notesField: "notes",
     prismaModel: "industryPerson",
     displayName: "Industry Person",
     nameField: "name",
@@ -156,6 +163,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
   },
   opportunity: {
     targetType: "opportunity",
+    notesField: "notes",
     prismaModel: "opportunity",
     displayName: "Opportunity",
     nameField: "title",
@@ -184,6 +192,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
   },
   event: {
     targetType: "event",
+    notesField: "notes",
     prismaModel: "sportsEvent",
     displayName: "Sports Event",
     nameField: "title",

@@ -59,6 +59,9 @@ async function cleanup() {
   await db.creator.deleteMany({ where: { name: { startsWith: P } } });
   await db.entity.deleteMany({ where: { name: { startsWith: P } } });
   await db.ingestItem.deleteMany({ where: { OR: [{ filename: { startsWith: P } }, { extractedText: { startsWith: P } }] } });
+  await db.project.deleteMany({ where: { title: { startsWith: P } } });
+  await db.source.deleteMany({ where: { title: { startsWith: `Email: ${P}` } } });
+  await db.source.deleteMany({ where: { title: { contains: P } } });
 }
 
 beforeAll(cleanup);
@@ -393,6 +396,160 @@ describe("triage and propose with a fake model", () => {
     const result = await triageItemCore(item.id); // real runner path, no key in test env
     expect(result.ok).toBe(false);
     expect(result.error).toContain("ANTHROPIC_API_KEY");
+    await db.ingestItem.delete({ where: { id: item.id } });
+  });
+});
+
+describe("apply engine", () => {
+  let user: { id: string; email: string; name: string; role: "EDITOR" };
+  beforeAll(async () => {
+    const editor = await db.user.findUnique({ where: { email: "editor@440.media" } });
+    if (!editor) throw new Error("Seeded editor user missing — run npm run db:seed");
+    user = { id: editor.id, email: editor.email, name: editor.name, role: "EDITOR" };
+  });
+
+  it("applies approved changes in order: create, update (with version bump), link, note — with Source + audit + digest", async () => {
+    const creator = await db.creator.create({
+      data: { name: `${P} Ada Cole`, slug: slugify(`${P} Ada Cole`), miniBio: "Old." },
+    });
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} Ada Cole is hosting ${P} Deep Water.`, status: "proposed", filename: `${P}-apply.txt` },
+    });
+    const base = { confidence: 0.9, rationale: "t", evidence: [`${P} Ada Cole`], sensitive: false };
+    await db.ingestChange.createMany({
+      data: [
+        {
+          itemId: item.id, group: "New · Project", opType: "create", sortOrder: 0, status: "approved",
+          destination: { targetType: "project", targetId: null, path: null, name: `${P} Deep Water` },
+          payload: { op: "create", targetType: "project", name: `${P} Deep Water`, fields: { projectType: "docuseries" }, ...base },
+          after: { name: `${P} Deep Water` },
+        },
+        {
+          itemId: item.id, group: `Talent › ${P} Ada Cole`, opType: "update", sortOrder: 1, status: "approved",
+          destination: { targetType: "creator", targetId: creator.id, path: null, name: creator.name, field: "miniBio" },
+          payload: { op: "update", targetType: "creator", targetName: creator.name, targetId: creator.id, field: "miniBio", value: "Hosts Deep Water.", expectedVersion: creator.version, ...base },
+          before: "Old.", after: "Hosts Deep Water.",
+        },
+        {
+          itemId: item.id, group: `Talent › ${P} Ada Cole`, opType: "link", sortOrder: 2, status: "approved",
+          destination: { targetType: "creator", targetId: creator.id, path: null, name: creator.name, linkKind: "creator_project" },
+          payload: { op: "link", kind: "creator_project", aName: creator.name, aId: creator.id, bName: `${P} Deep Water`, role: "host", ...base },
+          after: { kind: "creator_project", a: creator.name, b: `${P} Deep Water`, role: "host" },
+        },
+        {
+          itemId: item.id, group: `Talent › ${P} Ada Cole`, opType: "note", sortOrder: 3, status: "approved",
+          destination: { targetType: "creator", targetId: creator.id, path: null, name: creator.name },
+          payload: { op: "note", text: "Prefers morning shoots.", aboutType: "creator", aboutName: creator.name, aboutId: creator.id, ...base },
+          after: { text: "Prefers morning shoots." },
+        },
+      ],
+    });
+
+    const { applyIngestChangesCore } = await import("@/lib/ingest/apply");
+    clearDigestMemo();
+    const outcome = await applyIngestChangesCore(item.id, user);
+    expect(outcome.applied).toBe(4);
+    expect(outcome.failed).toBe(0);
+
+    const updated = await db.creator.findUnique({ where: { id: creator.id }, include: { credits: { include: { project: true } } } });
+    expect(updated?.miniBio).toBe("Hosts Deep Water.");
+    expect(updated?.version).toBe(creator.version + 1);
+    expect(updated?.internalNotes).toContain("Prefers morning shoots.");
+    expect(updated?.credits.some((c) => c.project.title === `${P} Deep Water` && c.role === "host")).toBe(true);
+
+    // Source attribution back to the ingest item
+    const sources = await db.recordSource.findMany({
+      where: { targetType: "creator", targetId: creator.id },
+      include: { source: true },
+    });
+    expect(sources.some((s) => s.source.url === `/ingest/${item.id}`)).toBe(true);
+
+    // Audit trail says ingest
+    const audits = await db.auditLog.findMany({ where: { targetType: "creator", targetId: creator.id } });
+    expect(audits.some((a) => a.field?.includes("ingest"))).toBe(true);
+
+    // Digest reflects the new relationship
+    const digest = await db.knowledgeDigest.findUnique({
+      where: { targetType_targetId: { targetType: "creator", targetId: creator.id } },
+    });
+    expect(digest?.searchText).toContain(`${P} Deep Water`);
+
+    const finished = await db.ingestItem.findUnique({ where: { id: item.id } });
+    expect(finished?.status).toBe("applied");
+    await db.ingestItem.delete({ where: { id: item.id } });
+  });
+
+  it("a stale version marks the change superseded instead of overwriting", async () => {
+    const creator = await db.creator.create({
+      data: { name: `${P} Stale Target`, slug: slugify(`${P} Stale Target`), headline: "Original" },
+    });
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} stale`, status: "proposed" },
+    });
+    await db.ingestChange.create({
+      data: {
+        itemId: item.id, group: "x", opType: "update", sortOrder: 0, status: "approved",
+        destination: { targetType: "creator", targetId: creator.id, path: null, name: creator.name, field: "headline" },
+        payload: {
+          op: "update", targetType: "creator", targetName: creator.name, targetId: creator.id,
+          field: "headline", value: "From ingest", expectedVersion: creator.version,
+          confidence: 0.9, rationale: "t", evidence: ["x"], sensitive: false,
+        },
+        before: "Original", after: "From ingest",
+      },
+    });
+    // A colleague edits first — version moves on
+    await db.creator.update({ where: { id: creator.id }, data: { headline: "Colleague edit", version: { increment: 1 } } });
+
+    const { applyIngestChangesCore } = await import("@/lib/ingest/apply");
+    const outcome = await applyIngestChangesCore(item.id, user);
+    expect(outcome.superseded).toBe(1);
+    expect(outcome.applied).toBe(0);
+
+    const untouched = await db.creator.findUnique({ where: { id: creator.id } });
+    expect(untouched?.headline).toBe("Colleague edit");
+
+    const change = await db.ingestChange.findFirst({ where: { itemId: item.id } });
+    expect(change?.status).toBe("superseded");
+    expect(change?.before).toBe("Colleague edit"); // refreshed for re-review
+    const parent = await db.ingestItem.findUnique({ where: { id: item.id } });
+    expect(parent?.status).toBe("proposed"); // back in the review queue
+    await db.ingestItem.delete({ where: { id: item.id } });
+  });
+
+  it("archive sets reason and timestamp, never deletes, and is restorable", async () => {
+    const project = await db.project.create({
+      data: { title: `${P} Cancelled Show`, slug: slugify(`${P} Cancelled Show`) },
+    });
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} cancelled`, status: "proposed" },
+    });
+    await db.ingestChange.create({
+      data: {
+        itemId: item.id, group: "x", opType: "archive", sortOrder: 0, status: "approved",
+        destination: { targetType: "project", targetId: project.id, path: null, name: project.title },
+        payload: {
+          op: "archive", targetType: "project", targetName: project.title, targetId: project.id,
+          reason: "Network cancelled the series", confidence: 0.95, rationale: "t", evidence: ["x"], sensitive: false,
+        },
+        after: { archived: true, reason: "Network cancelled the series" },
+      },
+    });
+
+    const { applyIngestChangesCore } = await import("@/lib/ingest/apply");
+    const outcome = await applyIngestChangesCore(item.id, user);
+    expect(outcome.applied).toBe(1);
+
+    const archived = await db.project.findUnique({ where: { id: project.id } });
+    expect(archived).toBeTruthy(); // never deleted
+    expect(archived?.archived).toBe(true);
+    expect(archived?.archivedReason).toBe("Network cancelled the series");
+    expect(archived?.archivedAt).toBeTruthy();
+
+    // Restorable through the ordinary un-archive path
+    await db.project.update({ where: { id: project.id }, data: { archived: false, archivedReason: null, archivedAt: null } });
+    const restored = await db.project.findUnique({ where: { id: project.id } });
+    expect(restored?.archived).toBe(false);
     await db.ingestItem.delete({ where: { id: item.id } });
   });
 });
