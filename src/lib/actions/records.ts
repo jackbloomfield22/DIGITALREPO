@@ -279,6 +279,11 @@ const personSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
   title: z.string().trim().max(200).optional().nullable(),
   roleType: z.string().trim().max(40).optional().nullable(),
+  email: z.string().trim().max(200).optional().nullable(),
+  phone: z.string().trim().max(60).optional().nullable(),
+  contactUrl: z.string().trim().max(400).optional().nullable(),
+  assistantName: z.string().trim().max(200).optional().nullable(),
+  assistantEmail: z.string().trim().max(200).optional().nullable(),
   notes: z.string().max(8000).optional().nullable(),
 });
 export type PersonInput = z.infer<typeof personSchema>;

@@ -11,6 +11,7 @@ import { StickyMiniHeader, CopySummaryButton } from "@/components/profile-chrome
 import { SourceList, AttachmentList } from "@/components/sources-attachments";
 import { VerifyButton } from "@/components/talent/verify-button";
 import { TalentTypeSelect } from "@/components/talent/talent-type-select";
+import { RepList } from "@/components/talent/rep-list";
 import {
   CREATOR_ORG_RELATIONSHIPS,
   CREATOR_PERSON_RELATIONSHIPS,
@@ -495,26 +496,43 @@ export default async function CreatorProfilePage({
           </Section>
 
           <Section title="Representation">
-            <LinkChips
+            <RepList
+              creatorId={creator.id}
               canEdit={canEdit}
-              items={creator.people.map((p) => ({
-                key: p.id,
-                label: p.person.name,
-                sub: [labelFor(p.relationship), p.person.organizations[0]?.organization.name].filter(Boolean).join(" · "),
-                href: `/people/${p.person.slug}`,
-                removePayload: { kind: "creator_person", creatorId: creator.id, personId: p.personId, relationship: p.relationship },
+              reps={creator.people.map((p) => ({
+                id: p.id,
+                personId: p.personId,
+                relationship: p.relationship,
+                current: p.current,
+                start: p.start,
+                end: p.end,
+                person: {
+                  name: p.person.name,
+                  slug: p.person.slug,
+                  email: p.person.email,
+                  phone: p.person.phone,
+                  assistantName: p.person.assistantName,
+                  assistantEmail: p.person.assistantEmail,
+                  orgName: p.person.organizations[0]?.organization.name ?? null,
+                },
               }))}
-              addConfig={{
-                template: { kind: "creator_person", creatorId: creator.id },
-                idField: "personId",
-                lookupType: "person",
-                roleField: "relationship",
-                roleOptions: CREATOR_PERSON_RELATIONSHIPS,
-                createKind: "person",
-                buttonLabel: "+ Add Rep",
-              }}
-              emptyMessage="No representation recorded."
             />
+            {(canEdit || creator.people.length === 0) && (
+              <LinkChips
+                canEdit={canEdit}
+                items={[]}
+                addConfig={{
+                  template: { kind: "creator_person", creatorId: creator.id },
+                  idField: "personId",
+                  lookupType: "person",
+                  roleField: "relationship",
+                  roleOptions: CREATOR_PERSON_RELATIONSHIPS,
+                  createKind: "person",
+                  buttonLabel: "+ Add Rep",
+                }}
+                emptyMessage="No representation recorded."
+              />
+            )}
           </Section>
 
           {(otherOrgs.length > 0 || canEdit) && (

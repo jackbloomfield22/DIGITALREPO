@@ -49,6 +49,43 @@ export default async function PersonPage({
       </div>
 
       <div className="max-w-3xl">
+        {(person.email || person.phone || person.contactUrl || person.assistantName || person.assistantEmail) && (
+          <Section title="Contact">
+            <div className="card space-y-1 px-4 py-3 text-sm">
+              {person.email && (
+                <div>
+                  <span className="text-muted">Email · </span>
+                  <a href={`mailto:${person.email}`} className="hover:text-accent-deep hover:underline">{person.email}</a>
+                </div>
+              )}
+              {person.phone && (
+                <div>
+                  <span className="text-muted">Phone · </span>
+                  <a href={`tel:${person.phone}`} className="hover:text-accent-deep hover:underline">{person.phone}</a>
+                </div>
+              )}
+              {person.contactUrl && (
+                <div>
+                  <span className="text-muted">Link · </span>
+                  <a href={person.contactUrl} target="_blank" rel="noreferrer" className="break-all hover:text-accent-deep hover:underline">{person.contactUrl}</a>
+                </div>
+              )}
+              {(person.assistantName || person.assistantEmail) && (
+                <div>
+                  <span className="text-muted">Assistant · </span>
+                  {person.assistantName}
+                  {person.assistantEmail && (
+                    <>
+                      {person.assistantName ? " — " : ""}
+                      <a href={`mailto:${person.assistantEmail}`} className="hover:text-accent-deep hover:underline">{person.assistantEmail}</a>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
         <Section title="Represented / Connected Talent">
           <div className="space-y-2">
             {person.creators.map((cp) => (
@@ -57,7 +94,10 @@ export default async function PersonPage({
                   <Portrait name={cp.creator.name} imageUrl={cp.creator.imageUrl} className="h-8 w-8 shrink-0 rounded" textClass="text-[11px]" />
                   <span className="truncate">{cp.creator.name}</span>
                 </Link>
-                <span className="text-xs text-muted">{labelFor(cp.relationship)}</span>
+                <span className="text-xs text-muted">
+                  {labelFor(cp.relationship)}
+                  {!cp.current && <span className="ml-1.5 rounded bg-wash px-1 py-0.5 text-[10px] uppercase tracking-wide">Past</span>}
+                </span>
               </div>
             ))}
             {person.creators.length === 0 && <p className="text-sm text-faint">No talent connected yet.</p>}

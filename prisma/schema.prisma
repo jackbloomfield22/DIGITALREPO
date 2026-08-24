@@ -179,6 +179,11 @@ model IndustryPerson {
   name      String
   title     String?
   roleType  String? // agent | manager | publicist | executive | producer | ...
+  email     String?
+  phone     String?
+  contactUrl String? // LinkedIn / website / booking page
+  assistantName  String?
+  assistantEmail String?
   notes     String?
   archived  Boolean  @default(false)
   archivedReason String?
@@ -388,6 +393,9 @@ model CreatorPerson {
   creatorId    String
   personId     String
   relationship String // agent | manager | publicist | attorney | other
+  current      Boolean @default(true)
+  start        String? // free text: "2023", "May 2024"
+  end          String?
   note         String?
   confidence   String?
 

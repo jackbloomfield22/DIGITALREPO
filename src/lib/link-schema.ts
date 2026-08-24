@@ -12,7 +12,12 @@ export const linkPayloadSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("creator_format"), creatorId: id, formatId: id, isPrimary: z.boolean().optional() }),
   z.object({ kind: z.literal("creator_project"), creatorId: id, projectId: id, role: rel }),
   z.object({ kind: z.literal("creator_org"), creatorId: id, organizationId: id, relationship: rel, status: z.string().max(30).optional() }),
-  z.object({ kind: z.literal("creator_person"), creatorId: id, personId: id, relationship: rel }),
+  z.object({
+    kind: z.literal("creator_person"), creatorId: id, personId: id, relationship: rel,
+    current: z.boolean().optional(),
+    start: z.string().max(40).optional(),
+    end: z.string().max(40).optional(),
+  }),
   z.object({ kind: z.literal("creator_creator"), creatorAId: id, creatorBId: id, relationship: rel, note: z.string().max(500).optional() }),
   z.object({ kind: z.literal("project_org"), projectId: id, organizationId: id, relationship: rel }),
   z.object({ kind: z.literal("project_entity"), projectId: id, entityId: id }),

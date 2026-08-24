@@ -69,5 +69,10 @@ export const PERSON_FIELDS: FieldDef[] = [
   { name: "name", label: "Name", type: "text", required: true },
   { name: "title", label: "Title", type: "text", half: true },
   { name: "roleType", label: "Role Type", type: "select", options: PERSON_ROLE_TYPES, half: true },
+  { name: "email", label: "Email", type: "text", half: true },
+  { name: "phone", label: "Phone", type: "text", half: true },
+  { name: "contactUrl", label: "LinkedIn / Contact URL", type: "text" },
+  { name: "assistantName", label: "Assistant", type: "text", half: true },
+  { name: "assistantEmail", label: "Assistant Email", type: "text", half: true },
   { name: "notes", label: "Notes", type: "textarea", rows: 3 },
 ];

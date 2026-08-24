@@ -69,7 +69,7 @@ async function buildCreatorDigest(id: string): Promise<DigestData | null> {
       projects.size ? `Projects: ${[...projects.entries()].map(([t, r]) => `${t} (${r.join("/")})`).join("; ")}` : null,
       c.formats.length ? `Formats: ${c.formats.map((f) => f.format.title).join(", ")}` : null,
       c.organizations.length ? `Orgs: ${c.organizations.map((o) => `${o.organization.name} (${labelFor(o.relationship)})`).join("; ")}` : null,
-      c.people.length ? `Rep: ${c.people.map((p) => `${p.person.name} (${labelFor(p.relationship)})`).join("; ")}` : null,
+      c.people.length ? `Rep: ${c.people.map((p) => `${p.person.name} (${labelFor(p.relationship)}${p.current ? "" : ", past"})`).join("; ")}` : null,
     ],
     [
       c.name, ...c.aliases,
@@ -188,10 +188,12 @@ async function buildPersonDigest(id: string): Promise<DigestData | null> {
     [
       `INDUSTRY PERSON — ${p.name}${p.archived ? " [ARCHIVED]" : ""}`,
       [p.title, labelFor(p.roleType), p.organizations[0]?.organization.name].filter(Boolean).join(" · "),
-      p.creators.length ? `Represents/connected: ${p.creators.map((c) => `${c.creator.name} (${labelFor(c.relationship)})`).join("; ")}` : null,
+      [p.email, p.phone].filter(Boolean).length ? `Contact: ${[p.email, p.phone].filter(Boolean).join(" · ")}` : null,
+      p.assistantName || p.assistantEmail ? `Assistant: ${[p.assistantName, p.assistantEmail].filter(Boolean).join(" — ")}` : null,
+      p.creators.length ? `Represents/connected: ${p.creators.map((c) => `${c.creator.name} (${labelFor(c.relationship)}${c.current ? "" : ", past"})`).join("; ")}` : null,
       p.projects.length ? `Projects: ${p.projects.map((x) => `${x.project.title} (${labelFor(x.role)})`).join("; ")}` : null,
     ],
-    [p.name, ...p.organizations.map((o) => o.organization.name), ...p.creators.map((c) => c.creator.name), ...p.projects.map((x) => x.project.title)],
+    [p.name, p.email ?? "", p.phone ?? "", ...p.organizations.map((o) => o.organization.name), ...p.creators.map((c) => c.creator.name), ...p.projects.map((x) => x.project.title)],
   );
   return { slug: p.slug, name: p.name, aliases: [], archived: p.archived, summary, searchText, sourceVersion: 0, path: `/people/${p.slug}` };
 }
