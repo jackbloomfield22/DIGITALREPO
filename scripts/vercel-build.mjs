@@ -48,4 +48,5 @@ const run = (cmd) => {
 
 run("npx prisma migrate deploy");
 run("npx tsx prisma/seed.ts");
+run("npx tsx scripts/rebuild-digests.ts --if-empty");
 run("npx next build");

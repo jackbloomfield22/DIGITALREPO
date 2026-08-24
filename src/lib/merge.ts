@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { refreshDigest } from "@/lib/ingest/digest";
 
 // Merge cores — shared by admin server actions and tests. Relationships of the
 // source record are re-pointed at the target; rows that would collide with an
@@ -52,6 +53,8 @@ export async function mergeEntitiesCore(sourceId: string, targetId: string): Pro
     });
     await tx.entity.delete({ where: { id: sourceId } });
   });
+  await refreshDigest("entity", sourceId); // record gone — removes the digest row
+  await refreshDigest("entity", targetId);
 }
 
 export async function mergeOrganizationsCore(sourceId: string, targetId: string): Promise<void> {
@@ -112,4 +115,6 @@ export async function mergeOrganizationsCore(sourceId: string, targetId: string)
     });
     await tx.organization.delete({ where: { id: sourceId } });
   });
+  await refreshDigest("organization", sourceId);
+  await refreshDigest("organization", targetId);
 }

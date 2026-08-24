@@ -672,6 +672,28 @@ model AiMessage {
   @@index([threadId])
 }
 
+// Compact, always-current, AI-readable index of every canonical record.
+// One row per record; `summary` reads like a dossier card, `searchText` packs
+// every name/alias/handle/related-name for candidate matching. The migration
+// adds (raw SQL): a generated tsvector column over searchText with a GIN
+// index, plus pg_trgm trigram indexes on name and searchText.
+model KnowledgeDigest {
+  id            String   @id @default(cuid())
+  targetType    String // creator | project | organization | format | person | opportunity | entity | event
+  targetId      String
+  slug          String
+  name          String
+  aliases       String[] @default([])
+  archived      Boolean  @default(false)
+  summary       String
+  searchText    String
+  sourceVersion Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([targetType, targetId])
+  @@index([name])
+}
+
 // Upcoming sports calendar: US professional and major world sports events.
 // Curated + fully editable; optionally linked to a sport taxonomy entity so
 // events connect into the knowledge graph.

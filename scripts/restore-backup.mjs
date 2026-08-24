@@ -21,7 +21,7 @@ const TABLE_ORDER = [
   "opportunityCreator", "opportunityFormat", "opportunityProject",
   "opportunityOrganization", "collection", "collectionItem", "savedView",
   "favorite", "recentView", "source", "recordSource", "attachment", "auditLog",
-  "aiThread", "aiMessage", "researchInboxItem",
+  "aiThread", "aiMessage", "researchInboxItem", "knowledgeDigest",
 ];
 
 const file = process.argv[2];

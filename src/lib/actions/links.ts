@@ -1,39 +1,28 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { linkPayloadSchema as payloadSchema, type LinkPayload } from "@/lib/link-schema";
+import { refreshDigest } from "@/lib/ingest/digest";
+import { LINK_SPECS } from "@/lib/ingest/registry";
+
+/** A link touches two records; the audit hook refreshes one, this gets both. */
+async function refreshLinkSides(p: LinkPayload) {
+  const spec = LINK_SPECS[p.kind];
+  if (!spec) return;
+  const record = p as unknown as Record<string, string>;
+  await refreshDigest(spec.a.targetType, record[spec.a.idField]);
+  await refreshDigest(spec.b.targetType, record[spec.b.idField]);
+}
 
 // One server action pair covers every relationship in the graph. Adds are
 // idempotent (linking Soccer twice never duplicates the relationship) and
-// every change is audited.
+// every change is audited. The payload vocabulary lives in
+// src/lib/link-schema.ts so non-server modules (ingest registry) share it.
 
-const id = z.string().min(1);
-const rel = z.string().min(1).max(60);
-
-const payloadSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("creator_entity"), creatorId: id, entityId: id, relationship: z.string().max(60).optional() }),
-  z.object({ kind: z.literal("creator_format"), creatorId: id, formatId: id, isPrimary: z.boolean().optional() }),
-  z.object({ kind: z.literal("creator_project"), creatorId: id, projectId: id, role: rel }),
-  z.object({ kind: z.literal("creator_org"), creatorId: id, organizationId: id, relationship: rel, status: z.string().max(30).optional() }),
-  z.object({ kind: z.literal("creator_person"), creatorId: id, personId: id, relationship: rel }),
-  z.object({ kind: z.literal("creator_creator"), creatorAId: id, creatorBId: id, relationship: rel, note: z.string().max(500).optional() }),
-  z.object({ kind: z.literal("project_org"), projectId: id, organizationId: id, relationship: rel }),
-  z.object({ kind: z.literal("project_entity"), projectId: id, entityId: id }),
-  z.object({ kind: z.literal("project_person"), projectId: id, personId: id, role: rel }),
-  z.object({ kind: z.literal("format_entity"), formatId: id, entityId: id }),
-  z.object({ kind: z.literal("format_org"), formatId: id, organizationId: id, relationship: z.string().max(60).optional() }),
-  z.object({ kind: z.literal("opportunity_creator"), opportunityId: id, creatorId: id, status: z.string().max(30).optional() }),
-  z.object({ kind: z.literal("opportunity_format"), opportunityId: id, formatId: id }),
-  z.object({ kind: z.literal("opportunity_project"), opportunityId: id, projectId: id }),
-  z.object({ kind: z.literal("opportunity_org"), opportunityId: id, organizationId: id }),
-  z.object({ kind: z.literal("opportunity_entity"), opportunityId: id, entityId: id }),
-  z.object({ kind: z.literal("collection_item"), collectionId: id, targetType: z.string().max(30), targetId: id }),
-]);
-
-export type LinkPayload = z.infer<typeof payloadSchema>;
+export type { LinkPayload };
 export type LinkResult = { ok: true } | { ok: false; error: string };
 
 async function label(table: "creator" | "project" | "organization" | "format" | "opportunity" | "entity" | "person" | "collection", recordId: string): Promise<string> {
@@ -274,6 +263,7 @@ export async function addLink(payload: LinkPayload): Promise<LinkResult> {
     await upsertLink(p);
     const info = await auditInfo(p);
     await logAudit(user, { ...info, action: "linked", newValue: info.other });
+    await refreshLinkSides(p);
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
@@ -288,6 +278,7 @@ export async function removeLink(payload: LinkPayload): Promise<LinkResult> {
     const info = await auditInfo(p);
     await deleteLink(p);
     await logAudit(user, { ...info, action: "unlinked", oldValue: info.other });
+    await refreshLinkSides(p);
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {

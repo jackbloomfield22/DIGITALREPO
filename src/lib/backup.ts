@@ -54,6 +54,9 @@ export const TABLE_ORDER = [
   "aiThread",
   "aiMessage",
   "researchInboxItem",
+  // Rebuildable at any time (scripts/rebuild-digests.ts), but included so the
+  // dump is complete and the coverage test stays honest.
+  "knowledgeDigest",
 ] as const;
 
 export type BackupFile = {
