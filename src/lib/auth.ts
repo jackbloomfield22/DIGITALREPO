@@ -11,8 +11,20 @@ export { hasRole };
 export type { SessionUser };
 
 const COOKIE_NAME = "db_session";
-const secret = () =>
-  new TextEncoder().encode(process.env.AUTH_SECRET ?? "dev-secret-4440");
+const secret = () => {
+  // Accept common casing slips — Vercel env var names are case-sensitive.
+  const configured =
+    process.env.AUTH_SECRET || process.env.Auth_secret || process.env.auth_secret;
+  if (configured) return new TextEncoder().encode(configured);
+  if (process.env.NODE_ENV === "production") {
+    // Never sign production sessions with a secret that lives in a public
+    // repo — anyone could forge an admin cookie. Fail loudly instead.
+    throw new Error(
+      "AUTH_SECRET is not set. Add it in Vercel → Settings → Environment Variables, then redeploy.",
+    );
+  }
+  return new TextEncoder().encode("dev-secret-4440");
+};
 
 const SESSION_DAYS = 90;
 

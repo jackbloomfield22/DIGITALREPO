@@ -28,7 +28,9 @@ export default async function LoginPage({
             <p className="rounded bg-accent-wash px-3 py-2 text-sm text-accent-deep">
               {error === "credentials"
                 ? "That email and password didn't match."
-                : "Sign-in failed. Try again."}
+                : error === "rate"
+                  ? "Too many sign-in attempts — wait a few minutes and try again."
+                  : "Sign-in failed. Try again."}
             </p>
           )}
           <div>

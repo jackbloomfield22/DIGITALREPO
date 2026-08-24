@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { createSession } from "@/lib/auth";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 const signupSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -30,9 +31,24 @@ export async function signup(formData: FormData) {
   }
   const { name, email, password } = parsed.data;
 
-  // Sign-up requires the team invite code. The SIGNUP_CODE env var overrides
-  // the built-in default; with the default, the trailing "!" is optional.
-  const requiredCode = process.env.SIGNUP_CODE || "44Forty2026!";
+  const ip = await clientIp();
+  if (!rateLimit(`signup:${ip}`, 10, 15 * 60_000)) {
+    redirect(`/signup?error=${encodeURIComponent("Too many attempts — wait a few minutes and try again.")}`);
+  }
+
+  // Sign-up requires the team invite code. In production the code MUST come
+  // from the SIGNUP_CODE env var — this repo is public, so a code written in
+  // the source is not a secret. Locally the dev default keeps signup working.
+  const requiredCode =
+    process.env.SIGNUP_CODE ||
+    (process.env.NODE_ENV === "production" ? null : "44Forty2026!");
+  if (!requiredCode) {
+    redirect(
+      `/signup?error=${encodeURIComponent(
+        "Sign-ups are closed until an admin sets the SIGNUP_CODE environment variable.",
+      )}`,
+    );
+  }
   const submitted = String(formData.get("code") ?? "").trim();
   const codeOk =
     submitted === requiredCode ||

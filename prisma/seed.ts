@@ -3,6 +3,7 @@
 // sports, cities, production companies, brands) are intentional so relational
 // discovery has something to discover.
 
+import crypto from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { slugify } from "../src/lib/slug";
@@ -23,12 +24,24 @@ async function main() {
   console.log("Seeding Digital Bible demo data...");
 
   // --- Users -----------------------------------------------------------------
+  // On hosted deploys (SEED_IF_EMPTY) the demo accounts get random passwords —
+  // the well-known dev passwords must never exist on a public URL. The admin
+  // password is printed once in the build log so the deployer can sign in.
+  const hosted = !!process.env.SEED_IF_EMPTY;
+  const randomPw = () => crypto.randomBytes(12).toString("base64url");
+  const users = [
+    { email: "admin@440.media", name: "Jordan Avery", role: "ADMIN", pw: hosted ? randomPw() : "admin440" },
+    { email: "editor@440.media", name: "Sam Whitaker", role: "EDITOR", pw: hosted ? randomPw() : "editor440" },
+    { email: "viewer@440.media", name: "Riley Chen", role: "VIEWER", pw: hosted ? randomPw() : "viewer440" },
+  ];
+  if (hosted) {
+    console.log("──────────────────────────────────────────────────────────");
+    console.log(`  Bootstrap admin: ${users[0].email} / ${users[0].pw}`);
+    console.log("  Save this password now — it is only printed once, here.");
+    console.log("──────────────────────────────────────────────────────────");
+  }
   const [admin, editor] = await Promise.all(
-    [
-      { email: "admin@440.media", name: "Jordan Avery", role: "ADMIN", pw: "admin440" },
-      { email: "editor@440.media", name: "Sam Whitaker", role: "EDITOR", pw: "editor440" },
-      { email: "viewer@440.media", name: "Riley Chen", role: "VIEWER", pw: "viewer440" },
-    ].map((u) =>
+    users.map((u) =>
       db.user.upsert({
         where: { email: u.email },
         update: {},
