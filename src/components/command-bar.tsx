@@ -13,7 +13,7 @@ const ACTIONS: ResultItem[] = [
   { label: "Add Format", href: "/formats/new" },
   { label: "Create Opportunity", href: "/opportunities/new" },
   { label: "Open AI Search", href: "/ai" },
-  { label: "Open Research Inbox", href: "/inbox" },
+  { label: "Open Ingest", href: "/ingest" },
 ];
 
 export function CommandBar() {

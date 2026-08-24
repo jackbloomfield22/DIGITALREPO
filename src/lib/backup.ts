@@ -53,7 +53,8 @@ export const TABLE_ORDER = [
   "auditLog",
   "aiThread",
   "aiMessage",
-  "researchInboxItem",
+  "ingestItem",
+  "ingestChange",
   // Rebuildable at any time (scripts/rebuild-digests.ts), but included so the
   // dump is complete and the coverage test stays honest.
   "knowledgeDigest",

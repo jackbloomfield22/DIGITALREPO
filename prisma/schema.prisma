@@ -34,7 +34,7 @@ model User {
   collections  Collection[]
   auditLogs    AuditLog[]
   aiThreads    AiThread[]
-  inboxItems   ResearchInboxItem[]
+  ingestItems  IngestItem[]
   ownedFormats Format[]            @relation("FormatOwner")
   ownedOpps    Opportunity[]       @relation("OpportunityOwner")
 }
@@ -687,11 +687,16 @@ model KnowledgeDigest {
   archived      Boolean  @default(false)
   summary       String
   searchText    String
+  // Generated column (see the knowledge_digest migration); queried via $queryRaw.
+  searchVector  Unsupported("tsvector")?
   sourceVersion Int      @default(0)
   updatedAt     DateTime @updatedAt
 
   @@unique([targetType, targetId])
   @@index([name])
+  @@index([searchVector], type: Gin, map: "KnowledgeDigest_searchVector_idx")
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "KnowledgeDigest_name_trgm_idx")
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "KnowledgeDigest_searchText_trgm_idx")
 }
 
 // Upcoming sports calendar: US professional and major world sports events.
@@ -731,14 +736,65 @@ model Snapshot {
   @@index([createdAt])
 }
 
-model ResearchInboxItem {
-  id          String   @id @default(cuid())
-  rawText     String
-  status      String   @default("pending") // pending | proposed | applied | dismissed
-  proposal    Json?
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// One row per ingested source: an uploaded file, pasted text, or a child
+// unpacked from a zip/mbox/email attachments. Raw bytes retained in Postgres
+// up to a configurable cap; extracted text always retained.
+model IngestItem {
+  id            String   @id @default(cuid())
+  kind          String // email | document | text | archive
+  filename      String?
+  mimeType      String?
+  sizeBytes     Int?
+  raw           Bytes?
+  rawRetained   Boolean  @default(false)
+  extractedText String?
+  metadata      Json?
+  parentId      String?
+  threadId      String?
+  status        String   @default("uploaded") // uploaded | parsed | triaged | irrelevant | proposed | applied | failed
+  relevance     Json?
+  tokenUsage    Json?
+  error         String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  parent    IngestItem?    @relation("IngestChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  IngestItem[]   @relation("IngestChildren")
+  createdBy User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  changes   IngestChange[]
+
+  @@index([status])
+  @@index([threadId])
+  @@index([createdAt])
+}
+
+// One row per proposed change awaiting review. `payload` holds the validated
+// op the apply engine consumes; `evidence` holds verbatim source snippets
+// with character offsets into extractedText.
+model IngestChange {
+  id          String    @id @default(cuid())
+  itemId      String
+  group       String // review-UI grouping label, e.g. "Talent › Maya Delgado"
+  destination Json // { targetType, targetId|null, field|linkKind, path }
+  opType      String // create | update | link | unlink | archive | note
+  payload     Json
+  before      Json?
+  after       Json
+  confidence  Float     @default(0.5)
+  rationale   String?
+  evidence    Json?
+  sensitive   Boolean   @default(false)
+  status      String    @default("pending") // pending | approved | edited | rejected | applied | failed | superseded
+  editedAfter Json?
+  appliedAt   DateTime?
+  appliedById String?
+  error       String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  item IngestItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, status])
 }
