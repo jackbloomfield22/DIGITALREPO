@@ -160,6 +160,19 @@ const STATUS_COLORS: Record<string, string> = {
   // creators
   watch: "bg-[#f5efdd] text-warn",
   priority: "bg-accent-wash text-accent-deep",
+  // ingest
+  uploaded: "bg-wash text-muted",
+  parsed: "bg-wash text-charcoal",
+  triaged: "bg-[#f5efdd] text-warn",
+  proposed: "bg-accent-wash text-accent-deep",
+  irrelevant: "bg-wash text-faint",
+  applied: "bg-[#eef2ec] text-ok",
+  failed: "bg-accent-wash text-accent-deep",
+  approved: "bg-[#eef2ec] text-ok",
+  edited: "bg-[#eef2ec] text-ok",
+  rejected: "bg-wash text-faint",
+  pending: "bg-[#f5efdd] text-warn",
+  superseded: "bg-accent-wash text-accent-deep",
 };
 
 export function StatusPill({ status, label }: { status: string; label: string }) {

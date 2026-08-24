@@ -1,6 +1,6 @@
-import "server-only";
 import { db } from "@/lib/db";
-import type { SessionUser } from "@/lib/auth";
+import { refreshDigest } from "@/lib/ingest/digest";
+import type { SessionUser } from "@/lib/roles";
 
 type AuditEntry = {
   targetType: string;
@@ -26,6 +26,10 @@ export async function logAudit(user: SessionUser | null, entry: AuditEntry) {
       newValue: entry.newValue ?? null,
     },
   });
+  // Audit is the chokepoint every mutation passes through — keep the
+  // Knowledge Digest current from here (TTL-memoized; no-op for
+  // non-digestible target types).
+  await refreshDigest(entry.targetType, entry.targetId);
 }
 
 /** Diff two flat records and write one audit row per changed field. */
@@ -55,7 +59,10 @@ export async function logFieldChanges(
       });
     }
   }
-  if (rows.length) await db.auditLog.createMany({ data: rows });
+  if (rows.length) {
+    await db.auditLog.createMany({ data: rows });
+    await refreshDigest(targetType, targetId);
+  }
 }
 
 function normalize(v: unknown): string | null {

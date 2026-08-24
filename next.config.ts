@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     return [
       { source: "/creators", destination: "/talent", permanent: true },
       { source: "/creators/:path*", destination: "/talent/:path*", permanent: true },
+      // Research Inbox became the Ingest system
+      { source: "/inbox", destination: "/ingest", permanent: true },
     ];
   },
 };

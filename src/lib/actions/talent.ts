@@ -352,7 +352,7 @@ export async function bulkArchive(creatorIds: string[]): Promise<ActionResult> {
     const user = await requireRole("ADMIN");
     await db.creator.updateMany({
       where: { id: { in: creatorIds.slice(0, 200) } },
-      data: { archived: true },
+      data: { archived: true, archivedReason: "Archived from talent table", archivedAt: new Date() },
     });
     await logAudit(user, {
       targetType: "creator",

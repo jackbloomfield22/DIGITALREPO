@@ -1,0 +1,72 @@
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { getSessionUser, hasRole } from "@/lib/auth";
+import { storeRawBytes } from "@/lib/ingest/storage";
+import { classifyKind } from "@/lib/ingest/parse";
+
+export const maxDuration = 60;
+
+const ACCEPTED = new Set(["eml", "msg", "mbox", "zip", "pdf", "docx", "pptx", "xlsx", "csv", "txt", "md", "html", "htm"]);
+const MAX_FILES = 50;
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+// Upload stage: create one IngestItem per file (plus one for pasted text) and
+// return immediately — parsing happens in its own short request.
+export async function POST(request: Request) {
+  const user = await getSessionUser();
+  if (!user || !hasRole(user, "EDITOR")) {
+    return NextResponse.json({ error: "Editor access required" }, { status: 403 });
+  }
+
+  const form = await request.formData();
+  const files = form.getAll("files").filter((f): f is File => f instanceof File);
+  const pasted = String(form.get("text") ?? "").trim();
+
+  if (!files.length && !pasted) {
+    return NextResponse.json({ error: "Nothing to ingest — add files or paste text." }, { status: 400 });
+  }
+  if (files.length > MAX_FILES) {
+    return NextResponse.json({ error: `Too many files — the limit is ${MAX_FILES} per upload.` }, { status: 400 });
+  }
+  const totalBytes = files.reduce((n, f) => n + f.size, 0);
+  if (totalBytes > MAX_UPLOAD_BYTES) {
+    return NextResponse.json({ error: "Upload exceeds 100MB — split it into smaller batches." }, { status: 400 });
+  }
+
+  const created: { id: string; filename: string | null; skipped?: string }[] = [];
+
+  for (const file of files) {
+    const extension = file.name.toLowerCase().split(".").pop() ?? "";
+    if (!ACCEPTED.has(extension)) {
+      created.push({ id: "", filename: file.name, skipped: `Unsupported type .${extension}` });
+      continue;
+    }
+    const item = await db.ingestItem.create({
+      data: {
+        kind: classifyKind(file.name, file.type || null),
+        filename: file.name,
+        mimeType: file.type || null,
+        sizeBytes: file.size,
+        createdById: user.id,
+        status: "uploaded",
+      },
+    });
+    await storeRawBytes(item.id, new Uint8Array(await file.arrayBuffer()));
+    created.push({ id: item.id, filename: file.name });
+  }
+
+  if (pasted) {
+    const item = await db.ingestItem.create({
+      data: {
+        kind: "text",
+        extractedText: pasted.slice(0, 200_000),
+        sizeBytes: pasted.length,
+        createdById: user.id,
+        status: "parsed", // pasted text needs no parse stage
+      },
+    });
+    created.push({ id: item.id, filename: null });
+  }
+
+  return NextResponse.json({ items: created });
+}
