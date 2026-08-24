@@ -179,6 +179,11 @@ model IndustryPerson {
   name      String
   title     String?
   roleType  String? // agent | manager | publicist | executive | producer | ...
+  email     String?
+  phone     String?
+  contactUrl String? // LinkedIn / website / booking page
+  assistantName  String?
+  assistantEmail String?
   notes     String?
   archived  Boolean  @default(false)
   archivedReason String?
@@ -388,6 +393,9 @@ model CreatorPerson {
   creatorId    String
   personId     String
   relationship String // agent | manager | publicist | attorney | other
+  current      Boolean @default(true)
+  start        String? // free text: "2023", "May 2024"
+  end          String?
   note         String?
   confidence   String?
 
@@ -636,6 +644,18 @@ model Attachment {
   createdAt    DateTime @default(now())
 
   @@index([targetType, targetId])
+}
+
+// Uploaded file contents. Serverless filesystems are ephemeral, so bytes live
+// in Postgres with everything else — attachments survive deploys and appear
+// in backups. `key` is the opaque name used in /api/files/<key> URLs.
+model StoredFile {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  mimeType  String?
+  sizeBytes Int
+  data      Bytes
+  createdAt DateTime @default(now())
 }
 
 model AuditLog {

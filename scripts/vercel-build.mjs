@@ -46,7 +46,22 @@ const run = (cmd) => {
   execSync(cmd, { stdio: "inherit", env });
 };
 
+if (!process.env.AUTH_SECRET && !process.env.Auth_secret && !process.env.auth_secret) {
+  console.warn(`
+⚠  AUTH_SECRET is not set — sign-in will fail on this deployment.
+   Add AUTH_SECRET in Vercel → Settings → Environment Variables.
+`);
+}
+if (!process.env.SIGNUP_CODE) {
+  console.warn(`
+⚠  SIGNUP_CODE is not set — sign-ups are closed on this deployment.
+   Add SIGNUP_CODE in Vercel → Settings → Environment Variables to open
+   invite-code sign-up. (This repo is public: the code must live in an
+   env var, not in the source.)
+`);
+}
 run("npx prisma migrate deploy");
 run("npx tsx prisma/seed.ts");
+run("npx tsx scripts/harden-demo-users.ts");
 run("npx tsx scripts/rebuild-digests.ts --if-empty");
 run("npx next build");

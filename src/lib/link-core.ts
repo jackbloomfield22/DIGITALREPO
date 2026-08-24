@@ -96,13 +96,21 @@ export async function upsertLink(p: LinkPayload): Promise<void> {
         create: { creatorId: p.creatorId, organizationId: p.organizationId, relationship: p.relationship, status: p.status ?? "active" },
       });
       return;
-    case "creator_person":
+    case "creator_person": {
+      // Re-linking an existing rep updates its status fields — the talent
+      // page's "mark past/current" toggle relies on this upsert path.
+      const status = {
+        ...(p.current === undefined ? {} : { current: p.current }),
+        ...(p.start === undefined ? {} : { start: p.start || null }),
+        ...(p.end === undefined ? {} : { end: p.end || null }),
+      };
       await db.creatorPerson.upsert({
         where: { creatorId_personId_relationship: { creatorId: p.creatorId, personId: p.personId, relationship: p.relationship } },
-        update: {},
-        create: { creatorId: p.creatorId, personId: p.personId, relationship: p.relationship },
+        update: status,
+        create: { creatorId: p.creatorId, personId: p.personId, relationship: p.relationship, ...status },
       });
       return;
+    }
     case "creator_creator": {
       if (p.creatorAId === p.creatorBId) throw new Error("A creator can't be linked to themselves.");
       const [creatorAId, creatorBId] = [p.creatorAId, p.creatorBId].sort();

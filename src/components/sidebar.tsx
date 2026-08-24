@@ -19,6 +19,7 @@ const SECONDARY = [
   { href: "/recent", label: "Recent" },
   { href: "/favorites", label: "Favorites" },
   { href: "/activity", label: "Activity" },
+  { href: "/attention", label: "Needs Attention" },
   { href: "/ingest", label: "Ingest" },
   { href: "/archive", label: "Archive" },
 ];

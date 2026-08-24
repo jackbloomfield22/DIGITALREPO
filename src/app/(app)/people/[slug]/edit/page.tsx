@@ -30,6 +30,11 @@ export default async function EditPersonPage({
           name: person.name,
           title: person.title ?? "",
           roleType: person.roleType ?? "",
+          email: person.email ?? "",
+          phone: person.phone ?? "",
+          contactUrl: person.contactUrl ?? "",
+          assistantName: person.assistantName ?? "",
+          assistantEmail: person.assistantEmail ?? "",
           notes: person.notes ?? "",
         },
       }}

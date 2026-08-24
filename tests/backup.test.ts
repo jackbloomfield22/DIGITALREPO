@@ -5,7 +5,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { writeFileSync } from "node:fs";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { buildBackup, createSnapshot, TABLE_ORDER } from "@/lib/backup";
+import { buildBackup, createSnapshot, decodeBytesFields, TABLE_ORDER } from "@/lib/backup";
 
 const db = new PrismaClient();
 afterAll(() => db.$disconnect());
@@ -39,6 +39,25 @@ describe("backup round trip", () => {
 
     // Export for the restore-script integration check (run outside vitest).
     writeFileSync("/tmp/claude-0/test-backup.json", JSON.stringify(backup));
+  });
+
+  it("round-trips Bytes columns as JSON-safe base64 markers", async () => {
+    const data = new Uint8Array([0, 44, 40, 255, 128, 7]);
+    const file = await db.storedFile.create({
+      data: { key: "zz-test-bytes.bin", mimeType: "application/octet-stream", sizeBytes: data.byteLength, data },
+    });
+    try {
+      const backup = JSON.parse(JSON.stringify(await buildBackup())) as {
+        tables: { storedFile: Record<string, unknown>[] };
+      };
+      const row = backup.tables.storedFile.find((r) => r.key === "zz-test-bytes.bin");
+      expect(row).toBeTruthy();
+      expect((row!.data as { $bytes: string }).$bytes).toBeTypeOf("string");
+      const decoded = decodeBytesFields(row!);
+      expect(new Uint8Array(decoded.data as Buffer)).toEqual(data);
+    } finally {
+      await db.storedFile.delete({ where: { id: file.id } });
+    }
   });
 
   it("stores a snapshot with a size and per-table counts", async () => {

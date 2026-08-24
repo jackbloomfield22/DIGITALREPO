@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { offsiteBackupConfigured } from "@/lib/backup";
 import { BackupControls, DeleteSnapshotButton } from "@/components/admin/backup-controls";
 import { formatDate, relativeTime } from "@/lib/format";
 
@@ -20,6 +21,21 @@ export default async function BackupsPage() {
         (the newest 14 daily snapshots are kept; manual backups are kept until you delete
         them). Download copies periodically and keep them somewhere safe — a downloaded
         file can restore the entire database.
+      </p>
+
+      <p className="mb-6 max-w-2xl text-sm">
+        {offsiteBackupConfigured() ? (
+          <span className="rounded bg-wash px-2 py-1 text-xs">
+            ✓ Offsite copies on — every snapshot also uploads encrypted to Vercel Blob,
+            outside the database.
+          </span>
+        ) : (
+          <span className="rounded bg-[#f5efdd] px-2 py-1 text-xs text-warn">
+            Offsite copies off — snapshots live inside the same database they protect.
+            Add a Blob store in Vercel (Storage → Create → Blob) to store encrypted
+            copies outside it.
+          </span>
+        )}
       </p>
 
       <BackupControls />

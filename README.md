@@ -48,13 +48,20 @@ discover.
 | Variable            | Required | Purpose                                                        |
 | ------------------- | -------- | -------------------------------------------------------------- |
 | `DATABASE_URL`      | yes      | Postgres connection string                                     |
-| `AUTH_SECRET`       | yes      | Signs session cookies (set a strong value in production)       |
+| `AUTH_SECRET`       | yes      | Signs session cookies. **Production refuses to run without it** — there is no fallback secret. |
+| `SIGNUP_CODE`       | prod: yes | The invite code required at `/signup`. **Sign-ups are closed in production until this is set** (this repo is public, so the code can't live in the source). A dev-only default applies locally. |
 | `ANTHROPIC_API_KEY` | no       | Enables AI Search + Ingest triage/proposals. **The app is fully functional without it** — AI Search degrades to structured keyword search. |
+| `ADMIN_EMAIL`       | no       | On each deploy, promotes this account to ADMIN (use it once to make your own sign-up an admin) |
+| `BLOB_READ_WRITE_TOKEN` | no   | Auto-set when a Vercel Blob store is connected — every backup then also uploads an encrypted copy *outside* the database (decrypt with `scripts/decrypt-backup.mjs`) |
 | `AI_MODEL`          | no       | Override the Claude model (default `claude-opus-5`)            |
-| `SIGNUP_CODE`       | no       | Overrides the built-in invite code required at `/signup`        |
 | `AI_MODEL_TRIAGE`   | no       | Cheap model for ingest triage (default `claude-haiku-4-5`)      |
 | `INGEST_RAW_CAP_MB` | no       | Raw-file retention cap in Postgres (default 4)                  |
 | `CRON_SECRET`       | no       | When set, required on the backup and ingest cron endpoints      |
+
+On hosted deploys the bootstrap seed generates random passwords for the demo
+accounts (the admin one is printed once in the build log), and every build
+rotates any demo account still carrying a public default password. Uploaded
+attachments are stored in Postgres, so they survive serverless redeploys.
 
 Team members create their own accounts at `/signup` with the team invite code (new members
 join as editors; admins can adjust roles under Admin → Users). Everyone shares the one Repo, and every change
