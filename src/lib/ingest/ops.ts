@@ -16,11 +16,21 @@ const TARGET_TYPES = Object.keys(RECORD_REGISTRY) as IngestTargetType[];
 
 const targetType = z.enum(TARGET_TYPES as [IngestTargetType, ...IngestTargetType[]]);
 const confidence = z.number().min(0).max(1).default(0.6);
-const evidence = z.array(z.string().min(3).max(600)).min(1).max(4);
+
+// Model output is advisory text, not user input — an over-long string means
+// the model was chatty, not that the document is bad. Clamp to the cap
+// instead of failing the whole item ("Too big: expected string…").
+const clamp = (max: number) => z.string().transform((s) => (s.length > max ? s.slice(0, max) : s));
+const clampMin = (min: number, max: number) =>
+  z.string().min(min).transform((s) => (s.length > max ? s.slice(0, max) : s));
+const clampArr = <S extends z.ZodTypeAny>(schema: S, max: number) =>
+  z.array(schema).transform((a) => (a.length > max ? a.slice(0, max) : a));
+
+const evidence = z.array(clampMin(3, 600)).min(1).transform((a) => a.slice(0, 4));
 
 const baseChange = {
   confidence,
-  rationale: z.string().max(1000).default(""),
+  rationale: z.string().default("").transform((s) => (s.length > 1000 ? s.slice(0, 1000) : s)),
   evidence,
   sensitive: z.boolean().default(false),
 };
@@ -29,45 +39,45 @@ export const proposedOpSchema = z.discriminatedUnion("op", [
   z.object({
     op: z.literal("create"),
     targetType,
-    name: z.string().min(1).max(300),
-    entityKind: z.string().max(30).optional(), // for targetType entity
-    fields: z.record(z.string(), z.union([z.string().max(8000), z.number()])).optional(),
+    name: clampMin(1, 300),
+    entityKind: clamp(30).optional(), // for targetType entity
+    fields: z.record(z.string(), z.union([clamp(8000), z.number()])).optional(),
     ...baseChange,
   }),
   z.object({
     op: z.literal("update"),
     targetType,
-    targetName: z.string().min(1).max(300),
-    targetId: z.string().max(50).optional(),
-    field: z.string().min(1).max(60),
-    value: z.union([z.string().max(8000), z.number()]),
+    targetName: clampMin(1, 300),
+    targetId: clamp(50).optional(),
+    field: clampMin(1, 60),
+    value: z.union([clamp(8000), z.number()]),
     ...baseChange,
   }),
   z.object({
     op: z.literal("link"),
     kind: z.enum(INGEST_LINK_KINDS as [string, ...string[]]),
-    aName: z.string().min(1).max(300),
-    aId: z.string().max(50).optional(),
-    bName: z.string().min(1).max(300),
-    bId: z.string().max(50).optional(),
-    role: z.string().max(60).optional(),
-    entityKind: z.string().max(30).optional(), // when side b is a taxonomy entity
+    aName: clampMin(1, 300),
+    aId: clamp(50).optional(),
+    bName: clampMin(1, 300),
+    bId: clamp(50).optional(),
+    role: clamp(60).optional(),
+    entityKind: clamp(30).optional(), // when side b is a taxonomy entity
     ...baseChange,
   }),
   z.object({
     op: z.literal("archive"),
     targetType,
-    targetName: z.string().min(1).max(300),
-    targetId: z.string().max(50).optional(),
-    reason: z.string().min(3).max(500),
+    targetName: clampMin(1, 300),
+    targetId: clamp(50).optional(),
+    reason: clampMin(3, 500),
     ...baseChange,
   }),
   z.object({
     op: z.literal("note"),
-    text: z.string().min(3).max(2000),
+    text: clampMin(3, 2000),
     aboutType: targetType.optional(),
-    aboutName: z.string().max(300).optional(),
-    aboutId: z.string().max(50).optional(),
+    aboutName: clamp(300).optional(),
+    aboutId: clamp(50).optional(),
     ...baseChange,
   }),
 ]);
@@ -75,16 +85,20 @@ export const proposedOpSchema = z.discriminatedUnion("op", [
 export type ProposedOp = z.infer<typeof proposedOpSchema>;
 
 export const proposalOutputSchema = z.object({
-  changes: z.array(proposedOpSchema).max(80),
+  changes: clampArr(proposedOpSchema, 80),
 });
 
+const candidate = z.object({ targetType, name: clampMin(1, 300) });
+
+// The list fields are advisory context for the propose stage — a malformed
+// entry degrades them to empty rather than failing the verdict.
 export const triageOutputSchema = z.object({
   relevant: z.boolean(),
   score: z.number().min(0).max(1),
-  reasons: z.array(z.string().max(300)).max(6),
-  candidateRecords: z.array(z.object({ targetType, name: z.string().max(300) })).max(20).default([]),
-  newRecordCandidates: z.array(z.object({ targetType, name: z.string().max(300) })).max(20).default([]),
-  sections: z.array(z.string().max(200)).max(12).default([]),
+  reasons: clampArr(clamp(300), 6).catch([]),
+  candidateRecords: clampArr(candidate, 20).default([]).catch([]),
+  newRecordCandidates: clampArr(candidate, 20).default([]).catch([]),
+  sections: clampArr(clamp(200), 12).default([]).catch([]),
 });
 export type TriageOutput = z.infer<typeof triageOutputSchema>;
 

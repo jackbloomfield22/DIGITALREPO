@@ -21,6 +21,42 @@ import { useToast } from "@/components/toast";
 import { StatusPill } from "@/components/ui";
 import type { ApplyOutcome } from "@/lib/ingest/apply";
 
+function RetryButton({ item }: { item: ItemVM }) {
+  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+  // Resume from wherever the item got to: no text → re-parse; text but no
+  // triage verdict → triage; otherwise straight to proposing again.
+  const stage = !item.text.trim() ? "parse" : item.relevance ? "propose" : "triage";
+
+  const retry = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/ingest/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, stage }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast("Retried — reloading…");
+        router.refresh();
+      } else {
+        toast(body.error ?? "Retry failed", { tone: "error" });
+      }
+    } catch {
+      toast("Network error — try again.", { tone: "error" });
+    }
+    setBusy(false);
+  };
+
+  return (
+    <button className="btn btn-secondary btn-sm mt-3" disabled={busy} onClick={retry}>
+      {busy ? "Retrying…" : `Retry (${stage})`}
+    </button>
+  );
+}
+
 export type ItemVM = {
   id: string;
   kind: string;
@@ -296,6 +332,7 @@ export function ReviewBoard({ item, changes, canEdit }: { item: ItemVM; changes:
     return (
       <div className="card border-accent/40 p-5 text-sm">
         <p className="font-medium text-accent-deep">This item failed: {item.error}</p>
+        {canEdit && <RetryButton item={item} />}
       </div>
     );
   }

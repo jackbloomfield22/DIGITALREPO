@@ -388,6 +388,60 @@ describe("triage and propose with a fake model", () => {
     await db.ingestItem.delete({ where: { id: item.id } });
   });
 
+  it("clamps over-long model text instead of failing the item (prod regression)", async () => {
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} A long pasted email thread about Nova Reyes and CAA.`, status: "parsed" },
+    });
+    const { triageItemCore } = await import("@/lib/ingest/pipeline");
+    const result = await triageItemCore(item.id, async () => ({
+      output: {
+        relevant: true,
+        score: 0.8,
+        // The exact production failure: a triage reason longer than 300 chars.
+        reasons: ["Short reason", "x".repeat(900)],
+        candidateRecords: [],
+        newRecordCandidates: [],
+        sections: [],
+      },
+      usage,
+    }));
+    expect(result.ok).toBe(true);
+    const stored = await db.ingestItem.findUnique({ where: { id: item.id } });
+    expect(stored?.status).toBe("triaged");
+    expect((stored?.relevance as { reasons: string[] }).reasons[1]).toHaveLength(300);
+    await db.ingestItem.delete({ where: { id: item.id } });
+  });
+
+  it("drops a malformed proposal without sinking the batch, and failed items can re-triage", async () => {
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} Nova Reyes update thread.`, status: "failed", error: "boom" },
+    });
+    const { triageItemCore, proposeItemCore } = await import("@/lib/ingest/pipeline");
+    // Retry path: a failed item with extracted text can run triage again.
+    const triaged = await triageItemCore(item.id, async () => ({
+      output: { relevant: true, score: 0.7, reasons: ["Facts present"], candidateRecords: [], newRecordCandidates: [], sections: [] },
+      usage,
+    }));
+    expect(triaged.ok).toBe(true);
+
+    const result = await proposeItemCore(item.id, async () => ({
+      output: {
+        changes: [
+          { op: "note", text: `${P} Valid note about the thread.`, confidence: 0.8, rationale: "ok", evidence: ["Nova Reyes update thread."], sensitive: false },
+          { op: "update", targetType: "creator" }, // structurally malformed — no targetName/field/value
+          { totally: "not an op" },
+        ],
+      },
+      usage,
+    }));
+    expect(result.ok).toBe(true);
+    const changes = await db.ingestChange.findMany({ where: { itemId: item.id } });
+    expect(changes).toHaveLength(1);
+    expect(changes[0].opType).toBe("note");
+    await db.ingestChange.deleteMany({ where: { itemId: item.id } });
+    await db.ingestItem.delete({ where: { id: item.id } });
+  });
+
   it("without an API key the real pipeline refuses gracefully", async () => {
     const item = await db.ingestItem.create({
       data: { kind: "text", extractedText: `${P} some text`, status: "parsed" },

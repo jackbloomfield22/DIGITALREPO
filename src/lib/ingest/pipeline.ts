@@ -13,8 +13,8 @@ import {
 import { matchCandidates, type DigestCandidate } from "@/lib/ingest/matching";
 import {
   describeOpVocabulary,
-  proposalOutputSchema,
   proposalToolSchema,
+  proposedOpSchema,
   triageOutputSchema,
   triageToolSchema,
   validateOp,
@@ -27,7 +27,10 @@ export type StageResult = { ok: boolean; error?: string; status?: string };
 const TRIAGE_TEXT_CAP = 18_000;
 const CHUNK_SIZE = 24_000;
 const CHUNK_OVERLAP = 2_000;
-const MAX_CHUNKS = 3; // keeps propose well inside the function limit; noted on the item
+// Long pasted threads are the main input, so cover more of them by default.
+// Still bounded to stay inside the serverless function limit; anything beyond
+// is noted on the item. Tune with INGEST_MAX_CHUNKS.
+const MAX_CHUNKS = Number(process.env.INGEST_MAX_CHUNKS) > 0 ? Number(process.env.INGEST_MAX_CHUNKS) : 5;
 
 async function recordUsage(itemId: string, stage: string, usage: ModelUsage) {
   const item = await db.ingestItem.findUnique({ where: { id: itemId }, select: { tokenUsage: true } });
@@ -76,7 +79,7 @@ export async function triageItemCore(
 ): Promise<StageResult> {
   const item = await db.ingestItem.findUnique({ where: { id: itemId } });
   if (!item) return { ok: false, error: "Item not found." };
-  if (!["parsed", "triaged", "irrelevant"].includes(item.status)) {
+  if (!["parsed", "triaged", "irrelevant", "failed"].includes(item.status)) {
     return item.status === "proposed" || item.status === "applied"
       ? { ok: true, status: item.status }
       : { ok: false, error: `Cannot triage an item in status "${item.status}".` };
@@ -85,6 +88,9 @@ export async function triageItemCore(
     return { ok: false, error: "AI triage needs ANTHROPIC_API_KEY. The document is parsed and stored — configure a key to generate proposals." };
   }
   const text = (item.extractedText ?? "").trim();
+  if (item.status === "failed" && !text) {
+    return { ok: false, error: "This item failed before any text was extracted — run the parse stage again." };
+  }
   if (!text) {
     await db.ingestItem.update({
       where: { id: itemId },
@@ -323,8 +329,16 @@ export async function proposeItemCore(
         toolSchema: proposalToolSchema(),
       });
       await recordUsage(itemId, "propose", usage);
-      const parsed = proposalOutputSchema.parse(output);
-      collected.push(...parsed.changes);
+      // Parse ops one by one — a single malformed proposal is dropped, not
+      // allowed to fail the whole batch.
+      const rawChanges = (output as { changes?: unknown[] })?.changes;
+      let droppedMalformed = 0;
+      for (const raw of (Array.isArray(rawChanges) ? rawChanges : []).slice(0, 80)) {
+        const parsed = proposedOpSchema.safeParse(raw);
+        if (parsed.success) collected.push(parsed.data);
+        else droppedMalformed++;
+      }
+      if (droppedMalformed) console.warn(`Ingest ${itemId}: dropped ${droppedMalformed} malformed proposal(s).`);
     }
 
     // Mechanical dedupe across chunks + registry validation
