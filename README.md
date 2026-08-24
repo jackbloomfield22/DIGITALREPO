@@ -49,9 +49,12 @@ discover.
 | ------------------- | -------- | -------------------------------------------------------------- |
 | `DATABASE_URL`      | yes      | Postgres connection string                                     |
 | `AUTH_SECRET`       | yes      | Signs session cookies (set a strong value in production)       |
-| `ANTHROPIC_API_KEY` | no       | Enables AI Search + Research Inbox parsing. **The app is fully functional without it** — AI Search degrades to structured keyword search. |
+| `ANTHROPIC_API_KEY` | no       | Enables AI Search + Ingest triage/proposals. **The app is fully functional without it** — AI Search degrades to structured keyword search. |
 | `AI_MODEL`          | no       | Override the Claude model (default `claude-opus-5`)            |
 | `SIGNUP_CODE`       | no       | Overrides the built-in invite code required at `/signup`        |
+| `AI_MODEL_TRIAGE`   | no       | Cheap model for ingest triage (default `claude-haiku-4-5`)      |
+| `INGEST_RAW_CAP_MB` | no       | Raw-file retention cap in Postgres (default 4)                  |
+| `CRON_SECRET`       | no       | When set, required on the backup and ingest cron endpoints      |
 
 Team members create their own accounts at `/signup` with the team invite code (new members
 join as editors; admins can adjust roles under Admin → Users). Everyone shares the one Repo, and every change
@@ -143,11 +146,26 @@ server-side tools** (`search_creators`, `get_organization`, `find_creator_connec
 to say "not in the database" rather than invent, and to label inferences. Answers come with
 clickable result cards back into the normal UI, and follow-up questions keep thread context.
 
-The **Research Inbox** (`/inbox`) is how the database stays current: paste anything —
-an announcement, notes from a call, a whole one-sheet — and AI proposes structured changes
-(create project X, link creator Y as Host, add org Z as production company…). Nothing
-touches canonical data until an editor clicks **Apply**; applied names are resolved against
-existing records so duplicates aren't created.
+### Ingest (`/ingest`) — how the Repo stays current
+
+Drop in emails (`.eml`, `.mbox`), documents (`.pdf`, `.docx`, `.pptx`, `.xlsx`), archives
+(`.zip`), or pasted text. A staged pipeline — each stage a short serverless request —
+parses deterministically (headers, quote-stripping, thread ids, attachments as child
+items), **triages** with a cheap model (pure logistics gets filtered out), and
+**proposes** structured changes grounded in the **Knowledge Digest**: a compact,
+always-current index with one dossier card per record, kept fresh by hooks on every
+mutation and searchable by trigram + full-text for candidate matching. Every proposal
+carries verbatim evidence, confidence, a rationale, and a before/after diff; sensitive
+items (fees, deal terms, personal details) sit in their own group, archives always need
+explicit approval, and a colleague's intervening edit turns a proposal into a
+`superseded` conflict instead of an overwrite. Applied changes are audited as ingest,
+attributed with a Source link back to the document, and refresh the digest. The whole
+vocabulary — editable fields, link kinds, digest recipes — derives from one registry
+(`src/lib/ingest/registry.ts`), so the AI layer has no hand-written schema knowledge.
+A daily cron (`/api/cron/ingest`) advances anything the in-browser runner left behind.
+
+**The Archive** (`/archive`) lists archived records of every type with the reason, who,
+when, and the source document, plus one-click Restore. Nothing is ever deleted.
 
 Without an API key, AI Search falls back to structured keyword search and the inbox still
 captures notes.
@@ -217,6 +235,16 @@ src/app/(app)/              # all authenticated pages
 src/components/             # design system + client interactivity
 tests/core.test.ts          # the core product guarantees
 ```
+
+
+## How to add a new category
+
+1. Add the vocabulary or record fields in `src/lib/taxonomy.ts` (statuses, roles, kinds).
+2. If it is a new record type: add the Prisma model, then one entry in
+   `src/lib/ingest/registry.ts` (fields, link participation, digest recipe, path).
+3. Run the tests — coverage checks fail until backups (`src/lib/backup.ts`), the
+   registry, and link specs all know about it. That is the entire wiring: the ingest op
+   schema, validation, digest, and review UI derive from the registry at runtime.
 
 ## Testing
 
