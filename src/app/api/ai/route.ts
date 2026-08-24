@@ -6,7 +6,7 @@ import { aiAvailable, runAiSearch } from "@/lib/ai/agent";
 import { ResultRegistry, toolByName } from "@/lib/ai/tools";
 
 const bodySchema = z.object({
-  threadId: z.string().max(50).optional(),
+  threadId: z.string().max(50).nullish(),
   message: z.string().min(1).max(4000),
 });
 
