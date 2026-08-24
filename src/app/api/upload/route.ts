@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { db } from "@/lib/db";
@@ -15,10 +14,9 @@ const ALLOWED = new Set([
   "text/csv", "text/plain",
 ]);
 
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
-
-// Local file storage. Swap for Supabase Storage by replacing this handler —
-// stored URLs are opaque to the rest of the app.
+// File bytes are stored in Postgres (StoredFile) — serverless filesystems are
+// ephemeral, so disk writes would silently vanish on the next deploy. Stored
+// URLs stay opaque to the rest of the app.
 export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user || !hasRole(user, "EDITOR")) {
@@ -37,11 +35,13 @@ export async function POST(request: Request) {
   }
 
   const ext = path.extname(file.name).toLowerCase().replace(/[^a-z0-9.]/g, "").slice(0, 10);
-  const stored = `${crypto.randomBytes(12).toString("hex")}${ext}`;
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  await writeFile(path.join(UPLOAD_DIR, stored), Buffer.from(await file.arrayBuffer()));
+  const key = `${crypto.randomBytes(12).toString("hex")}${ext}`;
+  const data = new Uint8Array(await file.arrayBuffer());
+  await db.storedFile.create({
+    data: { key, mimeType: file.type || null, sizeBytes: data.byteLength, data },
+  });
 
-  const url = `/api/files/${stored}`;
+  const url = `/api/files/${key}`;
 
   const targetType = form.get("targetType");
   const targetId = form.get("targetId");
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         targetType,
         targetId,
         filename: file.name,
-        storedPath: stored,
+        storedPath: key,
         mimeType: file.type || null,
         sizeBytes: file.size,
         uploadedById: user.id,

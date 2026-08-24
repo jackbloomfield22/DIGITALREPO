@@ -20,7 +20,7 @@ const TABLE_ORDER = [
   "creatorFormat", "formatOrganization", "creatorRelationship",
   "opportunityCreator", "opportunityFormat", "opportunityProject",
   "opportunityOrganization", "collection", "collectionItem", "savedView",
-  "favorite", "recentView", "source", "recordSource", "attachment", "auditLog",
+  "favorite", "recentView", "source", "recordSource", "storedFile", "attachment", "auditLog",
   "aiThread", "aiMessage", "ingestItem", "ingestChange", "knowledgeDigest",
 ];
 
@@ -61,7 +61,13 @@ try {
 
   console.log("Loading backup…");
   for (const table of TABLE_ORDER) {
-    const rows = backup.tables[table] ?? [];
+    const rows = (backup.tables[table] ?? []).map((row) => {
+      // Decode {$bytes: base64} markers written by buildBackup for Bytes columns.
+      for (const [k, v] of Object.entries(row)) {
+        if (v && typeof v === "object" && "$bytes" in v) row[k] = Buffer.from(v.$bytes, "base64");
+      }
+      return row;
+    });
     if (!rows.length || !db[table]) continue;
     await db[table].createMany({ data: rows });
     console.log(`  ${table}: ${rows.length}`);

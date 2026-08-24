@@ -638,6 +638,18 @@ model Attachment {
   @@index([targetType, targetId])
 }
 
+// Uploaded file contents. Serverless filesystems are ephemeral, so bytes live
+// in Postgres with everything else — attachments survive deploys and appear
+// in backups. `key` is the opaque name used in /api/files/<key> URLs.
+model StoredFile {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  mimeType  String?
+  sizeBytes Int
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
 model AuditLog {
   id          String   @id @default(cuid())
   userId      String?
