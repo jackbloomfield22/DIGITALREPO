@@ -284,3 +284,115 @@ describe("parse stage end to end", () => {
     await db.ingestItem.delete({ where: { id: item.id } });
   });
 });
+
+describe("candidate matching", () => {
+  it("finds an existing creator by alias and by email handle", async () => {
+    const creator = await db.creator.create({
+      data: {
+        name: `${P} Marlow Vane`,
+        slug: slugify(`${P} Marlow Vane`),
+        aliases: ["M. Vane"],
+        socialProfiles: { create: { platform: "instagram", handle: "marlowvane440" } },
+      },
+    });
+    clearDigestMemo();
+    await refreshDigest("creator", creator.id);
+
+    const { matchCandidates } = await import("@/lib/ingest/matching");
+    const byAlias = await matchCandidates("Spoke with M. Vane yesterday about the docuseries.");
+    expect(byAlias.some((c) => c.targetId === creator.id)).toBe(true);
+
+    const byHandle = await matchCandidates("Loop in marlowvane440@gmail.com when the deck is ready.");
+    expect(byHandle.some((c) => c.targetId === creator.id)).toBe(true);
+  });
+});
+
+describe("triage and propose with a fake model", () => {
+  const usage = { model: "fake", inputTokens: 100, outputTokens: 50, cacheReadTokens: 0 };
+
+  it("triage stores relevance and token usage; irrelevant stops the pipeline", async () => {
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} scheduling note: see you at 3pm thanks`, status: "parsed" },
+    });
+    const { triageItemCore } = await import("@/lib/ingest/pipeline");
+    const result = await triageItemCore(item.id, async () => ({
+      output: { relevant: false, score: 0.05, reasons: ["Pure scheduling"], candidateRecords: [], newRecordCandidates: [], sections: [] },
+      usage,
+    }));
+    expect(result.status).toBe("irrelevant");
+    const stored = await db.ingestItem.findUnique({ where: { id: item.id } });
+    expect(stored?.status).toBe("irrelevant");
+    expect((stored?.relevance as { reasons: string[] }).reasons[0]).toContain("scheduling");
+    expect((stored?.tokenUsage as { triage: { calls: number } }).triage.calls).toBe(1);
+    await db.ingestItem.delete({ where: { id: item.id } });
+  });
+
+  it("propose validates ops, captures before, dedupes, and writes IngestChange rows", async () => {
+    const creator = await db.creator.create({
+      data: { name: `${P} Nova Reyes`, slug: slugify(`${P} Nova Reyes`), miniBio: "Old bio." },
+    });
+    clearDigestMemo();
+    await refreshDigest("creator", creator.id);
+    const digest = await db.knowledgeDigest.findUnique({
+      where: { targetType_targetId: { targetType: "creator", targetId: creator.id } },
+    });
+
+    const text = `${P} Nova Reyes signed on to host Night Circuit. New bio incoming. Fee is $250k. Nova Reyes is repped by CAA now.`;
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: text, status: "triaged" },
+    });
+
+    const change = (op: Record<string, unknown>) => ({
+      confidence: 0.9,
+      rationale: "test",
+      evidence: [`${P} Nova Reyes signed on to host Night Circuit.`],
+      sensitive: false,
+      ...op,
+    });
+    const { proposeItemCore } = await import("@/lib/ingest/pipeline");
+    const result = await proposeItemCore(item.id, async () => ({
+      output: {
+        changes: [
+          change({ op: "update", targetType: "creator", targetName: `${P} Nova Reyes`, targetId: digest!.id, field: "miniBio", value: "New bio text." }),
+          change({ op: "update", targetType: "creator", targetName: `${P} Nova Reyes`, targetId: digest!.id, field: "miniBio", value: "New bio text." }), // duplicate
+          change({ op: "update", targetType: "creator", targetName: `${P} Nova Reyes`, targetId: digest!.id, field: "notARealField", value: "x" }), // invalid
+          change({ op: "link", kind: "creator_project", aName: `${P} Nova Reyes`, aId: digest!.id, bName: `${P} Night Circuit`, role: "host" }),
+          change({ op: "create", targetType: "project", name: `${P} Night Circuit`, fields: { projectType: "competition_show" } }),
+          change({ op: "note", text: "Fee is $250k.", aboutType: "creator", aboutName: `${P} Nova Reyes`, aboutId: digest!.id, sensitive: true }),
+        ],
+      },
+      usage,
+    }));
+    expect(result.ok).toBe(true);
+
+    const changes = await db.ingestChange.findMany({ where: { itemId: item.id }, orderBy: { sortOrder: "asc" } });
+    // duplicate merged, invalid dropped: create + update + link + note = 4
+    expect(changes).toHaveLength(4);
+
+    const update = changes.find((c) => c.opType === "update")!;
+    expect(update.before).toBe("Old bio.");
+    expect((update.destination as { targetId: string }).targetId).toBe(creator.id);
+    expect((update.payload as { expectedVersion: number }).expectedVersion).toBe(1);
+    expect((update.evidence as { start: number }[])[0].start).toBeGreaterThanOrEqual(0);
+
+    const note = changes.find((c) => c.opType === "note")!;
+    expect(note.sensitive).toBe(true);
+    expect(note.sortOrder).toBe(changes.length - 1); // sensitive sorts last
+
+    const stored = await db.ingestItem.findUnique({ where: { id: item.id } });
+    expect(stored?.status).toBe("proposed");
+    expect((stored?.metadata as { proposeInfo: { invalidOps: string[] } }).proposeInfo.invalidOps).toHaveLength(1);
+    await db.ingestItem.delete({ where: { id: item.id } });
+  });
+
+  it("without an API key the real pipeline refuses gracefully", async () => {
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} some text`, status: "parsed" },
+    });
+    const { triageItemCore } = await import("@/lib/ingest/pipeline");
+    const result = await triageItemCore(item.id); // real runner path, no key in test env
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("ANTHROPIC_API_KEY");
+    await db.ingestItem.delete({ where: { id: item.id } });
+  });
+});
