@@ -14,18 +14,20 @@ const COOKIE_NAME = "db_session";
 const secret = () =>
   new TextEncoder().encode(process.env.AUTH_SECRET ?? "dev-secret-4440");
 
+const SESSION_DAYS = 90;
+
 export async function createSession(userId: string) {
   const token = await new SignJWT({ sub: userId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("30d")
+    .setExpirationTime(`${SESSION_DAYS}d`)
     .sign(secret());
   const jar = await cookies();
   jar.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: 60 * 60 * 24 * SESSION_DAYS,
     path: "/",
   });
 }
@@ -35,23 +37,45 @@ export async function destroySession() {
   jar.delete(COOKIE_NAME);
 }
 
-/** Returns the logged-in user or null. Cached per request. */
+/**
+ * Returns the logged-in user or null. Cached per request.
+ *
+ * Only a missing/invalid token or a deleted user counts as "logged out".
+ * A database failure (e.g. serverless Postgres waking from idle) is retried
+ * and, if persistent, thrown — it must never masquerade as a logout and
+ * bounce a validly signed-in user to the login screen.
+ */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const jar = await cookies();
   const token = jar.get(COOKIE_NAME)?.value;
   if (!token) return null;
+
+  let userId: string | undefined;
   try {
     const { payload } = await jwtVerify(token, secret());
-    if (!payload.sub) return null;
-    const user = await db.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, email: true, name: true, role: true },
-    });
-    if (!user) return null;
-    return { ...user, role: user.role as UserRole };
+    userId = payload.sub;
   } catch {
-    return null;
+    return null; // expired or invalid token — genuinely signed out
   }
+  if (!userId) return null;
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, name: true, role: true },
+      });
+      if (!user) return null; // account removed — signed out
+      return { ...user, role: user.role as UserRole };
+    } catch (e) {
+      lastError = e;
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Database unavailable while checking the session.");
 });
 
 export async function requireUser(): Promise<SessionUser> {
