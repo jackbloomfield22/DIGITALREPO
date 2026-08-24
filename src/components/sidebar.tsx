@@ -20,6 +20,7 @@ const SECONDARY = [
   { href: "/favorites", label: "Favorites" },
   { href: "/activity", label: "Activity" },
   { href: "/ingest", label: "Ingest" },
+  { href: "/archive", label: "Archive" },
 ];
 
 const CREATE_ITEMS = [

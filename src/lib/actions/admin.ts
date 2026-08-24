@@ -77,13 +77,19 @@ export async function setArchived(
   targetType: keyof typeof ARCHIVABLE,
   targetId: string,
   archived: boolean,
+  reason?: string,
 ): Promise<Result> {
   try {
     const admin = await requireRole("ADMIN");
     if (!(targetType in ARCHIVABLE)) return { ok: false, error: "Unknown record type." };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model = ARCHIVABLE[targetType] as any;
-    const record = await model.update({ where: { id: targetId }, data: { archived } });
+    const record = await model.update({
+      where: { id: targetId },
+      data: archived
+        ? { archived: true, archivedReason: reason?.trim() || "Archived manually", archivedAt: new Date() }
+        : { archived: false, archivedReason: null, archivedAt: null },
+    });
     await logAudit(admin, {
       targetType,
       targetId,
