@@ -63,5 +63,6 @@ if (!process.env.SIGNUP_CODE) {
 run("npx prisma migrate deploy");
 run("npx tsx prisma/seed.ts");
 run("npx tsx scripts/harden-demo-users.ts");
+run("npx tsx scripts/remove-demo-data.ts");
 run("npx tsx scripts/rebuild-digests.ts --if-empty");
 run("npx next build");

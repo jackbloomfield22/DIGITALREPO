@@ -1,4 +1,5 @@
-import "server-only";
+// No "server-only" marker: maintenance scripts (backup offload, demo purge)
+// run this under tsx outside Next. Nothing here reaches the client bundle.
 import { db } from "@/lib/db";
 
 // Full-database backup engine. A backup captures every table — users,
