@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
@@ -63,6 +64,7 @@ export default async function FormatPage({
           </div>
           <div className="flex items-center gap-2">
             {canEdit && <Link href={`/formats/${format.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>}
+            {canEdit && <DeleteRecordButton targetType="format" id={format.id} label={format.title} />}
             <FavoriteButton targetType="format" targetId={format.id} favorited={!!favorite} />
             <AddToCollectionButton targetType="format" targetId={format.id} targetLabel={format.title} />
           </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { findRelatedCreators } from "@/lib/related";
@@ -256,6 +257,7 @@ export default async function CreatorProfilePage({
             <Link href={`/talent/${creator.slug}/one-sheet`} className="btn btn-secondary btn-sm">
               One-Sheet
             </Link>
+            {canEdit && <DeleteRecordButton targetType="creator" id={creator.id} label={creator.name} />}
             {canEdit && <VerifyButton creatorId={creator.id} />}
           </div>
         </div>

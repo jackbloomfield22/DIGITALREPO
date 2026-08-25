@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { Portrait, Section, StatusPill } from "@/components/ui";
@@ -106,7 +107,12 @@ export default async function OpportunityPage({
                 .join(" · ")}
             </div>
           </div>
-          {canEdit && <Link href={`/opportunities/${opp.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>}
+          {canEdit && (
+            <span className="flex gap-2">
+              <Link href={`/opportunities/${opp.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
+              <DeleteRecordButton targetType="opportunity" id={opp.id} label={opp.title} />
+            </span>
+          )}
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { Portrait, Section } from "@/components/ui";
@@ -45,7 +46,12 @@ export default async function PersonPage({
             )}
           </div>
         </div>
-        {canEdit && <Link href={`/people/${person.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>}
+        {canEdit && (
+          <span className="flex gap-2">
+            <Link href={`/people/${person.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
+            <DeleteRecordButton targetType="person" id={person.id} label={person.name} />
+          </span>
+        )}
       </div>
 
       <div className="max-w-3xl">
