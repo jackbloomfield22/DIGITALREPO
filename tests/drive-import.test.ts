@@ -102,3 +102,29 @@ describe("totals", () => {
     expect(Object.values(totals)).toEqual([1, 1, 1, 1, 1, 1]);
   });
 });
+
+describe("dates and held statuses", () => {
+  it("carries lastActivityAt through and keeps the most recent", () => {
+    const c = consolidateBatches([
+      { formats: [{ title: "The Process", lastActivityAt: "2026-01-27" }] },
+      { formats: [{ title: "The Process", lastActivityAt: "2026-08-24" }] },
+      { formats: [{ title: "The Process", lastActivityAt: "2026-02-23" }] },
+    ]);
+    expect(c.formats).toHaveLength(1);
+    expect(c.formats[0].lastActivityAt).toBe("2026-08-24");
+  });
+
+  it("keeps dates on opportunities and projects too", () => {
+    const c = consolidateBatches([
+      { opportunities: [{ title: "USA Handball", lastActivityAt: "2026-08-24" }] },
+      { projects: [{ title: "Foul Play", lastActivityAt: "2026-07-01" }] },
+    ]);
+    expect(c.opportunities[0].lastActivityAt).toBe("2026-08-24");
+    expect(c.projects[0].lastActivityAt).toBe("2026-07-01");
+  });
+
+  it("leaves the date unset when the source never gave one", () => {
+    const c = consolidateBatches([{ formats: [{ title: "Undated idea" }] }]);
+    expect(c.formats[0].lastActivityAt).toBeUndefined();
+  });
+});

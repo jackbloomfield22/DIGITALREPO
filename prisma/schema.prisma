@@ -134,6 +134,7 @@ model Project {
   archivedReason String?
   archivedAt     DateTime?
   version        Int       @default(1)
+  lastActivityAt DateTime? // real-world date this last moved, from the source material
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -219,6 +220,7 @@ model Format {
   archivedReason String?
   archivedAt     DateTime?
   version          Int      @default(1)
+  lastActivityAt DateTime? // real-world date this last moved, from the source material
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -249,6 +251,7 @@ model Opportunity {
   archivedReason String?
   archivedAt     DateTime?
   version              Int       @default(1)
+  lastActivityAt DateTime? // real-world date this last moved, from the source material
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

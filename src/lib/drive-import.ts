@@ -23,9 +23,9 @@ import { refreshDigest } from "@/lib/ingest/digest";
 export type ImportOrg = { name: string; aliases: string[]; types: string[]; description?: string; website?: string; location?: string; notes: string[] };
 export type ImportPerson = { name: string; aliases: string[]; title?: string; roleType?: string; email?: string; phone?: string; org?: string; notes: string[]; uncertain?: boolean };
 export type ImportTalent = { name: string; aliases: string[]; types: string[]; sports: string[]; interests: string[]; headline?: string; basedIn?: string; age?: number; notes: string[]; audience?: Record<string, number> };
-export type ImportProject = { title: string; projectType?: string; status?: string; logline?: string; premiereYear?: number; notes: string[]; orgs: { name: string; relationship: string }[]; credits: { creator: string; role: string }[]; people: { name: string; role: string }[] };
-export type ImportFormat = { title: string; formatType?: string; status?: string; logline?: string; targetPlatform?: string; notes: string[]; talent: string[]; orgs: { name: string; relationship: string }[]; people: { name: string; role: string }[] };
-export type ImportOpp = { title: string; type?: string; status?: string; description?: string; notes: string[]; orgs: string[] };
+export type ImportProject = { title: string; projectType?: string; status?: string; logline?: string; premiereYear?: number; lastActivityAt?: string; notes: string[]; orgs: { name: string; relationship: string }[]; credits: { creator: string; role: string }[]; people: { name: string; role: string }[] };
+export type ImportFormat = { title: string; formatType?: string; status?: string; logline?: string; targetPlatform?: string; lastActivityAt?: string; notes: string[]; talent: string[]; orgs: { name: string; relationship: string }[]; people: { name: string; role: string }[] };
+export type ImportOpp = { title: string; type?: string; status?: string; description?: string; lastActivityAt?: string; notes: string[]; orgs: string[] };
 
 export type Consolidated = {
   orgs: ImportOrg[];
@@ -159,6 +159,7 @@ export function consolidateBatches(batches: unknown[]): Consolidated {
     if (e.status && !p.status) p.status = e.status;
     if (e.logline && !p.logline) p.logline = e.logline;
     if (typeof e.premiereYear === "number") p.premiereYear = p.premiereYear ?? e.premiereYear;
+    if (typeof e.lastActivityAt === "string" && (!p.lastActivityAt || e.lastActivityAt > p.lastActivityAt)) p.lastActivityAt = e.lastActivityAt;
     for (const o of e.orgs ?? []) if (o?.name) p.orgs.push({ name: o.name, relationship: o.relationship ?? "partner" });
     for (const c of e.credits ?? []) if (c?.creator) p.credits.push({ creator: c.creator, role: c.role ?? "talent" });
     for (const pp of e.people ?? []) if (pp?.name) p.people.push({ name: pp.name, role: pp.role ?? "" });
@@ -173,6 +174,7 @@ export function consolidateBatches(batches: unknown[]): Consolidated {
     if (e.status && !f.status) f.status = e.status;
     if (e.logline && !f.logline) f.logline = e.logline;
     if (e.targetPlatform && !f.targetPlatform) f.targetPlatform = e.targetPlatform;
+    if (typeof e.lastActivityAt === "string" && (!f.lastActivityAt || e.lastActivityAt > f.lastActivityAt)) f.lastActivityAt = e.lastActivityAt;
     if (e.sensitive) pushNote(f.notes, "SENSITIVE — handle with care.");
     for (const t of e.talent ?? []) if (!f.talent.includes(t)) f.talent.push(t);
     for (const o of e.orgs ?? []) if (o?.name) f.orgs.push({ name: o.name, relationship: o.relationship ?? "partner" });
@@ -186,6 +188,7 @@ export function consolidateBatches(batches: unknown[]): Consolidated {
     if (e.type && !o.type) o.type = e.type;
     if (e.status && !o.status) o.status = e.status;
     if (e.description && !o.description) o.description = e.description;
+    if (typeof e.lastActivityAt === "string" && (!o.lastActivityAt || e.lastActivityAt > o.lastActivityAt)) o.lastActivityAt = e.lastActivityAt;
     for (const org of e.orgs ?? []) if (typeof org === "string") o.orgs.push(org);
     pushNote(o.notes, e.notes);
   }
@@ -280,8 +283,14 @@ export function importTotals(c: Consolidated): Record<ImportPhase, number> {
 // ---------------------------------------------------------------------------
 const FORMAT_STATUS: Record<string, string> = {
   idea: "idea", concept: "concept", researching: "concept", developing: "developing",
+  on_hold: "on_hold", paused: "on_hold", hold: "on_hold",
   outbound: "outbound", pitched: "pitched", in_discussion: "in_discussion",
   sold: "sold", produced: "produced", passed: "passed", archived: "archived",
+};
+const OPPORTUNITY_STATUS: Record<string, string> = {
+  researching: "researching", active: "active", on_hold: "on_hold", paused: "on_hold",
+  outbound: "outbound", in_discussion: "in_discussion", completed: "completed",
+  passed: "passed", archived: "archived",
 };
 const PROJECT_STATUS: Record<string, string> = {
   in_production: "in_production", post_production: "in_production", released: "released",
@@ -300,6 +309,13 @@ function mergeNotes(existing: string | null | undefined, incoming: string): stri
 }
 
 const joinNotes = (notes: string[]) => notes.join("\n\n");
+
+/** ISO date from a bundle, or null when absent/unparseable. */
+function activityDate(raw?: string): Date | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 async function ensureEntity(kind: string, name: string): Promise<string> {
   const slug = slugify(name);
@@ -567,6 +583,7 @@ export async function runImportChunk(
           data: {
             logline: existing.logline ?? p.logline ?? null,
             status: PROJECT_STATUS[p.status ?? ""] ?? existing.status,
+            lastActivityAt: activityDate(p.lastActivityAt) ?? existing.lastActivityAt,
             internalNotes: mergeNotes(existing.internalNotes, joinNotes(p.notes)),
           },
         });
@@ -578,6 +595,7 @@ export async function runImportChunk(
             projectType: p.projectType ?? "other",
             status: PROJECT_STATUS[p.status ?? ""] ?? "in_production",
             logline: p.logline ?? null, premiereYear: p.premiereYear ?? null,
+            lastActivityAt: activityDate(p.lastActivityAt),
             internalNotes: joinNotes(p.notes) || null,
           },
         });
@@ -626,6 +644,7 @@ export async function runImportChunk(
             logline: existing.logline ?? f.logline ?? null,
             status: FORMAT_STATUS[f.status ?? ""] ?? existing.status,
             targetPlatform: existing.targetPlatform ?? f.targetPlatform ?? null,
+            lastActivityAt: activityDate(f.lastActivityAt) ?? existing.lastActivityAt,
             notes: mergeNotes(existing.notes, incoming),
           },
         });
@@ -637,6 +656,7 @@ export async function runImportChunk(
             formatType: f.formatType ?? "other",
             status: FORMAT_STATUS[f.status ?? ""] ?? "developing",
             logline: f.logline ?? null, targetPlatform: f.targetPlatform ?? null,
+            lastActivityAt: activityDate(f.lastActivityAt),
             notes: incoming || null,
           },
         });
@@ -672,6 +692,8 @@ export async function runImportChunk(
           where: { id },
           data: {
             description: existing.description ?? o.description ?? null,
+            status: OPPORTUNITY_STATUS[o.status ?? ""] ?? existing.status,
+            lastActivityAt: activityDate(o.lastActivityAt) ?? existing.lastActivityAt,
             notes: mergeNotes(existing.notes, joinNotes(o.notes)),
           },
         });
@@ -680,8 +702,9 @@ export async function runImportChunk(
         const row = await db.opportunity.create({
           data: {
             title: o.title.trim(), slug: await uniqueSlug("opportunity", slugify(o.title)),
-            type: o.type ?? "other", status: o.status ?? "researching",
+            type: o.type ?? "other", status: OPPORTUNITY_STATUS[o.status ?? ""] ?? "researching",
             description: o.description ?? null, notes: joinNotes(o.notes) || null,
+            lastActivityAt: activityDate(o.lastActivityAt),
           },
         });
         id = row.id;

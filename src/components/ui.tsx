@@ -139,6 +139,7 @@ const STATUS_COLORS: Record<string, string> = {
   idea: "bg-wash text-muted",
   concept: "bg-wash text-muted",
   developing: "bg-[#eef2ec] text-ok",
+  on_hold: "bg-wash text-warn",
   outbound: "bg-[#f5efdd] text-warn",
   pitched: "bg-[#f5efdd] text-warn",
   in_discussion: "bg-[#f5efdd] text-warn",

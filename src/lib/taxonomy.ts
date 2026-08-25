@@ -220,6 +220,7 @@ export const FORMAT_STATUSES = mk([
   "idea",
   "concept",
   "developing",
+  "on_hold",
   "outbound",
   "pitched",
   "in_discussion",
@@ -262,6 +263,7 @@ export const OPPORTUNITY_TYPES = mk([
 export const OPPORTUNITY_STATUSES = mk([
   "researching",
   "active",
+  "on_hold",
   "outbound",
   "in_discussion",
   "completed",
