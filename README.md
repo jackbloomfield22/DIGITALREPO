@@ -53,6 +53,40 @@ one-row-per-network exports are merged into a single profile. Talent already in
 the Repo is enriched rather than duplicated — blank fields fill in, follower
 counts refresh, and existing text is never overwritten.
 
+### Bulk knowledge upload
+
+Admin → Bulk Upload loads a prepared `.json` **bundle** — organizations,
+industry people, talent, projects, formats, and opportunities extracted from a
+body of notes — straight from the browser. Use it whenever the data is too
+large or too structured for Ingest, or when whoever prepared the bundle can't
+reach the database directly (a sandboxed assistant, a laptop off the VPN).
+
+How it works:
+
+1. Pick the `.json` file. The Repo parses it, consolidates duplicates across
+   the files inside it, and shows you a per-section count before anything is
+   written. The bundle's own `title`/`url` prefill the source fields.
+2. A full snapshot is taken (Admin → Backups) before the first write, so the
+   whole load is reversible.
+3. The load runs in small batches driven by the browser, with a progress bar.
+   No single request does much work, so bundle size doesn't cause timeouts.
+   Stopping mid-run is safe; pressing Import again resumes.
+
+Every record is stamped with the source you named, so any fact traces back to
+where it came from. The whole thing is **idempotent** — re-uploading the same
+bundle creates nothing new, it only fills blanks and appends notes it hasn't
+seen. Bundles hold confidential data and are gitignored; never commit one.
+
+The same loader is available on the command line when the database *is*
+reachable:
+
+```bash
+DATABASE_URL="postgres://…" IMPORT_BATCH_DIR=/path/to/batches \
+  npx tsx scripts/import-drive-notes.ts            # load directly
+DATABASE_URL="…" IMPORT_BATCH_DIR=/path/to/batches \
+  npx tsx scripts/import-drive-notes.ts --bundle > my.bundle.json   # or package for the browser
+```
+
 ### Environment variables
 
 | Variable            | Required | Purpose                                                        |
