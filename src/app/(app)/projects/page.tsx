@@ -8,6 +8,7 @@ import { requireUser, hasRole } from "@/lib/auth";
 import { DirectoryControls, type DirChip } from "@/components/directory-controls";
 import { KindBadge, StatusPill } from "@/components/ui";
 import { PROJECT_ROLES, PROJECT_STATUSES, PROJECT_TYPES, labelFor } from "@/lib/taxonomy";
+import { Pagination } from "@/components/pagination";
 
 export const metadata = { title: "Projects" };
 
@@ -30,7 +31,7 @@ export default async function ProjectsPage({
   const entityId = one(params.entity);
   const year = one(params.year);
   const sort = parseSort(one(params.sort), "date-desc");
-  const view = one(params.view) === "table" ? "table" : "cards";
+  const view = one(params.view) === "cards" ? "cards" : "table";
   const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
 
   const and: Prisma.ProjectWhereInput[] = [{ archived: false }];
@@ -78,16 +79,6 @@ export default async function ProjectsPage({
     ...(year ? [{ param: "year", value: year, label: year }] : []),
   ];
 
-  const pageLink = (p: number) => {
-    const sp = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (key === "page" || value == null) continue;
-      for (const v of Array.isArray(value) ? value : [value]) sp.append(key, v);
-    }
-    if (p > 1) sp.set("page", String(p));
-    const qs = sp.toString();
-    return `/projects${qs ? `?${qs}` : ""}`;
-  };
 
   return (
     <div>
@@ -181,13 +172,7 @@ export default async function ProjectsPage({
         </div>
       )}
 
-      {pages > 1 && (
-        <nav aria-label="Pagination" className="mt-6 flex items-center justify-center gap-2 text-sm">
-          {page > 1 && <Link className="btn btn-secondary btn-sm" href={pageLink(page - 1)}>← Previous</Link>}
-          <span className="px-2 text-muted">Page {page} of {pages}</span>
-          {page < pages && <Link className="btn btn-secondary btn-sm" href={pageLink(page + 1)}>Next →</Link>}
-        </nav>
-      )}
+      <Pagination page={page} pages={pages} />
     </div>
   );
 }

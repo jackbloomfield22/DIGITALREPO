@@ -7,6 +7,7 @@ import { RecordTable } from "@/components/record-table";
 import { orderForOrganizations, parseSort } from "@/lib/directory-sort";
 import { Portrait } from "@/components/ui";
 import { ORG_TYPES, labelFor } from "@/lib/taxonomy";
+import { Pagination } from "@/components/pagination";
 
 export const metadata = { title: "Organizations" };
 
@@ -23,7 +24,7 @@ export default async function OrganizationsPage({
   const q = one(params.q)?.trim();
   const type = one(params.type);
   const sort = parseSort(one(params.sort), "name");
-  const view = one(params.view) === "table" ? "table" : "cards";
+  const view = one(params.view) === "cards" ? "cards" : "table";
   const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
 
   const and: Prisma.OrganizationWhereInput[] = [{ archived: false }];
@@ -117,13 +118,7 @@ export default async function OrganizationsPage({
 
       )}
 
-      {pages > 1 && (
-        <nav className="mt-6 flex justify-center gap-2 text-sm" aria-label="Pagination">
-          {page > 1 && <Link className="btn btn-secondary btn-sm" href={`/organizations?page=${page - 1}`}>← Previous</Link>}
-          <span className="px-2 text-muted">Page {page} of {pages}</span>
-          {page < pages && <Link className="btn btn-secondary btn-sm" href={`/organizations?page=${page + 1}`}>Next →</Link>}
-        </nav>
-      )}
+      <Pagination page={page} pages={pages} />
     </div>
   );
 }

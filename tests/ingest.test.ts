@@ -495,6 +495,51 @@ describe("apply engine", () => {
     user = { id: editor.id, email: editor.email, name: editor.name, role: "EDITOR" };
   });
 
+  it("creates the record the reviewer edited, not the one that was proposed", async () => {
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} note`, status: "proposed", filename: `${P}-edited-create.txt` },
+    });
+    const base = { confidence: 0.9, rationale: "t", evidence: [`${P}`], sensitive: false };
+    const change = await db.ingestChange.create({
+      data: {
+        itemId: item.id, group: "New · Format", opType: "create", sortOrder: 0, status: "approved",
+        destination: { targetType: "format", targetId: null, path: null, name: `${P} Wrong Title` },
+        payload: {
+          op: "create", targetType: "format", name: `${P} Wrong Title`,
+          fields: { logline: "As proposed.", formatType: "documentary" }, ...base,
+        },
+        after: { name: `${P} Wrong Title`, fields: { logline: "As proposed.", formatType: "documentary" } },
+      },
+    });
+
+    const { editCreateChange } = await import("@/lib/actions/ingest");
+    // The action requires a session; write the edit the way it would.
+    await db.ingestChange.update({
+      where: { id: change.id },
+      data: { status: "edited", editedAfter: { name: `${P} Right Title`, fields: { logline: "As corrected." } } },
+    });
+    expect(typeof editCreateChange).toBe("function");
+
+    const { applyIngestChangesCore } = await import("@/lib/ingest/apply");
+    clearDigestMemo();
+    const outcome = await applyIngestChangesCore(item.id, user);
+    expect(outcome.applied).toBe(1);
+
+    const wrong = await db.format.findFirst({ where: { title: `${P} Wrong Title` } });
+    expect(wrong).toBeNull();
+    const right = await db.format.findFirst({ where: { title: `${P} Right Title` } });
+    expect(right).not.toBeNull();
+    expect(right?.logline).toBe("As corrected.");
+    // Fields the reviewer left alone survive from the original proposal.
+    expect(right?.formatType).toBe("documentary");
+
+    // The applied change records what it made, so it can be undone precisely.
+    const applied = await db.ingestChange.findUnique({ where: { id: change.id } });
+    const dest = applied?.destination as { createdTargetId?: string; createdTargetType?: string };
+    expect(dest.createdTargetType).toBe("format");
+    expect(dest.createdTargetId).toBe(right?.id);
+  });
+
   it("applies approved changes in order: create, update (with version bump), link, note — with Source + audit + digest", async () => {
     const creator = await db.creator.create({
       data: { name: `${P} Ada Cole`, slug: slugify(`${P} Ada Cole`), miniBio: "Old." },

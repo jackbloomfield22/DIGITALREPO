@@ -51,6 +51,41 @@ export async function editChange(changeId: string, editedValue: string): Promise
 }
 
 /** Approve everything at/above a confidence threshold — never archives or sensitive. */
+/**
+ * Edit a proposed *create* before it happens: its name and any field it wants
+ * to set. Reviewing shouldn't be a choice between taking a record with the
+ * wrong name and throwing the whole proposal away.
+ */
+export async function editCreateChange(
+  changeId: string,
+  edited: { name: string; fields: Record<string, string> },
+): Promise<Result> {
+  try {
+    await requireRole("EDITOR");
+    const change = await db.ingestChange.findUnique({ where: { id: changeId } });
+    if (!change) return { ok: false, error: "Change not found." };
+    if (change.status === "applied") return { ok: false, error: "Already applied." };
+    if (change.opType !== "create") return { ok: false, error: "That change isn't a new record." };
+
+    const name = edited.name.trim().slice(0, 300);
+    if (!name) return { ok: false, error: "A new record needs a name." };
+    const fields: Record<string, string> = {};
+    for (const [key, value] of Object.entries(edited.fields ?? {})) {
+      const clean = String(value ?? "").trim();
+      if (clean) fields[key.slice(0, 60)] = clean.slice(0, 8000);
+    }
+
+    await db.ingestChange.update({
+      where: { id: changeId },
+      data: { status: "edited", editedAfter: { name, fields } },
+    });
+    revalidatePath(`/ingest/${change.itemId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed." };
+  }
+}
+
 export async function bulkApprove(itemId: string, minConfidence: number): Promise<Result & { count?: number }> {
   try {
     await requireRole("EDITOR");

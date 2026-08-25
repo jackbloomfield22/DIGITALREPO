@@ -74,6 +74,13 @@ export default async function IngestItemPage({
     before: c.before != null ? String(c.before) : null,
     after: c.after,
     editedValue: (c.editedAfter as { value?: string } | null)?.value ?? null,
+    editedCreate:
+      c.opType === "create" && (c.editedAfter as { name?: string } | null)?.name
+        ? {
+            name: (c.editedAfter as { name: string }).name,
+            fields: (c.editedAfter as { fields?: Record<string, string> }).fields ?? {},
+          }
+        : null,
     confidence: c.confidence,
     rationale: c.rationale,
     evidence: (c.evidence as { snippet: string; start: number; end: number }[] | null) ?? [],

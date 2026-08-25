@@ -80,7 +80,8 @@ export function DirectoryControls({
     };
   }, [lookupQ, activeLookup]);
 
-  const view = searchParams.get("view") === "table" ? "table" : "cards";
+  // Table is the default; cards are opt-in.
+  const view = searchParams.get("view") === "cards" ? "cards" : "table";
 
   return (
     <div className="mb-5">

@@ -181,6 +181,9 @@ RULES:
 - For updates to fields that may already have content, write the value as the complete new text; the reviewer sees a before/after diff. In the rationale, say which sentences changed and why.
 - Mark sensitive: true on anything about compensation, deal terms, fees, personal phone numbers, home addresses, health, or family details. Still propose it.
 - Emit "note" changes for relevant facts with no schema home so nothing is silently dropped; attach to a record when one is clear.
+- A status changes only when the source says so about the record itself. One party's decision is not the record's status: a buyer passing, a brand declining, a partner dropping out, or a single meeting going badly is a fact about that relationship — record it as a note against the record and leave the status alone. Where nothing states a status, say so in the rationale rather than choosing one.
+- When a document is organised under headings that name a state (IN PRODUCTION, ON HOLD, DEVELOPMENT ARCHIVE, COMPLETED, TRACKING), the heading a record sits under is the authority on its status and outranks anything implied by discussion elsewhere. A status line under that heading is more specific still: use the heading for the overall state and the status line for the detail.
+- Dates in the source belong on the record: when the text carries a date for when something last moved, set lastActivityAt. Never invent one.
 - If an earlier email in this thread already established a fact (listed under ALREADY CAPTURED), do not re-propose it.
 - Respond ONLY by calling the submit_changes tool.
 

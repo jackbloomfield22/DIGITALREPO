@@ -13,6 +13,7 @@ import {
   bulkApprove,
   bulkReject,
   editChange,
+  editCreateChange,
   markIrrelevant,
   setChangeStatus,
 } from "@/lib/actions/ingest";
@@ -82,6 +83,8 @@ export type ChangeVM = {
   before: string | null;
   after: unknown;
   editedValue: string | null;
+  /** A reviewer's corrected name/fields for a proposed new record. */
+  editedCreate: { name: string; fields: Record<string, string> } | null;
   confidence: number;
   rationale: string | null;
   evidence: { snippet: string; start: number; end: number }[];
@@ -100,6 +103,13 @@ const OP_BADGE: Record<string, string> = {
 
 function afterText(change: ChangeVM): string {
   if (change.editedValue != null) return change.editedValue;
+  // A reviewer's corrected new record is what will actually be created.
+  if (change.opType === "create" && change.editedCreate) {
+    return [
+      `name: ${change.editedCreate.name}`,
+      ...Object.entries(change.editedCreate.fields).map(([k, v]) => `${k}: ${v}`),
+    ].join("\n");
+  }
   if (typeof change.after === "string" || typeof change.after === "number") return String(change.after);
   const after = change.after as Record<string, unknown>;
   if (change.opType === "link") return [after.a, "→", after.b, after.role ? `(${after.role})` : ""].filter(Boolean).join(" ");
@@ -190,11 +200,26 @@ function ChangeCard({
   active: boolean;
   canEdit: boolean;
   onHover: () => void;
-  onAction: (action: "approved" | "rejected" | "pending" | "edit", value?: string) => void;
+  onAction: (
+    action: "approved" | "rejected" | "pending" | "edit" | "edit-create",
+    value?: string,
+    create?: { name: string; fields: Record<string, string> },
+  ) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(afterText(change));
   const isTextUpdate = change.opType === "update" || change.opType === "note";
+  const isCreate = change.opType === "create";
+  // A create proposes a name plus whatever fields it wants to set; both are
+  // editable so a nearly-right proposal can be corrected instead of discarded.
+  const proposedCreate = (change.editedCreate ?? {
+    name: String((change.after as Record<string, unknown>)?.name ?? ""),
+    fields: Object.fromEntries(
+      Object.entries(((change.after as Record<string, unknown>)?.fields ?? {}) as Record<string, unknown>)
+        .map(([k, v]) => [k, String(v ?? "")]),
+    ),
+  }) as { name: string; fields: Record<string, string> };
+  const [createDraft, setCreateDraft] = useState(proposedCreate);
   const terminal = ["applied", "failed"].includes(change.status);
 
   return (
@@ -237,6 +262,43 @@ function ChangeCard({
               ),
             )}
           </div>
+        ) : editing && isCreate ? (
+          <div className="space-y-2">
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted">Name</span>
+              <input
+                type="text"
+                className="w-full"
+                value={createDraft.name}
+                onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
+              />
+            </label>
+            {Object.keys(createDraft.fields).map((key) => (
+              <label key={key} className="block">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted">{key}</span>
+                <textarea
+                  rows={2}
+                  value={createDraft.fields[key]}
+                  onChange={(e) =>
+                    setCreateDraft((d) => ({ ...d, fields: { ...d.fields, [key]: e.target.value } }))
+                  }
+                />
+              </label>
+            ))}
+            <div className="flex gap-2">
+              <button
+                className="btn btn-primary btn-sm"
+                disabled={!createDraft.name.trim()}
+                onClick={() => {
+                  onAction("edit-create", undefined, createDraft);
+                  setEditing(false);
+                }}
+              >
+                Save Edit
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>Cancel</button>
+            </div>
+          </div>
         ) : editing ? (
           <div>
             <textarea rows={4} value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Edited value" />
@@ -271,11 +333,12 @@ function ChangeCard({
           ) : (
             <button className="btn btn-secondary btn-sm" onClick={() => onAction("pending")}>Un-approve</button>
           )}
-          {isTextUpdate && (
+          {(isTextUpdate || isCreate) && (
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => {
-                setDraft(afterText(change));
+                if (isCreate) setCreateDraft(proposedCreate);
+                else setDraft(afterText(change));
                 setEditing(true);
               }}
             >
@@ -313,11 +376,18 @@ export function ReviewBoard({ item, changes, canEdit }: { item: ItemVM; changes:
     return [...map.entries()];
   }, [changes]);
 
-  const act = async (change: ChangeVM, action: "approved" | "rejected" | "pending" | "edit", value?: string) => {
+  const act = async (
+    change: ChangeVM,
+    action: "approved" | "rejected" | "pending" | "edit" | "edit-create",
+    value?: string,
+    create?: { name: string; fields: Record<string, string> },
+  ) => {
     const result =
-      action === "edit"
-        ? await editChange(change.id, value ?? "")
-        : await setChangeStatus(change.id, action);
+      action === "edit-create"
+        ? await editCreateChange(change.id, create ?? { name: "", fields: {} })
+        : action === "edit"
+          ? await editChange(change.id, value ?? "")
+          : await setChangeStatus(change.id, action);
     if (!result.ok) toast(result.error ?? "Failed", { tone: "error" });
     router.refresh();
   };
@@ -464,7 +534,7 @@ export function ReviewBoard({ item, changes, canEdit }: { item: ItemVM; changes:
                       const idx = reviewable.findIndex((c) => c.id === change.id);
                       if (idx >= 0) setActiveIndex(idx);
                     }}
-                    onAction={(action, value) => act(change, action, value)}
+                    onAction={(action, value, create) => act(change, action, value, create)}
                   />
                 ))}
               </div>

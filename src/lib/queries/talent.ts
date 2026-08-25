@@ -38,7 +38,7 @@ export function parseCreatorFilters(
     minFollowers: one(params.min) ? Number(one(params.min)) : undefined,
     status: one(params.status) || undefined,
     sort: one(params.sort) || "name",
-    view: one(params.view) === "table" ? "table" : "cards",
+    view: one(params.view) === "cards" ? "cards" : "table",
     page: Math.max(1, Number(one(params.page) ?? 1) || 1),
   };
 }

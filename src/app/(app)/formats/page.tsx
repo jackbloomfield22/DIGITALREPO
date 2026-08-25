@@ -8,6 +8,7 @@ import { FORMAT_STATUSES, FORMAT_TYPES, labelFor } from "@/lib/taxonomy";
 import { formatDate, relativeTime } from "@/lib/format";
 import { RecordTable } from "@/components/record-table";
 import { orderForFormats, parseSort } from "@/lib/directory-sort";
+import { Pagination } from "@/components/pagination";
 
 export const metadata = { title: "Formats" };
 
@@ -28,7 +29,7 @@ export default async function FormatsPage({
   const entityId = one(params.entity);
   const orgId = one(params.org);
   const sort = parseSort(one(params.sort), "date-desc");
-  const view = one(params.view) === "table" ? "table" : "cards";
+  const view = one(params.view) === "cards" ? "cards" : "table";
   const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
 
   const and: Prisma.FormatWhereInput[] = [{ archived: false }];
@@ -188,13 +189,7 @@ export default async function FormatsPage({
         </div>
       )}
 
-      {pages > 1 && (
-        <nav className="mt-6 flex justify-center gap-2 text-sm" aria-label="Pagination">
-          {page > 1 && <Link className="btn btn-secondary btn-sm" href={`/formats?page=${page - 1}`}>← Previous</Link>}
-          <span className="px-2 text-muted">Page {page} of {pages}</span>
-          {page < pages && <Link className="btn btn-secondary btn-sm" href={`/formats?page=${page + 1}`}>Next →</Link>}
-        </nav>
-      )}
+      <Pagination page={page} pages={pages} />
     </div>
   );
 }

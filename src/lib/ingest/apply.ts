@@ -233,10 +233,18 @@ export async function applyIngestChangesCore(itemId: string, user: SessionUser):
     const op = change.payload as unknown as ProposedOp & { expectedVersion?: number };
     try {
       if (op.op === "create") {
+        // A reviewer may have corrected the name or fields before approving.
+        const edited =
+          change.status === "edited" && change.editedAfter
+            ? (change.editedAfter as { name?: string; fields?: Record<string, string> })
+            : null;
+        const effective = edited?.name
+          ? { ...op, name: edited.name, fields: { ...(op.fields ?? {}), ...(edited.fields ?? {}) } }
+          : op;
         // Remember which record a create actually produced, so the change can
         // be undone later without guessing by name.
         const before = new Set(touched.keys());
-        await applyCreate(op, user, touched);
+        await applyCreate(effective, user, touched);
         const created = [...touched.values()].find((t) => !before.has(`${t.targetType}:${t.targetId}`));
         if (created) {
           await db.ingestChange.update({

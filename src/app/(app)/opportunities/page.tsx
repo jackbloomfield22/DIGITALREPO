@@ -23,7 +23,7 @@ export default async function OpportunitiesPage({
   const type = one(params.type);
   const status = one(params.status);
   const sort = parseSort(one(params.sort), "date-desc");
-  const view = one(params.view) === "table" ? "table" : "cards";
+  const view = one(params.view) === "cards" ? "cards" : "table";
 
   const and: Prisma.OpportunityWhereInput[] = [{ archived: false }];
   if (q) and.push({ title: { contains: q, mode: "insensitive" } });

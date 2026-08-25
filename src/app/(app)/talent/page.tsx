@@ -14,6 +14,7 @@ import {
 import { CreatorCardGrid, CreatorTable } from "@/components/talent/creator-views";
 import { labelFor } from "@/lib/taxonomy";
 import { compactNumber } from "@/lib/format";
+import { Pagination } from "@/components/pagination";
 
 export const metadata = { title: "Talent" };
 
@@ -68,16 +69,6 @@ export default async function CreatorsPage({
       : []),
   ];
 
-  const pageLink = (page: number) => {
-    const p = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (key === "page" || value == null) continue;
-      for (const v of Array.isArray(value) ? value : [value]) p.append(key, v);
-    }
-    if (page > 1) p.set("page", String(page));
-    const qs = p.toString();
-    return `/talent${qs ? `?${qs}` : ""}`;
-  };
 
   return (
     <div>
@@ -100,23 +91,7 @@ export default async function CreatorsPage({
         <CreatorCardGrid creators={vms} canEdit={canEdit} />
       )}
 
-      {pages > 1 && (
-        <nav aria-label="Pagination" className="mt-6 flex items-center justify-center gap-2 text-sm">
-          {filters.page > 1 && (
-            <Link className="btn btn-secondary btn-sm" href={pageLink(filters.page - 1)}>
-              ← Previous
-            </Link>
-          )}
-          <span className="px-2 text-muted">
-            Page {filters.page} of {pages}
-          </span>
-          {filters.page < pages && (
-            <Link className="btn btn-secondary btn-sm" href={pageLink(filters.page + 1)}>
-              Next →
-            </Link>
-          )}
-        </nav>
-      )}
+      <Pagination page={filters.page} pages={pages} />
     </div>
   );
 }
