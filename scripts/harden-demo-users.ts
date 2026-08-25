@@ -41,12 +41,20 @@ async function main() {
     }
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  if (adminEmail) {
-    const user = await db.user.findUnique({ where: { email: adminEmail } });
-    if (user && user.role !== "ADMIN") {
+  // ADMIN_EMAIL / ADMIN_EMAILS: one or more addresses (comma, semicolon, or
+  // space separated). Each existing account is promoted to ADMIN; addresses
+  // without an account yet are reported and picked up on a later deploy.
+  const adminEmails = (process.env.ADMIN_EMAILS ?? process.env.ADMIN_EMAIL ?? "")
+    .split(/[,;\s]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.includes("@"));
+  for (const email of adminEmails) {
+    const user = await db.user.findUnique({ where: { email } });
+    if (!user) {
+      console.log(`ADMIN_EMAIL ${email}: no account yet — will promote once they sign up.`);
+    } else if (user.role !== "ADMIN") {
       await db.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
-      console.log(`Promoted ${adminEmail} to ADMIN (via ADMIN_EMAIL).`);
+      console.log(`Promoted ${email} to ADMIN (via ADMIN_EMAIL).`);
     }
   }
 }
