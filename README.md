@@ -43,6 +43,16 @@ All demo people, companies, and shows are fictional; overlaps (shared sports, ci
 production companies, brands) are intentional so relational discovery has something to
 discover.
 
+### Bulk talent import
+
+Admin → Import takes a CSV of talent. Exports from creator platforms
+(CreatorIQ and similar) can be uploaded as-is: column names are matched
+loosely (`Creator Name`, `IG Followers`, `Eng. Rate`…), abbreviated counts
+(`1.61M`, `646.95K`) are parsed, engagement rates are stored per account, and
+one-row-per-network exports are merged into a single profile. Talent already in
+the Repo is enriched rather than duplicated — blank fields fill in, follower
+counts refresh, and existing text is never overwritten.
+
 ### Environment variables
 
 | Variable            | Required | Purpose                                                        |

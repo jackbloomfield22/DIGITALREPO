@@ -166,7 +166,8 @@ export default async function CreatorProfilePage({
     "",
     "SOCIAL",
     ...creator.socialProfiles.map(
-      (s) => `${socialLabel(s.platform)}: ${s.handle ? `@${s.handle} — ` : ""}${s.followerCount != null ? compactNumber(s.followerCount) : "n/a"}`,
+      (s) =>
+        `${socialLabel(s.platform)}: ${s.handle ? `@${s.handle} — ` : ""}${s.followerCount != null ? compactNumber(s.followerCount) : "n/a"}${s.engagementRate != null ? ` (${s.engagementRate}% eng.)` : ""}`,
     ),
     `Total listed audience: ${compactNumber(audience)}`,
     "",
@@ -301,7 +302,12 @@ export default async function CreatorProfilePage({
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold">{s.followerCount != null ? compactNumber(s.followerCount) : "—"}</div>
+                        <div className="font-semibold">
+                          {s.followerCount != null ? compactNumber(s.followerCount) : "—"}
+                          {s.engagementRate != null && (
+                            <span className="ml-1.5 text-[11px] font-medium text-muted">{s.engagementRate}% eng.</span>
+                          )}
+                        </div>
                         {s.countUpdatedAt && (
                           <div className="text-[11px] text-faint">updated {relativeTime(s.countUpdatedAt)}</div>
                         )}

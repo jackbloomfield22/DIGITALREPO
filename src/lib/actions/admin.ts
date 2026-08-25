@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { USER_ROLES } from "@/lib/taxonomy";
 import { slugify, uniqueSlug } from "@/lib/slug";
 import { mergeEntitiesCore, mergeOrganizationsCore } from "@/lib/merge";
+import { normalizeTalentRows } from "@/lib/talent-import";
 
 type Result = { ok: boolean; error?: string };
 
@@ -161,25 +162,7 @@ export async function mergeOrganizations(sourceId: string, targetId: string): Pr
   }
 }
 
-// --- CSV import --------------------------------------------------------------
-
-const importRowSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  headline: z.string().max(300).optional(),
-  age: z.string().optional(),
-  based_in: z.string().max(100).optional(),
-  categories: z.string().max(500).optional(),
-  interests: z.string().max(500).optional(),
-  sports: z.string().max(500).optional(),
-  mini_bio: z.string().max(8000).optional(),
-  instagram_handle: z.string().max(120).optional(),
-  instagram_followers: z.string().optional(),
-  tiktok_handle: z.string().max(120).optional(),
-  tiktok_followers: z.string().optional(),
-  youtube_handle: z.string().max(120).optional(),
-  youtube_followers: z.string().optional(),
-});
-export type ImportRow = z.infer<typeof importRowSchema>;
+// --- Talent spreadsheet import ------------------------------------------------
 
 async function entityIdFor(kind: string, name: string): Promise<string> {
   const slug = slugify(name);
@@ -188,69 +171,120 @@ async function entityIdFor(kind: string, name: string): Promise<string> {
   return (await db.entity.create({ data: { kind, slug, name: name.trim() } })).id;
 }
 
-export async function importCreators(rows: ImportRow[]): Promise<{
+export type ImportOutcome = {
   ok: boolean;
   error?: string;
-  imported?: number;
-  skipped?: string[];
-}> {
+  created?: number;
+  enriched?: number;
+  details?: string[];
+};
+
+/**
+ * Import talent from any spreadsheet a creator tool exports. Rows are
+ * normalized by src/lib/talent-import.ts, so column names and number formats
+ * don't have to match ours.
+ *
+ * Existing talent is ENRICHED rather than skipped: empty fields get filled,
+ * new taxonomy links and social accounts are added, and follower/engagement
+ * numbers refresh (that's the point of re-importing). Text already written by
+ * the team is never overwritten.
+ */
+export async function importCreators(rawRows: Record<string, string>[]): Promise<ImportOutcome> {
   try {
     const user = await requireRole("EDITOR");
-    const skipped: string[] = [];
-    let imported = 0;
-    for (const raw of rows.slice(0, 500)) {
-      const parsed = importRowSchema.safeParse(raw);
-      if (!parsed.success) {
-        skipped.push(`${raw.name || "(no name)"}: invalid row`);
-        continue;
-      }
-      const row = parsed.data;
+    const parsed = normalizeTalentRows(rawRows).slice(0, 500);
+    const details: string[] = [];
+    let created = 0;
+    let enriched = 0;
+
+    for (const row of parsed) {
+      const name = row.name.trim();
+      const links: { entityId: string; relationship: string }[] = [];
+      for (const c of row.categories) links.push({ entityId: await entityIdFor("creator_category", c), relationship: "" });
+      for (const i of row.interests) links.push({ entityId: await entityIdFor("interest", i), relationship: "" });
+      for (const s of row.sports) links.push({ entityId: await entityIdFor("sport", s), relationship: "" });
+      if (row.basedIn) links.push({ entityId: await entityIdFor("location", row.basedIn), relationship: "based_in" });
+
       const existing = await db.creator.findFirst({
-        where: { name: { equals: row.name, mode: "insensitive" } },
+        where: { OR: [{ name: { equals: name, mode: "insensitive" } }, { aliases: { has: name } }] },
+      });
+
+      const creator =
+        existing ??
+        (await db.creator.create({
+          data: {
+            name,
+            slug: uniqueSlug(
+              name,
+              new Set(
+                (await db.creator.findMany({ where: { slug: { startsWith: slugify(name) } }, select: { slug: true } })).map((r) => r.slug),
+              ),
+            ),
+            headline: row.headline || null,
+            miniBio: row.miniBio || null,
+            age: row.age ?? null,
+          },
+        }));
+
+      if (existing) {
+        // Fill blanks only — never clobber what the team has written.
+        const fill: Record<string, string | number> = {};
+        if (!existing.headline && row.headline) fill.headline = row.headline;
+        if (!existing.miniBio && row.miniBio) fill.miniBio = row.miniBio;
+        if (existing.age == null && row.age != null) fill.age = row.age;
+        if (Object.keys(fill).length) await db.creator.update({ where: { id: creator.id }, data: fill });
+      }
+
+      for (const link of links) {
+        await db.creatorEntityLink.upsert({
+          where: { creatorId_entityId_relationship: { creatorId: creator.id, entityId: link.entityId, relationship: link.relationship } },
+          update: {},
+          create: { creatorId: creator.id, entityId: link.entityId, relationship: link.relationship },
+        });
+      }
+
+      for (const social of row.socials) {
+        const current = await db.socialProfile.findFirst({ where: { creatorId: creator.id, platform: social.platform } });
+        const metrics = {
+          ...(social.followerCount != null ? { followerCount: social.followerCount, countUpdatedAt: new Date() } : {}),
+          ...(social.engagementRate != null ? { engagementRate: social.engagementRate } : {}),
+        };
+        if (current) {
+          await db.socialProfile.update({
+            where: { id: current.id },
+            data: { handle: current.handle ?? social.handle ?? null, url: current.url ?? social.url ?? null, ...metrics },
+          });
+          if (social.followerCount != null) {
+            await db.socialSnapshot.create({ data: { socialProfileId: current.id, followerCount: social.followerCount } });
+          }
+        } else {
+          await db.socialProfile.create({
+            data: { creatorId: creator.id, platform: social.platform, handle: social.handle ?? null, url: social.url ?? null, ...metrics },
+          });
+        }
+      }
+
+      const summary = row.socials
+        .map((s) => `${s.platform}${s.followerCount != null ? ` ${s.followerCount}` : ""}${s.engagementRate != null ? ` @ ${s.engagementRate}%` : ""}`)
+        .join(", ");
+      await logAudit(user, {
+        targetType: "creator",
+        targetId: creator.id,
+        targetLabel: creator.name,
+        action: existing ? "updated" : "created",
+        field: existing ? "spreadsheet import (enriched)" : "spreadsheet import",
+        newValue: summary || undefined,
       });
       if (existing) {
-        skipped.push(`${row.name}: already exists`);
-        continue;
+        enriched++;
+        details.push(`${name}: enriched (${summary || "no new metrics"})`);
+      } else {
+        created++;
       }
-      const slugRows = await db.creator.findMany({
-        where: { slug: { startsWith: slugify(row.name) } },
-        select: { slug: true },
-      });
-      const split = (s?: string) => (s ?? "").split(/[;|]/).map((x) => x.trim()).filter(Boolean);
-      const entityLinks: { entityId: string; relationship: string }[] = [];
-      for (const c of split(row.categories)) entityLinks.push({ entityId: await entityIdFor("creator_category", c), relationship: "" });
-      for (const i of split(row.interests)) entityLinks.push({ entityId: await entityIdFor("interest", i), relationship: "" });
-      for (const s of split(row.sports)) entityLinks.push({ entityId: await entityIdFor("sport", s), relationship: "" });
-      if (row.based_in) entityLinks.push({ entityId: await entityIdFor("location", row.based_in), relationship: "based_in" });
-
-      const socials: { platform: string; handle: string; followerCount: number | null }[] = [];
-      const social = (platform: string, handle?: string, followers?: string) => {
-        if (handle || followers) {
-          socials.push({ platform, handle: handle ?? "", followerCount: followers && !isNaN(Number(followers)) ? Number(followers) : null });
-        }
-      };
-      social("instagram", row.instagram_handle, row.instagram_followers);
-      social("tiktok", row.tiktok_handle, row.tiktok_followers);
-      social("youtube", row.youtube_handle, row.youtube_followers);
-
-      const creator = await db.creator.create({
-        data: {
-          name: row.name,
-          slug: uniqueSlug(row.name, new Set(slugRows.map((r) => r.slug))),
-          headline: row.headline || null,
-          age: row.age && !isNaN(Number(row.age)) ? Number(row.age) : null,
-          miniBio: row.mini_bio || null,
-          entityLinks: { create: entityLinks },
-          socialProfiles: {
-            create: socials.map((s) => ({ ...s, countUpdatedAt: s.followerCount != null ? new Date() : null })),
-          },
-        },
-      });
-      await logAudit(user, { targetType: "creator", targetId: creator.id, targetLabel: creator.name, action: "created", field: "csv import" });
-      imported++;
     }
+
     revalidatePath("/", "layout");
-    return { ok: true, imported, skipped };
+    return { ok: true, created, enriched, details };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Import failed." };
   }
