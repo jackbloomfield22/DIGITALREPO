@@ -3,10 +3,9 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { Section } from "@/components/ui";
 import { daysAgo, formatDate, nowDate, relativeTime } from "@/lib/format";
+import { attentionWheres, STALE_DAYS } from "@/lib/attention";
 
 export const metadata = { title: "Needs Attention" };
-
-const STALE_DAYS = 90;
 
 type Item = { label: string; sub?: string; href: string };
 
@@ -37,7 +36,7 @@ function Bucket({ title, count, items, blurb }: {
 
 export default async function AttentionPage() {
   await requireUser();
-  const staleCutoff = daysAgo(STALE_DAYS);
+  const w = attentionWheres();
   const weekAhead = daysAgo(-7);
   const now = nowDate();
   const LIMIT = 12;
@@ -50,45 +49,12 @@ export default async function AttentionPage() {
     unverified, unverifiedCount,
     sourcedIds,
   ] = await Promise.all([
-    db.creator.findMany({
-      where: { archived: false, people: { none: { current: true } } },
-      select: { name: true, slug: true },
-      orderBy: { name: "asc" },
-      take: LIMIT,
-    }),
-    db.creator.count({ where: { archived: false, people: { none: { current: true } } } }),
-    db.creator.findMany({
-      where: {
-        archived: false,
-        socialProfiles: {
-          some: {
-            followerCount: { not: null },
-            OR: [{ countUpdatedAt: null }, { countUpdatedAt: { lt: staleCutoff } }],
-          },
-        },
-      },
-      select: { name: true, slug: true },
-      orderBy: { name: "asc" },
-      take: LIMIT,
-    }),
-    db.creator.count({
-      where: {
-        archived: false,
-        socialProfiles: {
-          some: {
-            followerCount: { not: null },
-            OR: [{ countUpdatedAt: null }, { countUpdatedAt: { lt: staleCutoff } }],
-          },
-        },
-      },
-    }),
-    db.project.findMany({
-      where: { archived: false, organizations: { none: {} } },
-      select: { title: true, slug: true },
-      orderBy: { title: "asc" },
-      take: LIMIT,
-    }),
-    db.project.count({ where: { archived: false, organizations: { none: {} } } }),
+    db.creator.findMany({ where: w.noRep, select: { name: true, slug: true }, orderBy: { name: "asc" }, take: LIMIT }),
+    db.creator.count({ where: w.noRep }),
+    db.creator.findMany({ where: w.staleSocial, select: { name: true, slug: true }, orderBy: { name: "asc" }, take: LIMIT }),
+    db.creator.count({ where: w.staleSocial }),
+    db.project.findMany({ where: w.noProdCo, select: { title: true, slug: true }, orderBy: { title: "asc" }, take: LIMIT }),
+    db.project.count({ where: w.noProdCo }),
     db.opportunity.findMany({
       where: { archived: false, deadline: { gte: now, lte: weekAhead } },
       select: { title: true, slug: true, deadline: true },
@@ -96,20 +62,12 @@ export default async function AttentionPage() {
       take: LIMIT,
     }),
     db.creator.findMany({
-      where: {
-        archived: false,
-        OR: [{ lastVerifiedAt: null }, { lastVerifiedAt: { lt: staleCutoff } }],
-      },
+      where: w.unverified,
       select: { name: true, slug: true, lastVerifiedAt: true },
       orderBy: { lastVerifiedAt: { sort: "asc", nulls: "first" } },
       take: LIMIT,
     }),
-    db.creator.count({
-      where: {
-        archived: false,
-        OR: [{ lastVerifiedAt: null }, { lastVerifiedAt: { lt: staleCutoff } }],
-      },
-    }),
+    db.creator.count({ where: w.unverified }),
     db.recordSource.findMany({
       where: { targetType: "creator" },
       select: { targetId: true },

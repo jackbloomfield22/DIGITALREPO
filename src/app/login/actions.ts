@@ -23,5 +23,5 @@ export async function login(formData: FormData) {
     redirect("/login?error=credentials");
   }
   await createSession(user.id);
-  redirect("/talent");
+  redirect("/");
 }
