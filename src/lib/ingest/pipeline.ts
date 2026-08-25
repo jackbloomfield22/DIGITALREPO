@@ -54,6 +54,27 @@ function describeSource(item: { kind: string; filename: string | null; metadata:
   return `${item.kind.toUpperCase()}${item.filename ? `: ${item.filename}` : ""}`;
 }
 
+// Shown only when the uploader flipped the Internet research toggle on.
+const WEB_RESEARCH_RULES = [
+  "INTERNET RESEARCH IS ENABLED for this document. You may use the web_search tool to fill",
+  "gaps: when the document references a person, company, project, or deal but omits details",
+  "worth recording (full name, company, role, platform, dates), search to complete them.",
+  "Rules:",
+  "- Search only for things the document itself references — never add unrelated facts.",
+  "- Facts that come from the web rather than the document: cap confidence at 0.6, and",
+  "  name the source (publication/site and date) at the start of the rationale, e.g.",
+  '  "Web: Variety, Aug 2026 — ...". Quote the document for evidence where possible;',
+  "  otherwise quote the search result.",
+  "- Prefer the document over the web when they disagree; note the disagreement.",
+  "- At most a few targeted searches — this is gap-filling, not open-ended research.",
+].join("\n");
+
+function uploaderContext(item: { context: string | null }): string {
+  return item.context
+    ? `NOTE FROM THE UPLOADER (what this is and why it matters — trust it when judging relevance and deciding what to extract):\n${item.context}`
+    : "";
+}
+
 function candidateBlock(candidates: DigestCandidate[]): string {
   if (!candidates.length) return "No existing records matched this document.";
   return [
@@ -108,11 +129,12 @@ export async function triageItemCore(
       userContent: [
         candidateBlock(candidates),
         "",
+        uploaderContext(item),
         describeSource(item),
         "",
         "DOCUMENT TEXT:",
         text.slice(0, TRIAGE_TEXT_CAP),
-      ].join("\n"),
+      ].filter(Boolean).join("\n"),
       toolName: "submit_triage",
       toolDescription: "Submit the triage verdict for this document.",
       toolSchema: triageToolSchema(),
@@ -316,9 +338,12 @@ export async function proposeItemCore(
         model: PROPOSE_MODEL,
         maxTokens: 16_000,
         systemStable: proposeSystem(),
+        webSearch: item.webResearch,
         userContent: [
           candidateBlock(candidates),
           thread,
+          item.webResearch ? WEB_RESEARCH_RULES : "",
+          uploaderContext(item),
           describeSource(item),
           chunks.length > 1 ? `(Part ${chunks.indexOf(chunk) + 1} of ${chunks.length} of a long document)` : "",
           "DOCUMENT TEXT:",

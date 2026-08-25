@@ -18,6 +18,8 @@ export type StructuredRequest = {
   toolSchema: Record<string, unknown>;
   /** Force the tool call (only safe on models without thinking, e.g. Haiku). */
   forceTool?: boolean;
+  /** Let the model use Anthropic's server-side web search to fill gaps. */
+  webSearch?: boolean;
 };
 
 export type StructuredResult = { output: unknown; usage: ModelUsage };
@@ -45,48 +47,62 @@ export const anthropicRunner: ModelRunner = async (req) => {
   ];
   if (req.systemVolatile) system.push({ type: "text", text: req.systemVolatile });
 
+  const tools: Anthropic.ToolUnion[] = [
+    {
+      name: req.toolName,
+      description: req.toolDescription,
+      input_schema: req.toolSchema as Anthropic.Tool.InputSchema,
+    },
+  ];
+  if (req.webSearch) {
+    // Server-side web search — runs on Anthropic's infrastructure inside the
+    // same request; results arrive as content blocks. Capped to keep cost and
+    // latency bounded per call.
+    tools.push({ type: "web_search_20260209", name: "web_search", max_uses: 3 } as unknown as Anthropic.ToolUnion);
+  }
+
   const params: Anthropic.MessageCreateParamsNonStreaming = {
     model: req.model,
     max_tokens: req.maxTokens,
     system,
-    tools: [
-      {
-        name: req.toolName,
-        description: req.toolDescription,
-        input_schema: req.toolSchema as Anthropic.Tool.InputSchema,
-      },
-    ],
-    // Thinking-capable models reject forced tool choice; instruct + retry instead.
-    tool_choice: req.forceTool ? { type: "tool", name: req.toolName } : { type: "auto" },
+    tools,
+    // Thinking-capable models reject forced tool choice; instruct + retry
+    // instead. (Web search also requires auto tool choice.)
+    tool_choice: req.forceTool && !req.webSearch ? { type: "tool", name: req.toolName } : { type: "auto" },
     messages: [{ role: "user", content: req.userContent }],
   };
 
-  let response = await client.messages.create(params);
-  let output = extractToolInput(response, req.toolName);
-  let usage: ModelUsage = {
-    model: req.model,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+  const usage: ModelUsage = { model: req.model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 };
+  const addUsage = (r: Anthropic.Message) => {
+    usage.inputTokens += r.usage.input_tokens;
+    usage.outputTokens += r.usage.output_tokens;
+    usage.cacheReadTokens += r.usage.cache_read_input_tokens ?? 0;
   };
 
-  if (output === null && !req.forceTool) {
+  // Server tools can pause the turn mid-way (e.g. between web searches);
+  // resume by appending the assistant content and continuing.
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: req.userContent }];
+  let response = await client.messages.create({ ...params, messages });
+  addUsage(response);
+  for (let i = 0; i < 6 && response.stop_reason === "pause_turn"; i++) {
+    messages.push({ role: "assistant", content: response.content });
+    response = await client.messages.create({ ...params, messages });
+    addUsage(response);
+  }
+  let output = extractToolInput(response, req.toolName);
+
+  if (output === null && params.tool_choice?.type === "auto") {
     // One retry with an explicit reminder — no free-text fallback parsing.
     const retry = await client.messages.create({
       ...params,
       messages: [
-        { role: "user", content: req.userContent },
+        ...messages,
         { role: "assistant", content: response.content },
         { role: "user", content: `You must respond by calling the ${req.toolName} tool with the structured result. Call it now.` },
       ],
     });
     output = extractToolInput(retry, req.toolName);
-    usage = {
-      ...usage,
-      inputTokens: usage.inputTokens + retry.usage.input_tokens,
-      outputTokens: usage.outputTokens + retry.usage.output_tokens,
-      cacheReadTokens: usage.cacheReadTokens + (retry.usage.cache_read_input_tokens ?? 0),
-    };
+    addUsage(retry);
     response = retry;
   }
 

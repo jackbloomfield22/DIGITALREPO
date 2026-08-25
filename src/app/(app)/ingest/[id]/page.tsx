@@ -58,6 +58,8 @@ export default async function IngestItemPage({
           }
         : null,
     error: item.error,
+    context: item.context,
+    webResearch: item.webResearch,
     relevance: relevance ? { score: relevance.score ?? null, reasons: relevance.reasons ?? [] } : null,
     proposeInfo: (meta.proposeInfo as ItemVM["proposeInfo"]) ?? null,
   };

@@ -21,6 +21,8 @@ async function runStage(id: string, stage: "parse" | "triage" | "propose"): Prom
 
 export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; pendingIds: string[] }) {
   const [text, setText] = useState("");
+  const [context, setContext] = useState("");
+  const [webResearch, setWebResearch] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [progress, setProgress] = useState<Progress>(null);
   const stopRef = useRef(false);
@@ -59,6 +61,8 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
     const form = new FormData();
     for (const f of files) form.append("files", f);
     if (text.trim()) form.append("text", text.trim());
+    if (context.trim()) form.append("context", context.trim());
+    if (webResearch) form.append("webResearch", "1");
     setProgress({ done: 0, total: files.length || 1, label: "Uploading…" });
     try {
       const res = await fetch("/api/ingest/upload", { method: "POST", body: form });
@@ -69,7 +73,8 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
         return;
       }
       setText("");
-      const skipped = (body.items as { skipped?: string; filename: string | null }[]).filter((i) => i.skipped);
+      setContext("");
+      const skipped =(body.items as { skipped?: string; filename: string | null }[]).filter((i) => i.skipped);
       if (skipped.length) toast(`Skipped: ${skipped.map((s) => s.filename).join(", ")}`, { tone: "error" });
       const created = (body.items as { id: string; filename: string | null; skipped?: string }[]).filter((i) => !i.skipped && i.id);
       toast(`Ingesting ${created.length} item${created.length === 1 ? "" : "s"}…`);
@@ -127,6 +132,27 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
           onChange={(e) => setText(e.target.value)}
           aria-label="Paste research"
         />
+        <textarea
+          rows={2}
+          className="mt-2"
+          placeholder="Context (optional) — what is this, and what should we pay attention to? e.g. “Thread about the Nike deal; care about who reps whom.”"
+          value={context}
+          onChange={(e) => setContext(e.target.value)}
+          aria-label="Context for this upload"
+        />
+        <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-current"
+            checked={webResearch}
+            onChange={(e) => setWebResearch(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium">Internet research</span> — let the AI run a few web
+            searches to fill gaps the document leaves open (web-sourced facts are marked and
+            get lower confidence)
+          </span>
+        </label>
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="text-xs text-faint">
             {aiAvailable

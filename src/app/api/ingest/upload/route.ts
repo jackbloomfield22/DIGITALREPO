@@ -21,6 +21,10 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const files = form.getAll("files").filter((f): f is File => f instanceof File);
   const pasted = String(form.get("text") ?? "").trim();
+  // Optional uploader note ("what this is / why it matters") — stored on every
+  // item in the batch and fed to triage and propose as trusted context.
+  const context = String(form.get("context") ?? "").trim().slice(0, 2000) || null;
+  const webResearch = form.get("webResearch") === "1";
 
   if (!files.length && !pasted) {
     return NextResponse.json({ error: "Nothing to ingest — add files or paste text." }, { status: 400 });
@@ -47,6 +51,8 @@ export async function POST(request: Request) {
         filename: file.name,
         mimeType: file.type || null,
         sizeBytes: file.size,
+        context,
+        webResearch,
         createdById: user.id,
         status: "uploaded",
       },
@@ -61,6 +67,8 @@ export async function POST(request: Request) {
         kind: "text",
         extractedText: pasted.slice(0, 200_000),
         sizeBytes: pasted.length,
+        context,
+        webResearch,
         createdById: user.id,
         status: "parsed", // pasted text needs no parse stage
       },

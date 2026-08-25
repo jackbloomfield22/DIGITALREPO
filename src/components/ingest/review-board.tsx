@@ -66,6 +66,8 @@ export type ItemVM = {
   strippedText: string | null;
   headers: { from: string; to: string; cc: string; date: string; subject: string } | null;
   error: string | null;
+  context: string | null;
+  webResearch: boolean;
   relevance: { score: number | null; reasons: string[] } | null;
   proposeInfo: { coveredChars: number; totalChars: number; invalidOps?: string[] } | null;
 };
@@ -130,6 +132,19 @@ function SourcePane({ item, activeSpans }: { item: ItemVM; activeSpans: { start:
   let firstActiveRendered = false;
   return (
     <div className="card sticky top-4 max-h-[80vh] overflow-y-auto p-4 text-sm leading-relaxed">
+      {(item.context || item.webResearch) && (
+        <div className="mb-3 rounded bg-wash px-3 py-2 text-xs">
+          {item.context && (
+            <div>
+              <span className="font-semibold">Uploader context: </span>
+              {item.context}
+            </div>
+          )}
+          {item.webResearch && (
+            <div className="mt-0.5 text-muted">Internet research was enabled for this item.</div>
+          )}
+        </div>
+      )}
       {item.headers && (
         <div className="mb-3 space-y-0.5 border-b border-line pb-3 text-xs">
           <div><span className="text-muted">From:</span> {item.headers.from}</div>
