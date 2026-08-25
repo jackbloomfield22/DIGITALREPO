@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { formatDate } from "@/lib/format";
+import { RecordTable } from "@/components/record-table";
+import { orderForProjects, parseSort } from "@/lib/directory-sort";
 import { requireUser, hasRole } from "@/lib/auth";
 import { DirectoryControls, type DirChip } from "@/components/directory-controls";
 import { KindBadge, StatusPill } from "@/components/ui";
@@ -26,7 +29,7 @@ export default async function ProjectsPage({
   const orgId = one(params.org);
   const entityId = one(params.entity);
   const year = one(params.year);
-  const sort = one(params.sort) ?? "recent";
+  const sort = parseSort(one(params.sort), "date-desc");
   const view = one(params.view) === "table" ? "table" : "cards";
   const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
 
@@ -42,11 +45,7 @@ export default async function ProjectsPage({
   if (year && Number(year)) and.push({ premiereYear: Number(year) });
   const where = { AND: and };
 
-  const orderBy: Prisma.ProjectOrderByWithRelationInput[] =
-    sort === "title" ? [{ title: "asc" }]
-    : sort === "year" ? [{ premiereYear: "desc" }, { title: "asc" }]
-    : sort === "updated" ? [{ updatedAt: "desc" }]
-    : [{ createdAt: "desc" }];
+  const orderBy = orderForProjects(sort) as never;
 
   const [projects, total, creatorRecord, orgRecord, entityRecord] = await Promise.all([
     db.project.findMany({
@@ -103,10 +102,11 @@ export default async function ProjectsPage({
         savedViewType="projects"
         chips={chips}
         sorts={[
-          { value: "recent", label: "Recently Added" },
+          { value: "date-desc", label: "Latest Activity" },
+          { value: "status", label: "Status" },
+          { value: "year-desc", label: "Premiere Year" },
           { value: "updated", label: "Recently Updated" },
           { value: "title", label: "Alphabetical" },
-          { value: "year", label: "Premiere Year" },
         ]}
         filters={[
           { param: "type", label: "Project Type", kind: "select", options: PROJECT_TYPES },
@@ -123,40 +123,36 @@ export default async function ProjectsPage({
           No projects match. {canEdit && <Link className="underline" href="/projects/new">Add one</Link>}
         </div>
       ) : view === "table" ? (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line text-left">
-                <th className="px-3 py-2 font-semibold">Project</th>
-                <th className="px-3 py-2 font-semibold">Type</th>
-                <th className="px-3 py-2 font-semibold">Status</th>
-                <th className="px-3 py-2 font-semibold">Year</th>
-                <th className="px-3 py-2 font-semibold">Talent</th>
-                <th className="px-3 py-2 font-semibold">Companies</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((p) => (
-                <tr key={p.id} className="border-b border-line last:border-0 hover:bg-wash/60">
-                  <td className="px-3 py-2">
-                    <Link href={`/projects/${p.slug}`} className="font-medium hover:text-accent-deep">
-                      {p.title}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-muted">{labelFor(p.projectType)}</td>
-                  <td className="px-3 py-2"><StatusPill status={p.status} label={labelFor(p.status)} /></td>
-                  <td className="px-3 py-2 text-muted">{p.premiereYear ?? ""}</td>
-                  <td className="max-w-52 truncate px-3 py-2 text-muted">
-                    {[...new Set(p.credits.map((c) => c.creator.name))].join(", ")}
-                  </td>
-                  <td className="max-w-52 truncate px-3 py-2 text-muted">
-                    {[...new Set(p.organizations.map((o) => o.organization.name))].join(", ")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <RecordTable
+          sort={sort}
+          columns={[
+            { label: "Project", sortKey: "title" },
+            { label: "Status", sortKey: "status" },
+            { label: "Last activity", sortKey: "date" },
+            { label: "Year", sortKey: "year", showAt: "hidden sm:table-cell" },
+            { label: "Type", sortKey: "type", showAt: "hidden sm:table-cell" },
+            { label: "Talent", showAt: "hidden md:table-cell" },
+            { label: "Companies", showAt: "hidden lg:table-cell" },
+          ]}
+          rows={projects.map((p) => ({
+            id: p.id,
+            href: `/projects/${p.slug}`,
+            cells: [
+              <span key="t">
+                {p.title}
+                {p.logline && <span className="block text-xs font-normal text-muted line-clamp-1">{p.logline}</span>}
+              </span>,
+              <StatusPill key="s" status={p.status} label={labelFor(p.status)} />,
+              <span key="d" className="whitespace-nowrap text-muted">
+                {p.lastActivityAt ? formatDate(p.lastActivityAt) : <span className="text-faint">—</span>}
+              </span>,
+              <span key="y" className="text-muted">{p.premiereYear ?? <span className="text-faint">—</span>}</span>,
+              <span key="ty" className="text-muted">{labelFor(p.projectType)}</span>,
+              <span key="c" className="line-clamp-1 text-muted">{[...new Set(p.credits.map((c) => c.creator.name))].join(", ")}</span>,
+              <span key="o" className="line-clamp-1 text-muted">{[...new Set(p.organizations.map((o) => o.organization.name))].join(", ")}</span>,
+            ],
+          }))}
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => {

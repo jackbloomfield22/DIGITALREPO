@@ -6,6 +6,8 @@ import { DirectoryControls, type DirChip } from "@/components/directory-controls
 import { StatusPill } from "@/components/ui";
 import { OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, labelFor } from "@/lib/taxonomy";
 import { formatDate, relativeTime } from "@/lib/format";
+import { RecordTable } from "@/components/record-table";
+import { orderForOpportunities, parseSort } from "@/lib/directory-sort";
 
 export const metadata = { title: "Opportunities" };
 
@@ -20,6 +22,8 @@ export default async function OpportunitiesPage({
   const q = one(params.q)?.trim();
   const type = one(params.type);
   const status = one(params.status);
+  const sort = parseSort(one(params.sort), "date-desc");
+  const view = one(params.view) === "table" ? "table" : "cards";
 
   const and: Prisma.OpportunityWhereInput[] = [{ archived: false }];
   if (q) and.push({ title: { contains: q, mode: "insensitive" } });
@@ -30,7 +34,7 @@ export default async function OpportunitiesPage({
   const [opportunities, total] = await Promise.all([
     db.opportunity.findMany({
       where,
-      orderBy: { updatedAt: "desc" },
+      orderBy: orderForOpportunities(sort) as never,
       take: 100,
       include: {
         owner: { select: { name: true } },
@@ -56,13 +60,54 @@ export default async function OpportunitiesPage({
         searchPlaceholder="Search opportunities…"
         canEdit={hasRole(user, "EDITOR")}
         chips={chips}
-        sorts={[]}
+        viewToggle
+        savedViewType="opportunities"
+        sorts={[
+          { value: "date-desc", label: "Latest Activity" },
+          { value: "date", label: "Oldest Activity" },
+          { value: "status", label: "Status" },
+          { value: "type", label: "Type" },
+          { value: "title", label: "Alphabetical" },
+        ]}
         filters={[
           { param: "type", label: "Type", kind: "select", options: OPPORTUNITY_TYPES },
           { param: "status", label: "Status", kind: "select", options: OPPORTUNITY_STATUSES },
         ]}
       />
 
+      {view === "table" ? (
+        <RecordTable
+          sort={sort}
+          empty="No opportunities yet."
+          columns={[
+            { label: "Opportunity", sortKey: "title" },
+            { label: "Status", sortKey: "status" },
+            { label: "Last activity", sortKey: "date" },
+            { label: "Type", sortKey: "type", showAt: "hidden sm:table-cell" },
+            { label: "Due", showAt: "hidden md:table-cell" },
+            { label: "Topics", showAt: "hidden lg:table-cell" },
+          ]}
+          rows={opportunities.map((o) => ({
+            id: o.id,
+            href: `/opportunities/${o.slug}`,
+            cells: [
+              <span key="t">
+                {o.title}
+                {o.description && <span className="block text-xs font-normal text-muted line-clamp-1">{o.description}</span>}
+              </span>,
+              <StatusPill key="s" status={o.status} label={labelFor(o.status)} />,
+              <span key="d" className="whitespace-nowrap text-muted">
+                {o.lastActivityAt ? formatDate(o.lastActivityAt) : <span className="text-faint">—</span>}
+              </span>,
+              <span key="ty" className="text-muted">{labelFor(o.type)}</span>,
+              <span key="due" className="whitespace-nowrap text-muted">
+                {o.deadline ? formatDate(o.deadline) : <span className="text-faint">—</span>}
+              </span>,
+              <span key="e" className="line-clamp-1 text-muted">{o.entityLinks.map((l) => l.entity.name).join(", ")}</span>,
+            ],
+          }))}
+        />
+      ) : (
       <div className="space-y-3">
         {opportunities.map((o) => (
           <Link key={o.id} href={`/opportunities/${o.slug}`} className="card block p-4 transition-shadow hover:shadow-pop">
@@ -90,6 +135,7 @@ export default async function OpportunitiesPage({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

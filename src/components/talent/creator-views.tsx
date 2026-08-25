@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Portrait } from "@/components/ui";
 import { FavoriteButton } from "@/components/action-buttons";
 import { QuickPreviewDrawer } from "./quick-preview";
@@ -168,6 +168,35 @@ export function CreatorCardGrid({
 }
 
 // --- Table view --------------------------------------------------------------
+
+// Columns whose label doubles as a sort control, using the sort values the
+// talent query already understands.
+const COLUMN_SORTS: Record<string, string> = {
+  audience: "audience",
+  formats: "formats",
+  projects: "projects",
+  updated: "updated",
+};
+
+function SortableHeader({ label, sortValue }: { label: string; sortValue?: string }) {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  if (!sortValue) return <span className="text-muted">{label}</span>;
+  const active = (searchParams.get("sort") ?? "name") === sortValue;
+  const params = new URLSearchParams(searchParams.toString());
+  params.set("sort", sortValue);
+  params.delete("page");
+  return (
+    <Link
+      href={`${pathname}?${params.toString()}`}
+      scroll={false}
+      className={`inline-flex items-center gap-1 hover:text-accent ${active ? "text-accent" : "text-muted"}`}
+    >
+      {label}
+      <span aria-hidden>{active ? "↓" : "↕"}</span>
+    </Link>
+  );
+}
 
 const ALL_COLUMNS = [
   { key: "categories", label: "Categories" },
@@ -419,9 +448,13 @@ export function CreatorTable({
                   />
                 </th>
               )}
-              <th className="px-3 py-2 font-semibold">Talent</th>
+              <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">
+                <SortableHeader label="Talent" sortValue="name" />
+              </th>
               {ALL_COLUMNS.filter((c) => columns.includes(c.key)).map((col) => (
-                <th key={col.key} className="px-3 py-2 font-semibold">{col.label}</th>
+                <th key={col.key} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">
+                  <SortableHeader label={col.label} sortValue={COLUMN_SORTS[col.key]} />
+                </th>
               ))}
               <th className="px-3 py-2" />
             </tr>

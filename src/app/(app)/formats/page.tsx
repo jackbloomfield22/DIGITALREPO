@@ -5,7 +5,9 @@ import { requireUser, hasRole } from "@/lib/auth";
 import { DirectoryControls, type DirChip } from "@/components/directory-controls";
 import { KindBadge, StatusPill } from "@/components/ui";
 import { FORMAT_STATUSES, FORMAT_TYPES, labelFor } from "@/lib/taxonomy";
-import { relativeTime } from "@/lib/format";
+import { formatDate, relativeTime } from "@/lib/format";
+import { RecordTable } from "@/components/record-table";
+import { orderForFormats, parseSort } from "@/lib/directory-sort";
 
 export const metadata = { title: "Formats" };
 
@@ -25,13 +27,18 @@ export default async function FormatsPage({
   const creatorId = one(params.creator);
   const entityId = one(params.entity);
   const orgId = one(params.org);
-  const sort = one(params.sort) ?? "updated";
+  const sort = parseSort(one(params.sort), "date-desc");
   const view = one(params.view) === "table" ? "table" : "cards";
   const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
 
   const and: Prisma.FormatWhereInput[] = [{ archived: false }];
   if (q) and.push({ title: { contains: q, mode: "insensitive" } });
+  // The slate keeps its development archive as a separate section, and it is by
+  // far the largest one — showing it by default would bury live work. Asking
+  // for the archived status explicitly still brings it back.
+  const showingArchive = status === "archived" || one(params.archive) === "1";
   if (status) and.push({ status });
+  else if (!showingArchive) and.push({ status: { not: "archived" } });
   if (type) and.push({ formatType: type });
   if (creatorId) and.push({ creators: { some: { creatorId } } });
   if (entityId) and.push({ entityLinks: { some: { entityId } } });
@@ -41,7 +48,7 @@ export default async function FormatsPage({
   const [formats, total, creatorRecord, entityRecord, orgRecord] = await Promise.all([
     db.format.findMany({
       where,
-      orderBy: sort === "title" ? { title: "asc" } : sort === "recent" ? { createdAt: "desc" } : { updatedAt: "desc" },
+      orderBy: orderForFormats(sort) as never,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
@@ -56,8 +63,20 @@ export default async function FormatsPage({
     orgId ? db.organization.findUnique({ where: { id: orgId }, select: { name: true } }) : null,
   ]);
 
+  const archivedCount = await db.format.count({ where: { archived: false, status: "archived" } });
+  // Keep whatever the reader is already looking at when revealing the archive.
+  const archiveHref = (() => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      const val = Array.isArray(v) ? v[0] : v;
+      if (val && k !== "page" && k !== "archive") p.set(k, val);
+    }
+    p.set("archive", "1");
+    return `/formats?${p.toString()}`;
+  })();
   const chips: DirChip[] = [
     ...(status ? [{ param: "status", value: status, label: labelFor(status) }] : []),
+    ...(one(params.archive) === "1" ? [{ param: "archive", value: "1", label: "Including archive" }] : []),
     ...(type ? [{ param: "type", value: type, label: labelFor(type) }] : []),
     ...(creatorRecord ? [{ param: "creator", value: creatorId!, label: creatorRecord.name }] : []),
     ...(entityRecord ? [{ param: "entity", value: entityId!, label: entityRecord.name }] : []),
@@ -79,8 +98,10 @@ export default async function FormatsPage({
         savedViewType="formats"
         chips={chips}
         sorts={[
+          { value: "date-desc", label: "Latest Activity" },
+          { value: "date", label: "Oldest Activity" },
+          { value: "status", label: "Status" },
           { value: "updated", label: "Recently Updated" },
-          { value: "recent", label: "Recently Added" },
           { value: "title", label: "Alphabetical" },
         ]}
         filters={[
@@ -92,39 +113,48 @@ export default async function FormatsPage({
         ]}
       />
 
+      {!showingArchive && archivedCount > 0 && (
+        <p className="-mt-2 mb-3 text-xs text-muted">
+          {archivedCount} archived formats hidden.{" "}
+          <Link className="underline hover:text-accent" href={archiveHref}>
+            Include them
+          </Link>
+        </p>
+      )}
+
       {formats.length === 0 ? (
         <div className="rounded-md border border-dashed border-line-strong bg-wash/50 px-6 py-10 text-center text-sm text-muted">
           No formats match. {canEdit && <Link className="underline" href="/formats/new">Create one</Link>}
         </div>
       ) : view === "table" ? (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line text-left">
-                <th className="px-3 py-2 font-semibold">Format</th>
-                <th className="px-3 py-2 font-semibold">Type</th>
-                <th className="px-3 py-2 font-semibold">Status</th>
-                <th className="px-3 py-2 font-semibold">Talent</th>
-                <th className="px-3 py-2 font-semibold">Topics</th>
-                <th className="px-3 py-2 font-semibold">Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {formats.map((f) => (
-                <tr key={f.id} className="border-b border-line last:border-0 hover:bg-wash/60">
-                  <td className="px-3 py-2">
-                    <Link href={`/formats/${f.slug}`} className="font-medium hover:text-accent-deep">{f.title}</Link>
-                  </td>
-                  <td className="px-3 py-2 text-muted">{labelFor(f.formatType)}</td>
-                  <td className="px-3 py-2"><StatusPill status={f.status} label={labelFor(f.status)} /></td>
-                  <td className="max-w-52 truncate px-3 py-2 text-muted">{f.creators.map((c) => c.creator.name).join(", ")}</td>
-                  <td className="max-w-44 truncate px-3 py-2 text-muted">{f.entityLinks.map((l) => l.entity.name).join(", ")}</td>
-                  <td className="px-3 py-2 text-muted">{relativeTime(f.updatedAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <RecordTable
+          sort={sort}
+          columns={[
+            { label: "Format", sortKey: "title" },
+            { label: "Status", sortKey: "status" },
+            { label: "Last activity", sortKey: "date" },
+            { label: "Type", sortKey: "type", showAt: "hidden sm:table-cell" },
+            { label: "Talent", showAt: "hidden md:table-cell" },
+            { label: "Topics", showAt: "hidden lg:table-cell" },
+          ]}
+          rows={formats.map((f) => ({
+            id: f.id,
+            href: `/formats/${f.slug}`,
+            cells: [
+              <span key="t">
+                {f.title}
+                {f.logline && <span className="block text-xs font-normal text-muted line-clamp-1">{f.logline}</span>}
+              </span>,
+              <StatusPill key="s" status={f.status} label={labelFor(f.status)} />,
+              <span key="d" className="whitespace-nowrap text-muted">
+                {f.lastActivityAt ? formatDate(f.lastActivityAt) : <span className="text-faint">—</span>}
+              </span>,
+              <span key="ty" className="text-muted">{labelFor(f.formatType)}</span>,
+              <span key="c" className="line-clamp-1 text-muted">{f.creators.map((c) => c.creator.name).join(", ")}</span>,
+              <span key="e" className="line-clamp-1 text-muted">{f.entityLinks.map((l) => l.entity.name).join(", ")}</span>,
+            ],
+          }))}
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {formats.map((f) => {
