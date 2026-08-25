@@ -442,6 +442,39 @@ describe("triage and propose with a fake model", () => {
     await db.ingestItem.delete({ where: { id: item.id } });
   });
 
+  it("uploader context reaches the prompts and the web-research flag reaches the runner", async () => {
+    const item = await db.ingestItem.create({
+      data: {
+        kind: "text",
+        extractedText: `${P} Short note about Nova Reyes.`,
+        context: "This is the Nike deal thread — care about who reps whom.",
+        webResearch: true,
+        status: "parsed",
+      },
+    });
+    const { triageItemCore, proposeItemCore } = await import("@/lib/ingest/pipeline");
+
+    let triagePrompt = "";
+    await triageItemCore(item.id, async (req) => {
+      triagePrompt = req.userContent;
+      return {
+        output: { relevant: true, score: 0.9, reasons: ["ok"], candidateRecords: [], newRecordCandidates: [], sections: [] },
+        usage,
+      };
+    });
+    expect(triagePrompt).toContain("Nike deal thread");
+
+    let proposeReq: { userContent: string; webSearch?: boolean } | null = null;
+    await proposeItemCore(item.id, async (req) => {
+      proposeReq = req;
+      return { output: { changes: [] }, usage };
+    });
+    expect(proposeReq!.webSearch).toBe(true);
+    expect(proposeReq!.userContent).toContain("Nike deal thread");
+    expect(proposeReq!.userContent).toContain("INTERNET RESEARCH IS ENABLED");
+    await db.ingestItem.delete({ where: { id: item.id } });
+  });
+
   it("without an API key the real pipeline refuses gracefully", async () => {
     const item = await db.ingestItem.create({
       data: { kind: "text", extractedText: `${P} some text`, status: "parsed" },

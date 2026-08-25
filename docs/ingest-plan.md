@@ -138,3 +138,17 @@ the model can propose restoring instead of duplicating.
 6. Cron + bulk runner + Admin → Ingest + README.
 
 One commit per phase; `typecheck`, `lint`, `test` before each.
+
+## Post-launch additions (Aug 2026)
+
+- **Robust model-output validation**: free-text from the model is clamped to caps
+  instead of failing the item; proposals parse per-op (malformed ops dropped and
+  counted); failed items are retryable from the right stage via a Retry button.
+- **Uploader context**: optional note on upload ("what this is / why it matters"),
+  stored on IngestItem.context, inherited by children, fed to triage and propose
+  as trusted context, and shown on the review screen.
+- **Internet research toggle**: per-upload opt-in (IngestItem.webResearch). When on,
+  propose runs with Anthropic's server-side web_search tool (web_search_20260209,
+  max 3 searches/call, pause_turn continuation in the runner). Prompt rules require
+  web-sourced facts to name their source in the rationale and cap confidence at 0.6.
+- Propose covers up to INGEST_MAX_CHUNKS chunks (default 5, ~116k chars).

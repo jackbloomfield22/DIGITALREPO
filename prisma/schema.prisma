@@ -780,6 +780,8 @@ model IngestItem {
   raw           Bytes?
   rawRetained   Boolean  @default(false)
   extractedText String?
+  context       String? // optional uploader note: what this is and why it matters
+  webResearch   Boolean  @default(false) // allow web search to fill gaps during propose
   metadata      Json?
   parentId      String?
   threadId      String?
