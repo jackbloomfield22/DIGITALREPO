@@ -11,7 +11,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <Link className="chip" href="/admin">Overview & Users</Link>
         <Link className="chip" href="/admin/data-health">Data Health</Link>
         <Link className="chip" href="/admin/entities">Entities</Link>
-        <Link className="chip" href="/admin/import">Import</Link>
+        <Link className="chip" href="/admin/import">Talent Import</Link>
+        <Link className="chip" href="/admin/bulk-upload">Bulk Upload</Link>
         <Link className="chip" href="/admin/backups">Backups</Link>
         <Link className="chip" href="/admin/ingest">Ingest</Link>
       </nav>

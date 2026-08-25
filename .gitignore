@@ -44,3 +44,9 @@ next-env.d.ts
 # runtime file storage
 /uploads
 
+
+# Knowledge bundles for Admin → Bulk Upload contain confidential business data.
+# They are handed over as files and must never be committed.
+*.bundle.json
+bundle.json
+/import-batches/
