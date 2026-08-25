@@ -5,6 +5,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { applyIngestChangesCore, type ApplyOutcome } from "@/lib/ingest/apply";
+import { logAudit } from "@/lib/audit";
+import { refreshDigest } from "@/lib/ingest/digest";
 
 type Result = { ok: boolean; error?: string };
 
@@ -118,5 +120,186 @@ export async function deleteIngestItem(itemId: string): Promise<Result> {
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed." };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Undo and retry
+// ---------------------------------------------------------------------------
+// Removing an ingest that was never applied is a clean slate: the item and its
+// proposals go, and the same material can be submitted again. Removing one that
+// *was* applied has to put the records back first — every applied change stores
+// the value it replaced, and creates record the row they produced, so both
+// directions are recoverable.
+
+const UNDO_MODELS: Record<string, string> = {
+  creator: "creator",
+  project: "project",
+  organization: "organization",
+  format: "format",
+  opportunity: "opportunity",
+  person: "industryPerson",
+};
+
+export type IngestUndoOutcome = {
+  ok: boolean;
+  error?: string;
+  reverted?: number;
+  deleted?: number;
+  skipped?: string[];
+};
+
+/** Put back what an applied ingest changed. Safe to run more than once. */
+export async function revertIngestChanges(itemId: string): Promise<IngestUndoOutcome> {
+  try {
+    const user = await requireRole("EDITOR");
+    const item = await db.ingestItem.findUnique({ where: { id: itemId } });
+    if (!item) return { ok: false, error: "That ingest is no longer on record." };
+
+    const applied = await db.ingestChange.findMany({
+      where: { itemId, status: "applied" },
+      orderBy: { sortOrder: "desc" },
+    });
+
+    let reverted = 0;
+    let deleted = 0;
+    const skipped: string[] = [];
+
+    for (const change of applied) {
+      const dest = (change.destination ?? {}) as {
+        targetType?: string;
+        targetId?: string;
+        field?: string;
+        createdTargetType?: string;
+        createdTargetId?: string;
+      };
+
+      try {
+        if (change.opType === "create") {
+          const type = dest.createdTargetType;
+          const id = dest.createdTargetId;
+          const model = type ? UNDO_MODELS[type] : undefined;
+          if (!model || !id) {
+            skipped.push(`${change.group} (created before undo was recorded — remove it by hand)`);
+            continue;
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const exists = await (db as any)[model].findUnique({ where: { id } });
+          if (exists) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (db as any)[model].delete({ where: { id } });
+            await db.knowledgeDigest.deleteMany({ where: { targetType: type!, targetId: id } });
+            await db.favorite.deleteMany({ where: { targetType: type!, targetId: id } });
+            await db.recentView.deleteMany({ where: { targetType: type!, targetId: id } });
+            await db.recordSource.deleteMany({ where: { targetType: type!, targetId: id } });
+            await db.collectionItem.deleteMany({ where: { targetType: type!, targetId: id } });
+            deleted++;
+          }
+        } else if (change.opType === "update" || change.opType === "note" || change.opType === "archive") {
+          const model = dest.targetType ? UNDO_MODELS[dest.targetType] : undefined;
+          if (!model || !dest.targetId || !dest.field) {
+            skipped.push(change.group);
+            continue;
+          }
+          // `before` is JSON null both when the field was empty and when it
+          // wasn't captured; either way restoring null is the correct undo.
+          const previous = change.before === undefined ? null : change.before;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (db as any)[model].update({
+            where: { id: dest.targetId },
+            data: { [dest.field]: previous },
+          });
+          await refreshDigest(dest.targetType!, dest.targetId);
+          reverted++;
+        } else {
+          // Links are additive and cheap to leave; note them rather than guess.
+          skipped.push(`${change.group} (link)`);
+          continue;
+        }
+
+        await db.ingestChange.update({
+          where: { id: change.id },
+          data: { status: "approved", appliedAt: null, appliedById: null },
+        });
+      } catch (e) {
+        skipped.push(`${change.group} — ${e instanceof Error ? e.message : "could not undo"}`);
+      }
+    }
+
+    // The provenance record this ingest created goes with it.
+    const source = await db.source.findFirst({ where: { url: `/ingest/${itemId}` } });
+    if (source) {
+      await db.recordSource.deleteMany({ where: { sourceId: source.id } });
+      await db.source.delete({ where: { id: source.id } }).catch(() => {});
+    }
+
+    await db.ingestItem.update({ where: { id: itemId }, data: { status: "proposed" } });
+    await logAudit(user, {
+      targetType: "ingest",
+      targetId: itemId,
+      targetLabel: item.filename ?? "Ingested material",
+      action: "updated",
+      field: `undid ${reverted + deleted} applied changes`,
+    });
+
+    revalidatePath("/", "layout");
+    return { ok: true, reverted, deleted, skipped };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Undo failed." };
+  }
+}
+
+/**
+ * Remove an ingest entirely. Anything it applied is put back first, so this is
+ * always a complete undo rather than only forgetting the paperwork.
+ */
+export async function removeIngestItem(itemId: string): Promise<IngestUndoOutcome> {
+  try {
+    const user = await requireRole("EDITOR");
+    const item = await db.ingestItem.findUnique({ where: { id: itemId } });
+    if (!item) return { ok: true, reverted: 0, deleted: 0, skipped: [] };
+
+    let undo: IngestUndoOutcome = { ok: true, reverted: 0, deleted: 0, skipped: [] };
+    const hasApplied = await db.ingestChange.count({ where: { itemId, status: "applied" } });
+    if (hasApplied) {
+      undo = await revertIngestChanges(itemId);
+      if (!undo.ok) return undo;
+    }
+
+    await db.ingestItem.delete({ where: { id: itemId } }); // cascades to children + changes
+    await logAudit(user, {
+      targetType: "ingest",
+      targetId: itemId,
+      targetLabel: item.filename ?? "Ingested material",
+      action: "deleted",
+    });
+
+    revalidatePath("/", "layout");
+    return { ...undo, ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not remove that ingest." };
+  }
+}
+
+/** Clear proposals and put an item back at the start of the pipeline. */
+export async function retryIngestItem(itemId: string): Promise<Result> {
+  try {
+    await requireRole("EDITOR");
+    const hasApplied = await db.ingestChange.count({ where: { itemId, status: "applied" } });
+    if (hasApplied) {
+      return {
+        ok: false,
+        error: "This ingest has already been applied — undo it first, then retry.",
+      };
+    }
+    await db.ingestChange.deleteMany({ where: { itemId } });
+    await db.ingestItem.update({
+      where: { id: itemId },
+      data: { status: "parsed", error: null, relevance: undefined },
+    });
+    revalidatePath("/ingest");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Retry failed." };
   }
 }

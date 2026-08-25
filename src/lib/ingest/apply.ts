@@ -232,7 +232,25 @@ export async function applyIngestChangesCore(itemId: string, user: SessionUser):
   for (const change of ordered) {
     const op = change.payload as unknown as ProposedOp & { expectedVersion?: number };
     try {
-      if (op.op === "create") await applyCreate(op, user, touched);
+      if (op.op === "create") {
+        // Remember which record a create actually produced, so the change can
+        // be undone later without guessing by name.
+        const before = new Set(touched.keys());
+        await applyCreate(op, user, touched);
+        const created = [...touched.values()].find((t) => !before.has(`${t.targetType}:${t.targetId}`));
+        if (created) {
+          await db.ingestChange.update({
+            where: { id: change.id },
+            data: {
+              destination: {
+                ...(change.destination as object),
+                createdTargetType: created.targetType,
+                createdTargetId: created.targetId,
+              },
+            },
+          });
+        }
+      }
       else if (op.op === "update") {
         const effective =
           change.status === "edited" && change.editedAfter != null

@@ -44,7 +44,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/explore", label: "Explore" },
       { href: "/ai", label: "AI Search" },
-      { href: "/ingest", label: "Ingest" },
+      { href: "/uploads", label: "Add Info", children: [{ href: "/ingest", label: "Ingest queue" }] },
     ],
   },
   {
