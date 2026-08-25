@@ -86,6 +86,7 @@ model SocialProfile {
   handle         String?
   url            String?
   followerCount  Int?
+  engagementRate Float? // percent, e.g. 4.47 — the headline metric in creator tooling
   countUpdatedAt DateTime?
   notes          String?
 
