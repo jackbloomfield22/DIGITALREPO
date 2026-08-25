@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
@@ -88,7 +89,12 @@ export default async function OrganizationPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {canEdit && <Link href={`/organizations/${org.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>}
+          {canEdit && (
+            <span className="flex gap-2">
+              <Link href={`/organizations/${org.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
+              <DeleteRecordButton targetType="organization" id={org.id} label={org.name} />
+            </span>
+          )}
           <FavoriteButton targetType="organization" targetId={org.id} favorited={!!favorite} />
           <AddToCollectionButton targetType="organization" targetId={org.id} targetLabel={org.name} />
         </div>

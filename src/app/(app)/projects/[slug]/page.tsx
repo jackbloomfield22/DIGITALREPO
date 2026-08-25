@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { findRelatedProjects } from "@/lib/related";
@@ -129,6 +130,7 @@ export default async function ProjectPage({
             {canEdit && (
               <Link href={`/projects/${project.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
             )}
+            {canEdit && <DeleteRecordButton targetType="project" id={project.id} label={project.title} />}
             <FavoriteButton targetType="project" targetId={project.id} favorited={!!favorite} />
             <AddToCollectionButton targetType="project" targetId={project.id} targetLabel={project.title} />
           </div>
