@@ -4,24 +4,65 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-const PRIMARY = [
-  { href: "/talent", label: "Talent" },
-  { href: "/formats", label: "Formats" },
-  { href: "/projects", label: "Projects" },
-  { href: "/opportunities", label: "Opportunities" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/explore", label: "Explore" },
-  { href: "/ai", label: "AI Search" },
-];
+// Navigation communicates the product hierarchy: pillars of the Repo first,
+// research modes second, personal utilities third, operations fourth, system
+// last. Development and Industry are parents with their two halves indented —
+// a new teammate should read this list and understand the company.
 
-const SECONDARY = [
-  { href: "/collections", label: "Collections" },
-  { href: "/recent", label: "Recent" },
-  { href: "/favorites", label: "Favorites" },
-  { href: "/activity", label: "Activity" },
-  { href: "/attention", label: "Needs Attention" },
-  { href: "/ingest", label: "Ingest" },
-  { href: "/archive", label: "Archive" },
+type NavChild = { href: string; label: string };
+type NavItem = { href: string; label: string; children?: NavChild[] };
+type NavGroup = { label: string | null; items: NavItem[] };
+
+const GROUPS: NavGroup[] = [
+  { label: null, items: [{ href: "/", label: "Home" }] },
+  {
+    label: "The Repo",
+    items: [
+      { href: "/talent", label: "Talent" },
+      {
+        href: "/development",
+        label: "Development",
+        children: [
+          { href: "/formats", label: "Formats" },
+          { href: "/opportunities", label: "Opportunities" },
+        ],
+      },
+      { href: "/projects", label: "Projects" },
+      {
+        href: "/industry",
+        label: "Industry",
+        children: [
+          { href: "/organizations", label: "Organizations" },
+          { href: "/people", label: "People" },
+        ],
+      },
+      { href: "/calendar", label: "Calendar" },
+    ],
+  },
+  {
+    label: "Research",
+    items: [
+      { href: "/explore", label: "Explore" },
+      { href: "/ai", label: "AI Search" },
+      { href: "/ingest", label: "Ingest" },
+    ],
+  },
+  {
+    label: "My Repo",
+    items: [
+      { href: "/collections", label: "Collections" },
+      { href: "/favorites", label: "Favorites" },
+      { href: "/recent", label: "Recent" },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/attention", label: "Needs Attention" },
+      { href: "/activity", label: "Activity" },
+      { href: "/archive", label: "Archive" },
+    ],
+  },
 ];
 
 const CREATE_ITEMS = [
@@ -30,6 +71,7 @@ const CREATE_ITEMS = [
   { href: "/projects/new", label: "New Project" },
   { href: "/opportunities/new", label: "New Opportunity" },
   { href: "/organizations/new", label: "New Organization" },
+  { href: "/people/new", label: "New Industry Person" },
   { href: "/collections/new", label: "New Collection" },
 ];
 
@@ -47,18 +89,24 @@ function NavLinks({
   const pathname = usePathname();
   const [createOpen, setCreateOpen] = useState(false);
 
-  const link = (item: { href: string; label: string }) => {
-    const active =
-      pathname === item.href || pathname.startsWith(item.href + "/");
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
+
+  const row = (item: NavChild, opts?: { child?: boolean; parentOfActive?: boolean }) => {
+    const active = isActive(item.href);
     return (
       <Link
         key={item.href}
         href={item.href}
         onClick={onNavigate}
-        className={`block rounded px-3 py-1.5 text-sm transition-colors ${
+        className={`block rounded py-1.5 transition-colors ${
+          opts?.child ? "pl-7 pr-3 text-[13px]" : "px-3 text-sm"
+        } ${
           active
             ? "bg-wash font-semibold text-ink"
-            : "text-muted hover:bg-wash hover:text-ink"
+            : opts?.parentOfActive
+              ? "font-medium text-ink hover:bg-wash"
+              : "text-muted hover:bg-wash hover:text-ink"
         }`}
       >
         {item.label}
@@ -67,8 +115,8 @@ function NavLinks({
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <Link href="/talent" onClick={onNavigate} className="block px-3 pb-5 pt-4">
+    <div className="flex h-full flex-col overflow-y-auto">
+      <Link href="/" onClick={onNavigate} className="block px-3 pb-4 pt-4">
         <div className="font-display text-lg font-bold leading-none tracking-tight">
           4.4.FORTY
         </div>
@@ -76,7 +124,7 @@ function NavLinks({
       </Link>
 
       {isEditor && (
-        <div className="relative mb-4 px-3">
+        <div className="relative mb-3 px-3">
           <button
             className="btn btn-accent w-full"
             onClick={() => setCreateOpen((v) => !v)}
@@ -116,28 +164,34 @@ function NavLinks({
         </div>
       )}
 
-      <nav aria-label="Primary" className="space-y-0.5 px-2">
-        {PRIMARY.map(link)}
-      </nav>
+      <button
+        className="mx-3 mb-3 flex items-center justify-between rounded border border-line px-3 py-1.5 text-sm text-faint hover:border-line-strong hover:text-muted"
+        onClick={() => window.dispatchEvent(new CustomEvent("open-command-bar"))}
+      >
+        <span>Search the Repo…</span>
+        <kbd className="rounded border border-line px-1 text-[10px]">⌘K</kbd>
+      </button>
 
-      <div className="mt-6 px-2">
-        <div className="overline mb-1 px-3">Library</div>
-        <nav aria-label="Library" className="space-y-0.5">
-          {SECONDARY.map(link)}
-        </nav>
-      </div>
+      {GROUPS.map((group, gi) => (
+        <div key={group.label ?? gi} className={gi === 0 ? "px-2" : "mt-4 px-2"}>
+          {group.label && <div className="overline mb-1 px-3">{group.label}</div>}
+          <nav aria-label={group.label ?? "Home"} className="space-y-0.5">
+            {group.items.map((item) => {
+              const childActive = item.children?.some((c) => isActive(c.href)) ?? false;
+              return (
+                <div key={item.href}>
+                  {row(item, { parentOfActive: childActive })}
+                  {item.children?.map((c) => row(c, { child: true }))}
+                </div>
+              );
+            })}
+          </nav>
+        </div>
+      ))}
 
-      <div className="mt-auto space-y-0.5 px-2 pb-4">
-        <button
-          className="block w-full rounded px-3 py-1 text-left text-xs text-faint hover:text-muted"
-          onClick={() =>
-            window.dispatchEvent(new CustomEvent("open-command-bar"))
-          }
-        >
-          Search <kbd className="rounded border border-line px-1">⌘K</kbd>
-        </button>
-        {isAdmin && link({ href: "/admin", label: "Admin" })}
-        {link({ href: "/settings", label: "Settings" })}
+      <div className="mt-auto space-y-0.5 px-2 pb-4 pt-6">
+        {isAdmin && row({ href: "/admin", label: "Admin" })}
+        {row({ href: "/settings", label: "Settings" })}
         <div className="flex items-center justify-between px-3 pt-2 text-xs text-faint">
           <span className="truncate">{userName}</span>
           <form action="/api/logout" method="post">
@@ -173,7 +227,7 @@ export function Sidebar(props: {
         >
           ☰
         </button>
-        <Link href="/talent" className="font-display text-sm font-bold">
+        <Link href="/" className="font-display text-sm font-bold">
           4.4.FORTY REPO
         </Link>
         <button

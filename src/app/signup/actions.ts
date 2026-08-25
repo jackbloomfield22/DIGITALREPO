@@ -87,5 +87,5 @@ export async function signup(formData: FormData) {
   });
 
   await createSession(user.id);
-  redirect("/talent");
+  redirect("/");
 }
