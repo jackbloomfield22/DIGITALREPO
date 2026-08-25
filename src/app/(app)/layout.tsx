@@ -1,6 +1,7 @@
 import { requireUser, hasRole } from "@/lib/auth";
 import { Sidebar } from "@/components/sidebar";
 import { CommandBar } from "@/components/command-bar";
+import { QuickCapture } from "@/components/quick-capture";
 
 export default async function AppLayout({
   children,
@@ -19,6 +20,7 @@ export default async function AppLayout({
       <main className="min-h-screen pt-12 lg:pl-52 lg:pt-0">
         <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8">{children}</div>
       </main>
+      {hasRole(user, "EDITOR") && <QuickCapture />}
     </div>
   );
 }

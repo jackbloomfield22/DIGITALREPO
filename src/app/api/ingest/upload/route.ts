@@ -25,6 +25,9 @@ export async function POST(request: Request) {
   // item in the batch and fed to triage and propose as trusted context.
   const context = String(form.get("context") ?? "").trim().slice(0, 2000) || null;
   const webResearch = form.get("webResearch") === "1";
+  // Optional human label for pasted text, so a note is recognisable in the
+  // queue and in Add Info rather than showing up as one more "Pasted text".
+  const label = String(form.get("label") ?? "").trim().slice(0, 120) || null;
 
   if (!files.length && !pasted) {
     return NextResponse.json({ error: "Nothing to ingest — add files or paste text." }, { status: 400 });
@@ -65,6 +68,7 @@ export async function POST(request: Request) {
     const item = await db.ingestItem.create({
       data: {
         kind: "text",
+        filename: label,
         extractedText: pasted.slice(0, 200_000),
         sizeBytes: pasted.length,
         context,
@@ -73,7 +77,7 @@ export async function POST(request: Request) {
         status: "parsed", // pasted text needs no parse stage
       },
     });
-    created.push({ id: item.id, filename: null });
+    created.push({ id: item.id, filename: label });
   }
 
   return NextResponse.json({ items: created });
