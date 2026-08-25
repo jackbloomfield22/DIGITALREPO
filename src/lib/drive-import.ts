@@ -359,6 +359,13 @@ async function resolveTalentIds(names: string[]): Promise<Map<string, string>> {
   return map;
 }
 
+/**
+ * Stamped on every RecordSource row an import creates. Records that already
+ * existed are enriched instead, and get no link — so this marker identifies
+ * exactly the rows an import brought into being, and nothing else.
+ */
+export const IMPORT_RECORD_NOTE = "Created by the bulk knowledge import.";
+
 export type ImportSourceInfo = { id: string; title: string; url: string };
 
 /** The provenance record every imported row is linked to. Idempotent. */
@@ -405,7 +412,7 @@ export async function runImportChunk(
 ): Promise<ChunkResult> {
   const all = phaseItems(c, phase);
   const slice = all.slice(offset, offset + limit);
-  const sourceNote = "Created by the bulk knowledge import.";
+  const sourceNote = IMPORT_RECORD_NOTE;
   let created = 0;
   let enriched = 0;
 

@@ -1,12 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   discardBulkUpload,
   finishBulkUpload,
+  listImports,
+  revertImportChunk,
   runBulkUploadStep,
   stageBundle,
+  type ImportSummary,
 } from "@/lib/actions/bulk-upload";
 import { IMPORT_PHASES, PHASE_LABELS, type ImportPhase } from "@/lib/drive-import";
 import { useToast } from "@/components/toast";
@@ -36,9 +39,19 @@ export function BulkUpload() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ created: number; enriched: number } | null>(null);
+  const [imports, setImports] = useState<ImportSummary[]>([]);
+  const [confirming, setConfirming] = useState<ImportSummary | null>(null);
+  const [undoing, setUndoing] = useState<{ id: string; removed: number; total: number } | null>(null);
   const cancelled = useRef(false);
   const router = useRouter();
   const { toast } = useToast();
+
+  const refreshImports = useCallback(() => {
+    listImports()
+      .then(setImports)
+      .catch(() => setImports([]));
+  }, []);
+  useEffect(refreshImports, [refreshImports]);
 
   async function onStage() {
     setBusy(true);
@@ -95,6 +108,30 @@ export function BulkUpload() {
     setDone({ created, enriched });
     setStaged(null);
     setProgress(null);
+    refreshImports();
+    router.refresh();
+  }
+
+  async function onUndo(target: ImportSummary) {
+    setConfirming(null);
+    setUndoing({ id: target.sourceId, removed: 0, total: target.total });
+    let removed = 0;
+    let first = true;
+    for (;;) {
+      const res = await revertImportChunk({ sourceId: target.sourceId, first });
+      first = false;
+      if (!res.ok) {
+        toast(res.error, { tone: "error" });
+        setUndoing(null);
+        return;
+      }
+      removed += res.deleted;
+      setUndoing({ id: target.sourceId, removed, total: target.total });
+      if (res.done) break;
+    }
+    setUndoing(null);
+    toast(`Removed ${removed} records from "${target.title}"`);
+    refreshImports();
     router.refresh();
   }
 
@@ -261,6 +298,65 @@ export function BulkUpload() {
             Keep this tab open while it runs. If it stops early, press Import again — it resumes
             without creating duplicates.
           </p>
+        </div>
+      )}
+
+      {imports.length > 0 && !staged && (
+        <div className="mt-8">
+          <h2 className="mb-1 font-display text-lg font-bold tracking-tight">PREVIOUS UPLOADS</h2>
+          <p className="mb-3 max-w-2xl text-sm text-muted">
+            Each upload keeps a list of the records it created, so it can be taken back out
+            cleanly. Removing an upload deletes only what it added — anything that was already
+            in the Repo stays, including text this upload appended to it.
+          </p>
+          <div className="card divide-y divide-line">
+            {imports.map((imp) => (
+              <div key={imp.sourceId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="font-medium">{imp.title}</div>
+                  <div className="text-xs text-muted">
+                    {new Date(imp.createdAt).toLocaleString()} ·{" "}
+                    {imp.counts.map((c) => `${c.n} ${c.label}`).join(" · ")}
+                  </div>
+                </div>
+                {undoing?.id === imp.sourceId ? (
+                  <span className="text-sm text-muted">
+                    Removing… {undoing.removed} / {undoing.total}
+                  </span>
+                ) : (
+                  <button
+                    className="btn btn-secondary btn-sm text-muted hover:border-accent hover:text-accent"
+                    disabled={!!undoing}
+                    onClick={() => setConfirming(imp)}
+                  >
+                    Remove this upload
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {confirming && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-ink/40" aria-hidden onClick={() => setConfirming(null)} />
+          <div role="alertdialog" aria-modal="true" className="relative w-full max-w-sm rounded-md border border-line bg-surface p-5 shadow-pop">
+            <p className="font-semibold">Are you sure you want to delete this?</p>
+            <p className="mt-1.5 text-sm text-muted">
+              All {confirming.total} records created by{" "}
+              <span className="font-medium text-ink">{confirming.title}</span> will be permanently
+              removed. A snapshot is taken first, so Admin → Backups can still get them back.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn btn-secondary btn-sm" onClick={() => setConfirming(null)}>
+                Cancel
+              </button>
+              <button className="btn btn-accent btn-sm" onClick={() => onUndo(confirming)}>
+                Remove {confirming.total} records
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
