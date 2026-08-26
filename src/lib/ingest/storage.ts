@@ -29,6 +29,8 @@ export async function readRawBytes(itemId: string): Promise<Uint8Array | null> {
     where: { id: itemId },
     select: { raw: true, rawRetained: true },
   });
-  if (!item?.rawRetained || !item.raw) return null;
+  // A backup restores the item but not its bytes, leaving an empty column
+  // behind a `rawRetained` flag that still says true. Treat that as gone.
+  if (!item?.rawRetained || !item.raw || item.raw.byteLength === 0) return null;
   return new Uint8Array(item.raw);
 }

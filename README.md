@@ -225,6 +225,14 @@ vocabulary — editable fields, link kinds, digest recipes — derives from one 
 (`src/lib/ingest/registry.ts`), so the AI layer has no hand-written schema knowledge.
 A daily cron (`/api/cron/ingest`) advances anything the in-browser runner left behind.
 
+**Backups don't carry file contents.** A snapshot records every uploaded file — name,
+type, size, and the record it hangs off — but not its bytes. Copying them in made each
+daily backup larger than the Repo it protects (base64 inflates by a third, and fourteen
+daily snapshots are kept), so 11MB of decks became ~50MB of database after three days and
+kept growing on its own. Restoring brings back every record and every attachment's place;
+the files themselves are re-uploaded, and asking for one that wasn't in the backup says so
+instead of handing over an empty file. Admin → Backups shows the live storage breakdown.
+
 **The note box** (bottom right of every page) does what you ask rather than only writing
 it down. "Put this on hold, ESPN passed", typed while looking at a format, comes back as
 the concrete changes it would make in plain English — untick anything wrong, press Make

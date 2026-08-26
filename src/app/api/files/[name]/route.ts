@@ -27,6 +27,15 @@ export async function GET(
   let type: string | null = null;
   const stored = await db.storedFile.findUnique({ where: { key: safe } });
   if (stored) {
+    // Backups keep the file record but not its contents, so a restored
+    // database has rows whose recorded size never arrived. Say that, rather
+    // than handing over a zero-byte download that looks like a corrupt file.
+    if (stored.data.byteLength === 0 && stored.sizeBytes > 0) {
+      return new NextResponse(
+        "This file's contents weren't included in the backup this database was restored from — the record is here, the file needs re-uploading.",
+        { status: 410, headers: { "Content-Type": "text/plain" } },
+      );
+    }
     bytes = new Uint8Array(stored.data);
     type = stored.mimeType;
   } else {
