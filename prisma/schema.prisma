@@ -846,3 +846,43 @@ model IngestChange {
 
   @@index([itemId, status])
 }
+
+/// A long-form document that lives in the Repo and is edited in place — the
+/// development slate above all. The slate was a Google Doc everyone linked to
+/// and nobody could see from inside the Repo; this is that document, next to
+/// the records it describes.
+model Doc {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  title         String
+  /// Sanitized HTML. Written only by editors, and stripped of anything active
+  /// on the way in — see sanitizeDocHtml.
+  content       String   @default("")
+  /// Optimistic concurrency: two people typing must not silently overwrite
+  /// one another, and an autosaving editor makes that likelier, not rarer.
+  version       Int      @default(1)
+  updatedById   String?
+  updatedByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  revisions DocRevision[]
+}
+
+/// The document as it stood before a save that replaced a lot of it. Autosave
+/// means there is no moment where someone consciously decides to keep a copy,
+/// so the app has to decide for them.
+model DocRevision {
+  id            String   @id @default(cuid())
+  docId         String
+  content       String
+  /// Why this version was kept: "before importing slate.pdf", "restored", …
+  note          String?
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  doc Doc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId, createdAt])
+}

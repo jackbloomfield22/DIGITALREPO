@@ -36,6 +36,7 @@ const GROUPS: NavGroup[] = [
           { href: "/people", label: "People" },
         ],
       },
+      { href: "/dev-slate", label: "Dev Slate" },
       { href: "/digital", label: "Digital" },
       { href: "/calendar", label: "Calendar" },
       // Most of the slate is history at any given moment; the Archive is where

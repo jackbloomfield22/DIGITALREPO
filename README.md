@@ -135,7 +135,7 @@ migrations, and seeds a fresh database automatically.
 
 ### The object model
 
-Ten first-class sections, all relational, all clickable in both directions:
+Eleven first-class sections, all relational, all clickable in both directions:
 
 - **Talent** — athletes, hosts, chefs, streamers, comedians, entrepreneurs… a person can
   hold multiple categories. Only a name is required to create one; profiles enrich gradually.
@@ -156,6 +156,12 @@ Ten first-class sections, all relational, all clickable in both directions:
 - **Sports Calendar** — upcoming US professional and major world sports events,
   month-by-month, filterable by sport, fully editable, with a curated standard calendar
   one click away.
+- **Dev Slate** (`/dev-slate`) — the working development slate, kept in the Repo rather
+  than linked from it, as a document you edit in place. It saves itself: there is no Save
+  button, because a document with one is a document someone eventually loses work in. An
+  exported slate (PDF, Word, or plain text) can be uploaded to replace it wholesale — the
+  text is rebuilt into headings, labels and paragraphs — and the version it replaced is
+  always kept, alongside a rolling history of substantial edits.
 - **Digital** (`/digital`) — the one place to look at the digital side: talent ranked by
   the audience they actually own (per platform or across all of them, with engagement and
   how fresh each number is), the formats built for those platforms, digital-native

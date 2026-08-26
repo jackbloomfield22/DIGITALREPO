@@ -199,3 +199,90 @@ label {
     background: #fff;
   }
 }
+
+/* A document, not a form field. Generous measure, real heading hierarchy, and
+   a focus ring on the page rather than a box around it — the page is the
+   document, so a border would only be drawing a border around the content. */
+.doc-body {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--color-charcoal);
+  min-height: 24rem;
+  padding-bottom: 6rem;
+  outline: none;
+}
+.doc-body:focus-visible {
+  outline: none;
+}
+.doc-body h2 {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 2rem 0 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.doc-body h2:first-child {
+  margin-top: 0;
+}
+.doc-body h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent-deep);
+  margin: 1.5rem 0 0.35rem;
+}
+.doc-body h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 1.1rem 0 0.3rem;
+}
+.doc-body p {
+  margin: 0 0 0.6rem;
+}
+.doc-body ul,
+.doc-body ol {
+  margin: 0 0 0.7rem 1.25rem;
+  padding-left: 0.5rem;
+}
+.doc-body ul { list-style: disc; }
+.doc-body ol { list-style: decimal; }
+.doc-body li { margin-bottom: 0.2rem; }
+.doc-body a {
+  color: var(--color-accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.doc-body blockquote {
+  margin: 0 0 0.7rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--color-line-strong);
+  color: var(--color-muted);
+}
+.doc-body hr {
+  margin: 1.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+}
+.doc-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.9rem;
+  font-size: 0.9rem;
+}
+.doc-body th,
+.doc-body td {
+  border: 1px solid var(--color-line);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
+.doc-body th {
+  background: var(--color-wash);
+  font-weight: 600;
+}
+.doc-body:empty::before {
+  content: "Start typing, or press Upload to bring in a document.";
+  color: var(--color-faint);
+}
