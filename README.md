@@ -135,7 +135,7 @@ migrations, and seeds a fresh database automatically.
 
 ### The object model
 
-Eleven first-class sections, all relational, all clickable in both directions:
+Twelve first-class sections, all relational, all clickable in both directions:
 
 - **Talent** — athletes, hosts, chefs, streamers, comedians, entrepreneurs… a person can
   hold multiple categories. Only a name is required to create one; profiles enrich gradually.
@@ -156,6 +156,13 @@ Eleven first-class sections, all relational, all clickable in both directions:
 - **Sports Calendar** — upcoming US professional and major world sports events,
   month-by-month, filterable by sport, fully editable, with a curated standard calendar
   one click away.
+- **YouTube Channels** (`/youtube`) — the athlete channels business, as its own section
+  rather than a filter. A channel is a thing the company pitches, signs, launches and then
+  runs, so it has a pipeline (prospect → in talks → signed → building → live), its own
+  numbers with a date on them (a subscriber count nobody has checked in two months is
+  flagged as stale), and — the part that is the actual work — a queue of ideas for what it
+  could make, added by typing one and pressing enter. Distinct from Formats, which are
+  single shows: a channel is the place a run of them lives.
 - **Dev Slate** (`/dev-slate`) — the working development slate, kept in the Repo rather
   than linked from it, as a document you edit in place. It saves itself: there is no Save
   button, because a document with one is a document someone eventually loses work in. An

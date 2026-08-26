@@ -4,6 +4,7 @@
 // of saying the same thing is how records end up half-archived.
 
 import {
+  CHANNEL_STATUSES,
   CREATOR_STATUSES,
   FORMAT_STATUSES,
   OPPORTUNITY_STATUSES,
@@ -11,7 +12,7 @@ import {
   type LabeledValue,
 } from "@/lib/taxonomy";
 
-export const STATUS_TYPES = ["project", "format", "opportunity", "creator"] as const;
+export const STATUS_TYPES = ["project", "format", "opportunity", "creator", "channel"] as const;
 export type StatusType = (typeof STATUS_TYPES)[number];
 export type ArchiveType = StatusType | "organization" | "person";
 
@@ -20,6 +21,7 @@ const ALL: Record<StatusType, LabeledValue[]> = {
   format: FORMAT_STATUSES,
   opportunity: OPPORTUNITY_STATUSES,
   creator: CREATOR_STATUSES,
+  channel: CHANNEL_STATUSES,
 };
 
 export function allStatuses(type: StatusType): LabeledValue[] {

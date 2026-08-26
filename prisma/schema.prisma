@@ -37,6 +37,7 @@ model User {
   ingestItems  IngestItem[]
   ownedFormats Format[]            @relation("FormatOwner")
   ownedOpps    Opportunity[]       @relation("OpportunityOwner")
+  ownedChannels Channel[]          @relation("ChannelOwner")
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,7 @@ model Creator {
   organizations  CreatorOrganization[]
   people         CreatorPerson[]
   formats        CreatorFormat[]
+  channels       Channel[]
   relationshipsA CreatorRelationship[]  @relation("RelA")
   relationshipsB CreatorRelationship[]  @relation("RelB")
   opportunities  OpportunityCreator[]
@@ -885,4 +887,76 @@ model DocRevision {
   doc Doc @relation(fields: [docId], references: [id], onDelete: Cascade)
 
   @@index([docId, createdAt])
+}
+
+/// A YouTube channel 4.4.Forty builds and runs for an athlete.
+///
+/// This is a business, not a lens on one: a channel is a thing the company
+/// pitches, signs, launches and operates, with its own pipeline and its own
+/// numbers. It is deliberately not a Format — a format is one show, and a
+/// channel is the place a run of them lives.
+model Channel {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  name     String
+  /// @handle, without the platform's URL around it.
+  handle   String?
+  url      String?
+  /// YouTube today; the shape holds for whatever the next one is.
+  platform String  @default("youtube")
+  status   String  @default("prospect")
+
+  /// The athlete whose channel it is. Optional because a channel is often
+  /// tracked before the person behind it is a record in the Repo.
+  creatorId String?
+  ownerId   String?
+
+  subscribers    Int?
+  totalViews     Int?
+  videoCount     Int?
+  /// When the numbers above were last checked — a subscriber count with no
+  /// date on it is a rumour.
+  countUpdatedAt DateTime?
+
+  /// "2 a week", "monthly" — how often it actually publishes.
+  cadence      String?
+  premise      String?
+  revenueModel String?
+  notes        String?
+
+  launchedAt     DateTime?
+  lastActivityAt DateTime?
+
+  archived       Boolean   @default(false)
+  archivedReason String?
+  archivedAt     DateTime?
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  creator Creator? @relation(fields: [creatorId], references: [id], onDelete: SetNull)
+  owner   User?    @relation("ChannelOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  ideas   ChannelIdea[]
+
+  @@index([status])
+  @@index([creatorId])
+}
+
+/// Something the channel could make. The slate keeps these as a running list
+/// under each athlete — "doc series", "Maxey drill", "content with the dogs" —
+/// and they are the actual work of the business, so they live as records
+/// rather than as a paragraph of notes.
+model ChannelIdea {
+  id        String   @id @default(cuid())
+  channelId String
+  title     String
+  notes     String?
+  status    String   @default("idea")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, sortOrder])
 }

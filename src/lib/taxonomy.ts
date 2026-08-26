@@ -324,6 +324,30 @@ export const SOURCE_TYPES = mk([
 
 export const CREATOR_STATUSES = mk(["active", "watch", "priority", "archived"]);
 
+// --- Athlete YouTube channels ------------------------------------------------
+
+// The pipeline a channel actually moves through: someone we would like to work
+// with, a conversation, a deal, a build, and then the part that never ends —
+// running it.
+export const CHANNEL_STATUSES = mk([
+  "prospect",
+  "in_talks",
+  "signed",
+  "building",
+  "live",
+  "paused",
+  "ended",
+  "archived",
+]);
+
+export const CHANNEL_IDEA_STATUSES = mk([
+  "idea",
+  "planned",
+  "filming",
+  "published",
+  "dropped",
+]);
+
 // --- Target types (polymorphic references) -----------------------------------
 
 export const TARGET_TYPES = [

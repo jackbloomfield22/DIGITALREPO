@@ -256,6 +256,37 @@ async function buildEventDigest(id: string): Promise<DigestData | null> {
   return { slug: ev.slug, name: ev.title, aliases: [], archived: false, summary, searchText, sourceVersion: 0, path: `/calendar` };
 }
 
+async function buildChannelDigest(id: string): Promise<DigestData | null> {
+  const c = await db.channel.findUnique({
+    where: { id },
+    include: {
+      creator: { select: { name: true } },
+      ideas: { orderBy: { sortOrder: "asc" }, take: 8, select: { title: true, status: true } },
+    },
+  });
+  if (!c) return null;
+  const reach = [
+    c.subscribers ? `${c.subscribers.toLocaleString()} subscribers` : null,
+    c.videoCount ? `${c.videoCount} videos` : null,
+    c.cadence,
+  ].filter(Boolean);
+  const { summary, searchText } = assemble(
+    [
+      `YOUTUBE CHANNEL (4.4.Forty athlete channels business) — ${c.name} [${labelFor(c.status)}]${c.archived ? " [ARCHIVED]" : ""}`,
+      c.creator ? `Athlete: ${c.creator.name}` : null,
+      c.handle ? `Handle: ${c.handle}` : null,
+      c.premise,
+      reach.length ? reach.join(" · ") : null,
+      c.ideas.length ? `Planned: ${c.ideas.map((i) => `${i.title} (${labelFor(i.status)})`).join("; ")}` : null,
+    ],
+    [c.name, c.handle ?? "", c.creator?.name ?? "", ...c.ideas.map((i) => i.title)],
+  );
+  return {
+    slug: c.slug, name: c.name, aliases: [], archived: c.archived,
+    summary, searchText, sourceVersion: c.version, path: `/youtube/${c.slug}`,
+  };
+}
+
 const BUILDERS: Record<IngestTargetType, (id: string) => Promise<DigestData | null>> = {
   creator: buildCreatorDigest,
   project: buildProjectDigest,
@@ -263,6 +294,7 @@ const BUILDERS: Record<IngestTargetType, (id: string) => Promise<DigestData | nu
   format: buildFormatDigest,
   person: buildPersonDigest,
   opportunity: buildOpportunityDigest,
+  channel: buildChannelDigest,
   entity: buildEntityDigest,
   event: buildEventDigest,
 };

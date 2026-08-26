@@ -34,6 +34,7 @@ const KINDS: Kind[] = [
   { type: "format", model: "format", nameField: "title", label: "Format", plural: "Formats", path: (s) => `/formats/${s}`, hasStatus: true },
   { type: "opportunity", model: "opportunity", nameField: "title", label: "Opportunity", plural: "Opportunities", path: (s) => `/opportunities/${s}`, hasStatus: true },
   { type: "creator", model: "creator", nameField: "name", label: "Talent", plural: "Talent", path: (s) => `/talent/${s}`, hasStatus: true },
+  { type: "channel", model: "channel", nameField: "name", label: "YouTube Channel", plural: "YouTube Channels", path: (s) => `/youtube/${s}`, hasStatus: true },
   { type: "organization", model: "organization", nameField: "name", label: "Organization", plural: "Organizations", path: (s) => `/organizations/${s}`, hasStatus: false },
   { type: "person", model: "industryPerson", nameField: "name", label: "Industry Person", plural: "Industry People", path: (s) => `/people/${s}`, hasStatus: false },
 ];

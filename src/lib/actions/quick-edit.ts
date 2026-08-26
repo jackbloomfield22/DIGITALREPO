@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { refreshDigest } from "@/lib/ingest/digest";
 import {
+  CHANNEL_STATUSES,
   CREATOR_STATUSES,
   FORMAT_STATUSES,
   OPPORTUNITY_STATUSES,
@@ -32,6 +33,7 @@ const SPEC = {
   format: { model: "format", nameField: "title", path: "/formats", statuses: FORMAT_STATUSES, revive: "concept", label: "Format", dated: true },
   opportunity: { model: "opportunity", nameField: "title", path: "/opportunities", statuses: OPPORTUNITY_STATUSES, revive: "researching", label: "Opportunity", dated: true },
   creator: { model: "creator", nameField: "name", path: "/talent", statuses: CREATOR_STATUSES, revive: "active", label: "Talent", dated: false },
+  channel: { model: "channel", nameField: "name", path: "/youtube", statuses: CHANNEL_STATUSES, revive: "prospect", label: "YouTube Channel", dated: true },
 } as const;
 
 /** Types that can be archived but have no status of their own. */

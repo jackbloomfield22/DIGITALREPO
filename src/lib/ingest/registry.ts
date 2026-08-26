@@ -8,6 +8,7 @@ import {
   CREATOR_ORG_RELATIONSHIPS,
   CREATOR_PERSON_RELATIONSHIPS,
   CREATOR_RELATIONSHIPS,
+  CHANNEL_STATUSES,
   CREATOR_STATUSES,
   FORMAT_STATUSES,
   FORMAT_TYPES,
@@ -31,6 +32,7 @@ export type IngestTargetType =
   | "format"
   | "person"
   | "opportunity"
+  | "channel"
   | "entity"
   | "event";
 
@@ -186,6 +188,30 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       text("platformRequirements", "Platform Requirements", 2000),
       longtext("outcome", "Outcome"),
       longtext("notes", "Notes"),
+    ],
+  },
+  channel: {
+    targetType: "channel",
+    notesField: "notes",
+    prismaModel: "channel",
+    displayName: "YouTube Channel",
+    nameField: "name",
+    hasVersion: true,
+    path: (slug) => `/youtube/${slug}`,
+    createFields: ["premise", "handle", "status"],
+    fields: [
+      text("handle", "Handle", 120),
+      text("url", "Channel URL", 500),
+      longtext("premise", "What the channel is"),
+      vocab("status", "Status", () => CHANNEL_STATUSES),
+      text("cadence", "Upload Cadence", 120),
+      longtext("revenueModel", "How it makes money"),
+      longtext("notes", "Notes"),
+      { name: "subscribers", label: "Subscribers", kind: "number" },
+      { name: "totalViews", label: "Total Views", kind: "number" },
+      { name: "videoCount", label: "Videos", kind: "number" },
+      { name: "launchedAt", label: "Launched", kind: "date" },
+      { name: "lastActivityAt", label: "Last Activity", kind: "date" },
     ],
   },
   entity: {

@@ -1,0 +1,198 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { db } from "@/lib/db";
+import { requireUser, hasRole } from "@/lib/auth";
+import { Section } from "@/components/ui";
+import { RowStatus } from "@/components/row-status";
+import { ChannelIdeas } from "@/components/channel-ideas";
+import { AttachmentList } from "@/components/attachments";
+import { attachmentsFor, uploadLimit } from "@/lib/files";
+import { compactNumber, formatDate, relativeTime, isStale } from "@/lib/format";
+
+const STALE_DAYS = 60;
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const channel = await db.channel.findUnique({ where: { slug }, select: { name: true } });
+  return { title: channel?.name ?? "Channel" };
+}
+
+export default async function ChannelPage({ params }: { params: Promise<{ slug: string }> }) {
+  const user = await requireUser();
+  const { slug } = await params;
+  const canEdit = hasRole(user, "EDITOR");
+  const limits = uploadLimit();
+
+  const channel = await db.channel.findUnique({
+    where: { slug },
+    include: {
+      creator: { select: { name: true, slug: true, headline: true } },
+      owner: { select: { name: true } },
+      ideas: { orderBy: { sortOrder: "asc" } },
+    },
+  });
+  if (!channel) notFound();
+
+  const [attachments, activity] = await Promise.all([
+    attachmentsFor("channel", channel.id),
+    db.auditLog.findMany({
+      where: { targetType: "channel", targetId: channel.id },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: { id: true, userName: true, action: true, field: true, newValue: true, createdAt: true },
+    }),
+  ]);
+
+  const numbers = [
+    { label: "Subscribers", value: channel.subscribers },
+    { label: "Total views", value: channel.totalViews },
+    { label: "Videos", value: channel.videoCount },
+  ].filter((n) => n.value != null);
+
+  return (
+    <div className="max-w-4xl">
+      <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="kind-badge kind-format">YouTube Channel</span>
+            <RowStatus type="channel" id={channel.id} status={channel.status} name={channel.name} canEdit={canEdit} />
+          </div>
+          <h1 className="font-display text-3xl font-bold tracking-tight">{channel.name}</h1>
+          <div className="mt-1 text-sm text-muted">
+            {[
+              channel.creator ? null : channel.handle,
+              channel.cadence,
+              channel.launchedAt ? `launched ${formatDate(channel.launchedAt)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {channel.url && (
+            <a href={channel.url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+              Open on YouTube
+            </a>
+          )}
+          {canEdit && <Link href={`/youtube/${channel.slug}/edit`} className="btn btn-secondary btn-sm">Edit</Link>}
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-x-10 gap-y-6 lg:grid-cols-[1fr_18rem]">
+        <div className="min-w-0">
+          {channel.premise && (
+            <Section title="What it is">
+              <p className="whitespace-pre-line text-sm text-charcoal">{channel.premise}</p>
+            </Section>
+          )}
+
+          <Section title="Ideas">
+            <ChannelIdeas
+              channelId={channel.id}
+              canEdit={canEdit}
+              ideas={channel.ideas.map((i) => ({ id: i.id, title: i.title, status: i.status, notes: i.notes }))}
+            />
+          </Section>
+
+          {channel.revenueModel && (
+            <Section title="How it makes money">
+              <p className="whitespace-pre-line text-sm text-charcoal">{channel.revenueModel}</p>
+            </Section>
+          )}
+
+          <Section title="Files">
+            <AttachmentList
+              canEdit={canEdit}
+              targetType="channel"
+              targetId={channel.id}
+              attachments={attachments}
+              blobReady={limits.blob}
+              maxBytes={limits.bytes}
+            />
+          </Section>
+
+          {channel.notes && (
+            <Section title="Notes">
+              <p className="whitespace-pre-line text-sm text-charcoal">{channel.notes}</p>
+            </Section>
+          )}
+        </div>
+
+        <aside className="space-y-4">
+          {numbers.length > 0 && (
+            <div className="card p-4">
+              <div className="overline mb-2">The numbers</div>
+              <dl className="space-y-1.5 text-sm">
+                {numbers.map((n) => (
+                  <div key={n.label} className="flex items-baseline justify-between gap-3">
+                    <dt className="text-muted">{n.label}</dt>
+                    <dd className="tabular-nums font-semibold">{compactNumber(n.value!)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-2 text-xs text-faint">
+                {channel.countUpdatedAt ? (
+                  <span className={isStale(channel.countUpdatedAt, STALE_DAYS) ? "text-warn" : undefined}>
+                    Checked {relativeTime(channel.countUpdatedAt)}
+                  </span>
+                ) : (
+                  "Never checked"
+                )}
+              </p>
+            </div>
+          )}
+
+          <div className="card p-4">
+            <div className="overline mb-2">Who</div>
+            <dl className="space-y-1.5 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-muted">Athlete</dt>
+                <dd className="min-w-0 truncate text-right">
+                  {channel.creator ? (
+                    <Link href={`/talent/${channel.creator.slug}`} className="underline underline-offset-2 hover:text-accent">
+                      {channel.creator.name}
+                    </Link>
+                  ) : (
+                    <span className="text-faint">Not linked</span>
+                  )}
+                </dd>
+              </div>
+              {channel.handle && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted">Handle</dt>
+                  <dd className="truncate">{channel.handle}</dd>
+                </div>
+              )}
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-muted">Lead</dt>
+                <dd className="truncate">{channel.owner?.name ?? <span className="text-faint">—</span>}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-muted">Last activity</dt>
+                <dd>{channel.lastActivityAt ? formatDate(channel.lastActivityAt) : <span className="text-faint">—</span>}</dd>
+              </div>
+            </dl>
+          </div>
+
+          {activity.length > 0 && (
+            <div className="card p-4">
+              <div className="overline mb-2">Recent</div>
+              <ul className="space-y-1 text-xs">
+                {activity.map((a) => (
+                  <li key={a.id} className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-muted">
+                      <span className="text-charcoal">{a.userName}</span>{" "}
+                      {a.field ?? a.action}
+                      {a.newValue ? `: ${a.newValue}` : ""}
+                    </span>
+                    <span className="shrink-0 text-faint">{relativeTime(a.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}

@@ -37,6 +37,7 @@ const GROUPS: NavGroup[] = [
         ],
       },
       { href: "/dev-slate", label: "Dev Slate" },
+      { href: "/youtube", label: "YouTube" },
       { href: "/digital", label: "Digital" },
       { href: "/calendar", label: "Calendar" },
       // Most of the slate is history at any given moment; the Archive is where
@@ -71,6 +72,7 @@ const GROUPS: NavGroup[] = [
 
 const CREATE_ITEMS = [
   { href: "/talent/new", label: "New Talent" },
+  { href: "/youtube/new", label: "New YouTube Channel" },
   { href: "/formats/new", label: "New Format" },
   { href: "/projects/new", label: "New Project" },
   { href: "/opportunities/new", label: "New Opportunity" },

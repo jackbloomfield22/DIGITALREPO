@@ -125,6 +125,22 @@ export async function resolveOpportunity(title: string, user: SessionUser): Prom
   return { id: opp.id, name: opp.title, created: true };
 }
 
+export async function resolveChannel(name: string, user: SessionUser): Promise<Resolution> {
+  const norm = normalizeName(name);
+  const all = await db.channel.findMany({ select: { id: true, name: true } });
+  const hit = all.find((c) => normalizeName(c.name) === norm);
+  if (hit) return { id: hit.id, name: hit.name, created: false };
+  const channel = await db.channel.create({
+    data: {
+      name: name.trim(),
+      ownerId: user.id,
+      slug: await freshSlug((s) => db.channel.findMany({ where: { slug: { startsWith: s } }, select: { slug: true } }), name),
+    },
+  });
+  await logAudit(user, { targetType: "channel", targetId: channel.id, targetLabel: channel.name, action: "created", field: "ingest" });
+  return { id: channel.id, name: channel.name, created: true };
+}
+
 /** Resolve a by-name reference for any ingest target type. */
 export async function resolveByType(
   targetType: IngestTargetType,
@@ -139,6 +155,7 @@ export async function resolveByType(
     case "person": return resolvePerson(name, user, hint);
     case "format": return resolveFormat(name, user);
     case "opportunity": return resolveOpportunity(name, user);
+    case "channel": return resolveChannel(name, user);
     case "entity": return resolveEntity(hint ?? "tag", name);
     case "event": {
       const existing = await db.sportsEvent.findFirst({ where: { title: { equals: name.trim(), mode: "insensitive" } } });
