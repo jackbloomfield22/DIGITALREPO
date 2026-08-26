@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { ResultCard } from "@/lib/ai/tools";
+import { AiAnswer } from "@/components/ai-answer";
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -19,15 +20,20 @@ const EXAMPLES = [
   "Find entrepreneurship talent not yet attached to a format.",
 ];
 
-const TYPE_LABEL: Record<string, string> = {
-  creator: "Talent",
-  project: "Project",
-  organization: "Organization",
-  format: "Format",
-  person: "Person",
-  opportunity: "Opportunity",
-  entity: "Entity",
+// Each kind gets its own colour so a mixed set of results is scannable —
+// which of these are our own concepts, which are outside productions, who is a
+// person rather than a company.
+const TYPE_STYLE: Record<string, { label: string; className: string }> = {
+  creator: { label: "Talent", className: "bg-[#eef2ec] text-[#4a6146] border-[#cfdac9]" },
+  project: { label: "Project", className: "bg-wash text-muted border-line-strong" },
+  organization: { label: "Company", className: "bg-[#eaeef4] text-[#4a5a72] border-[#ccd7e5]" },
+  format: { label: "4.4.Forty Format", className: "bg-accent-wash text-accent-deep border-[#e4c8bd]" },
+  person: { label: "Industry", className: "bg-[#f2eef6] text-[#5d4d70] border-[#dbd0e5]" },
+  opportunity: { label: "Opportunity", className: "bg-[#f6f1e6] text-[#6b5b39] border-[#e2d6bd]" },
+  entity: { label: "Topic", className: "bg-wash text-muted border-line-strong" },
 };
+
+const ORDER = ["format", "project", "opportunity", "creator", "person", "organization", "entity"];
 
 export function AiChat({
   available,
@@ -131,24 +137,35 @@ export function AiChat({
                 </div>
               ) : (
                 <div className="max-w-2xl">
-                  <div className="whitespace-pre-line text-[15px] leading-relaxed">{m.text}</div>
+                  <AiAnswer text={m.text} cards={m.cards} />
                   {m.cards.length > 0 && (
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {m.cards.map((c) => (
-                        <Link
-                          key={`${c.type}-${c.id}`}
-                          href={c.href}
-                          className="card flex items-baseline justify-between gap-2 px-3 py-2 text-sm transition-shadow hover:shadow-pop"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate font-semibold">{c.name}</span>
-                            {c.sub && <span className="block truncate text-xs text-muted">{c.sub}</span>}
-                          </span>
-                          <span className="kind-badge kind-project shrink-0">
-                            {TYPE_LABEL[c.type] ?? c.type}
-                          </span>
-                        </Link>
-                      ))}
+                    <div className="mt-4 border-t border-line pt-3">
+                      <div className="overline mb-2">
+                        {m.cards.length === 1 ? "Record in this answer" : `${m.cards.length} records in this answer`}
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {[...m.cards]
+                          .sort(
+                            (a, b) =>
+                              ORDER.indexOf(a.type) - ORDER.indexOf(b.type) || a.name.localeCompare(b.name),
+                          )
+                          .map((c) => {
+                            const style = TYPE_STYLE[c.type] ?? { label: c.type, className: "bg-wash text-muted border-line-strong" };
+                            return (
+                              <Link
+                                key={`${c.type}-${c.id}`}
+                                href={c.href}
+                                className="card flex items-baseline justify-between gap-2 px-3 py-2 text-sm transition-shadow hover:shadow-pop"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate font-semibold">{c.name}</span>
+                                  {c.sub && <span className="block truncate text-xs text-muted">{c.sub}</span>}
+                                </span>
+                                <span className={`kind-badge shrink-0 border ${style.className}`}>{style.label}</span>
+                              </Link>
+                            );
+                          })}
+                      </div>
                     </div>
                   )}
                 </div>

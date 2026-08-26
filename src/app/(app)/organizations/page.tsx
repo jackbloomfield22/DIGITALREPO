@@ -8,6 +8,7 @@ import { orderForOrganizations, parseSort } from "@/lib/directory-sort";
 import { Portrait } from "@/components/ui";
 import { ORG_TYPES, labelFor } from "@/lib/taxonomy";
 import { Pagination } from "@/components/pagination";
+import { RowArchive } from "@/components/row-status";
 
 export const metadata = { title: "Organizations" };
 
@@ -45,6 +46,7 @@ export default async function OrganizationsPage({
     db.organization.count({ where }),
   ]);
 
+  const canEdit = hasRole(user, "EDITOR");
   const chips: DirChip[] = type ? [{ param: "type", value: type, label: labelFor(type) }] : [];
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -56,7 +58,7 @@ export default async function OrganizationsPage({
         createHref="/organizations/new"
         createLabel="+ Add Organization"
         searchPlaceholder="Search organizations…"
-        canEdit={hasRole(user, "EDITOR")}
+        canEdit={canEdit}
         chips={chips}
         viewToggle
         savedViewType="organizations"
@@ -80,6 +82,7 @@ export default async function OrganizationsPage({
             { label: "Projects", align: "right", showAt: "hidden md:table-cell" },
             { label: "Formats", align: "right", showAt: "hidden md:table-cell" },
             { label: "People", align: "right", showAt: "hidden lg:table-cell" },
+            { label: "", align: "right" },
           ]}
           rows={organizations.map((o) => ({
             id: o.id,
@@ -91,6 +94,7 @@ export default async function OrganizationsPage({
               <span key="p" className="tabular-nums text-muted">{o._count.projects || <span className="text-faint">—</span>}</span>,
               <span key="f" className="tabular-nums text-muted">{o._count.formats || <span className="text-faint">—</span>}</span>,
               <span key="pe" className="tabular-nums text-muted">{o._count.people || <span className="text-faint">—</span>}</span>,
+              <RowArchive key="a" type="organization" id={o.id} name={o.name} canEdit={canEdit} />,
             ],
           }))}
         />

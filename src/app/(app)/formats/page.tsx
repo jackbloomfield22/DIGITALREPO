@@ -9,6 +9,7 @@ import { formatDate, relativeTime } from "@/lib/format";
 import { RecordTable } from "@/components/record-table";
 import { orderForFormats, parseSort } from "@/lib/directory-sort";
 import { Pagination } from "@/components/pagination";
+import { RowStatus } from "@/components/row-status";
 
 export const metadata = { title: "Formats" };
 
@@ -32,14 +33,11 @@ export default async function FormatsPage({
   const view = one(params.view) === "cards" ? "cards" : "table";
   const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
 
+  // Shelved formats live in the Archive now — one place for everything that is
+  // no longer live, rather than a status the directory has to remember to hide.
   const and: Prisma.FormatWhereInput[] = [{ archived: false }];
   if (q) and.push({ title: { contains: q, mode: "insensitive" } });
-  // The slate keeps its development archive as a separate section, and it is by
-  // far the largest one — showing it by default would bury live work. Asking
-  // for the archived status explicitly still brings it back.
-  const showingArchive = status === "archived" || one(params.archive) === "1";
   if (status) and.push({ status });
-  else if (!showingArchive) and.push({ status: { not: "archived" } });
   if (type) and.push({ formatType: type });
   if (creatorId) and.push({ creators: { some: { creatorId } } });
   if (entityId) and.push({ entityLinks: { some: { entityId } } });
@@ -64,20 +62,9 @@ export default async function FormatsPage({
     orgId ? db.organization.findUnique({ where: { id: orgId }, select: { name: true } }) : null,
   ]);
 
-  const archivedCount = await db.format.count({ where: { archived: false, status: "archived" } });
-  // Keep whatever the reader is already looking at when revealing the archive.
-  const archiveHref = (() => {
-    const p = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-      const val = Array.isArray(v) ? v[0] : v;
-      if (val && k !== "page" && k !== "archive") p.set(k, val);
-    }
-    p.set("archive", "1");
-    return `/formats?${p.toString()}`;
-  })();
+  const archivedCount = await db.format.count({ where: { archived: true } });
   const chips: DirChip[] = [
     ...(status ? [{ param: "status", value: status, label: labelFor(status) }] : []),
-    ...(one(params.archive) === "1" ? [{ param: "archive", value: "1", label: "Including archive" }] : []),
     ...(type ? [{ param: "type", value: type, label: labelFor(type) }] : []),
     ...(creatorRecord ? [{ param: "creator", value: creatorId!, label: creatorRecord.name }] : []),
     ...(entityRecord ? [{ param: "entity", value: entityId!, label: entityRecord.name }] : []),
@@ -114,12 +101,13 @@ export default async function FormatsPage({
         ]}
       />
 
-      {!showingArchive && archivedCount > 0 && (
+      {archivedCount > 0 && (
         <p className="-mt-2 mb-3 text-xs text-muted">
-          {archivedCount} archived formats hidden.{" "}
-          <Link className="underline hover:text-accent" href={archiveHref}>
-            Include them
+          {archivedCount} more {archivedCount === 1 ? "format is" : "formats are"} in the{" "}
+          <Link className="underline hover:text-accent" href="/archive?type=format">
+            Archive
           </Link>
+          .
         </p>
       )}
 
@@ -146,7 +134,7 @@ export default async function FormatsPage({
                 {f.title}
                 {f.logline && <span className="block text-xs font-normal text-muted line-clamp-1">{f.logline}</span>}
               </span>,
-              <StatusPill key="s" status={f.status} label={labelFor(f.status)} />,
+              <RowStatus key="s" type="format" id={f.id} status={f.status} name={f.title} canEdit={canEdit} />,
               <span key="d" className="whitespace-nowrap text-muted">
                 {f.lastActivityAt ? formatDate(f.lastActivityAt) : <span className="text-faint">—</span>}
               </span>,

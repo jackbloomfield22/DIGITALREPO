@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, hasRole } from "@/lib/auth";
 import { StatusPill } from "@/components/ui";
 import { labelFor } from "@/lib/taxonomy";
 import { formatDate, nowDate, relativeTime } from "@/lib/format";
+import { RowStatus } from "@/components/row-status";
 
 export const metadata = { title: "Development" };
 
@@ -11,13 +12,16 @@ export const metadata = { title: "Development" };
 // the opportunities they could serve. Formats are 4.4.Forty's own ideas —
 // distinct from Projects, which are existing outside productions.
 
-const PIPELINE = ["idea", "concept", "developing", "outbound", "pitched", "in_discussion", "sold", "produced"];
+// On hold belongs on the board: work that has paused is still live work, and
+// leaving it off the slate was the same as pretending it had gone away.
+const PIPELINE = ["idea", "concept", "developing", "on_hold", "outbound", "pitched", "in_discussion", "sold", "produced"];
 
 export default async function DevelopmentPage() {
-  await requireUser();
+  const user = await requireUser();
+  const canEdit = hasRole(user, "EDITOR");
   const now = nowDate();
 
-  const [formats, deadlines, recentOpps, activity] = await Promise.all([
+  const [formats, deadlines, recentOpps, activity, archivedFormats] = await Promise.all([
     db.format.findMany({
       where: { archived: false, status: { in: PIPELINE } },
       orderBy: { updatedAt: "desc" },
@@ -44,6 +48,7 @@ export default async function DevelopmentPage() {
       take: 8,
       select: { id: true, userName: true, action: true, targetLabel: true, targetType: true, createdAt: true },
     }),
+    db.format.count({ where: { archived: true } }),
   ]);
 
   const byStatus = new Map<string, typeof formats>();
@@ -82,20 +87,25 @@ export default async function DevelopmentPage() {
               </div>
               <div className="space-y-1.5">
                 {byStatus.get(status)!.slice(0, 8).map((f) => (
-                  <Link key={f.id} href={`/formats/${f.slug}`} className="card block px-3 py-2.5 transition-shadow hover:shadow-pop">
-                    <div className="truncate text-sm font-semibold">{f.title}</div>
-                    {f.logline && <div className="mt-0.5 line-clamp-2 text-xs text-muted">{f.logline}</div>}
-                    <div className="mt-1 truncate text-[11px] text-faint">
-                      {[
-                        f.creators.length ? f.creators.map((c) => c.creator.name).join(", ") : null,
-                        f.targetPlatform,
-                        f.owner?.name,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || labelFor(f.formatType ?? "")}
+                  <div key={f.id} className="card px-3 py-2.5 transition-shadow hover:shadow-pop">
+                    <Link href={`/formats/${f.slug}`} className="block">
+                      <div className="truncate text-sm font-semibold hover:text-accent">{f.title}</div>
+                      {f.logline && <div className="mt-0.5 line-clamp-2 text-xs text-muted">{f.logline}</div>}
+                      <div className="mt-1 truncate text-[11px] text-faint">
+                        {[
+                          f.creators.length ? f.creators.map((c) => c.creator.name).join(", ") : null,
+                          f.targetPlatform,
+                          f.owner?.name,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || labelFor(f.formatType ?? "")}
+                      </div>
+                    </Link>
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                      <RowStatus type="format" id={f.id} status={f.status} name={f.title} canEdit={canEdit} />
+                      <span className="text-[11px] text-faint">{relativeTime(f.updatedAt)}</span>
                     </div>
-                    <div className="mt-0.5 text-[11px] text-faint">{relativeTime(f.updatedAt)}</div>
-                  </Link>
+                  </div>
                 ))}
                 {byStatus.get(status)!.length > 8 && (
                   <Link href={`/formats?status=${status}`} className="block px-1 text-xs text-muted hover:text-accent-deep">
@@ -106,6 +116,14 @@ export default async function DevelopmentPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {archivedFormats > 0 && (
+        <p className="-mt-8 mb-10 text-xs text-muted">
+          {canEdit ? "Move anything off the board with its status pill. " : ""}
+          {archivedFormats} shelved {archivedFormats === 1 ? "format sits" : "formats sit"} in the{" "}
+          <Link href="/archive?type=format" className="underline hover:text-accent">Archive</Link>, ready to be revived.
+        </p>
       )}
 
       <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">

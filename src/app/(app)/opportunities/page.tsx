@@ -8,8 +8,12 @@ import { OPPORTUNITY_STATUSES, OPPORTUNITY_TYPES, labelFor } from "@/lib/taxonom
 import { formatDate, relativeTime } from "@/lib/format";
 import { RecordTable } from "@/components/record-table";
 import { orderForOpportunities, parseSort } from "@/lib/directory-sort";
+import { Pagination } from "@/components/pagination";
+import { RowStatus } from "@/components/row-status";
 
 export const metadata = { title: "Opportunities" };
+
+const PAGE_SIZE = 30;
 
 export default async function OpportunitiesPage({
   searchParams,
@@ -24,6 +28,7 @@ export default async function OpportunitiesPage({
   const status = one(params.status);
   const sort = parseSort(one(params.sort), "date-desc");
   const view = one(params.view) === "cards" ? "cards" : "table";
+  const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
 
   const and: Prisma.OpportunityWhereInput[] = [{ archived: false }];
   if (q) and.push({ title: { contains: q, mode: "insensitive" } });
@@ -35,7 +40,8 @@ export default async function OpportunitiesPage({
     db.opportunity.findMany({
       where,
       orderBy: orderForOpportunities(sort) as never,
-      take: 100,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
       include: {
         owner: { select: { name: true } },
         entityLinks: { include: { entity: { select: { name: true } } } },
@@ -44,6 +50,9 @@ export default async function OpportunitiesPage({
     }),
     db.opportunity.count({ where }),
   ]);
+
+  const canEdit = hasRole(user, "EDITOR");
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const chips: DirChip[] = [
     ...(type ? [{ param: "type", value: type, label: labelFor(type) }] : []),
@@ -58,7 +67,7 @@ export default async function OpportunitiesPage({
         createHref="/opportunities/new"
         createLabel="+ Add Opportunity"
         searchPlaceholder="Search opportunities…"
-        canEdit={hasRole(user, "EDITOR")}
+        canEdit={canEdit}
         chips={chips}
         viewToggle
         savedViewType="opportunities"
@@ -95,7 +104,7 @@ export default async function OpportunitiesPage({
                 {o.title}
                 {o.description && <span className="block text-xs font-normal text-muted line-clamp-1">{o.description}</span>}
               </span>,
-              <StatusPill key="s" status={o.status} label={labelFor(o.status)} />,
+              <RowStatus key="s" type="opportunity" id={o.id} status={o.status} name={o.title} canEdit={canEdit} />,
               <span key="d" className="whitespace-nowrap text-muted">
                 {o.lastActivityAt ? formatDate(o.lastActivityAt) : <span className="text-faint">—</span>}
               </span>,
@@ -136,6 +145,8 @@ export default async function OpportunitiesPage({
         )}
       </div>
       )}
+
+      <Pagination page={page} pages={pages} />
     </div>
   );
 }

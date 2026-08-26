@@ -573,7 +573,7 @@ export function CreatorTable({
             <button
               className="btn btn-secondary btn-sm text-accent"
               onClick={async () => {
-                if (!window.confirm(`Archive ${ids.length} creators? They can be restored from Admin.`)) return;
+                if (!window.confirm(`Archive ${ids.length} creators? Nothing is deleted — they move to the Archive and can be restored from there.`)) return;
                 const res = await bulkArchive(ids);
                 toast(res.ok ? `Archived ${ids.length} talent records` : res.error, res.ok ? {} : { tone: "error" });
                 setSelected(new Set());

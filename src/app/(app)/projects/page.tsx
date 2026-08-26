@@ -9,6 +9,7 @@ import { DirectoryControls, type DirChip } from "@/components/directory-controls
 import { KindBadge, StatusPill } from "@/components/ui";
 import { PROJECT_ROLES, PROJECT_STATUSES, PROJECT_TYPES, labelFor } from "@/lib/taxonomy";
 import { Pagination } from "@/components/pagination";
+import { RowStatus } from "@/components/row-status";
 
 export const metadata = { title: "Projects" };
 
@@ -133,7 +134,7 @@ export default async function ProjectsPage({
                 {p.title}
                 {p.logline && <span className="block text-xs font-normal text-muted line-clamp-1">{p.logline}</span>}
               </span>,
-              <StatusPill key="s" status={p.status} label={labelFor(p.status)} />,
+              <RowStatus key="s" type="project" id={p.id} status={p.status} name={p.title} canEdit={canEdit} />,
               <span key="d" className="whitespace-nowrap text-muted">
                 {p.lastActivityAt ? formatDate(p.lastActivityAt) : <span className="text-faint">—</span>}
               </span>,

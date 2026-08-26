@@ -36,7 +36,11 @@ const GROUPS: NavGroup[] = [
           { href: "/people", label: "People" },
         ],
       },
+      { href: "/digital", label: "Digital" },
       { href: "/calendar", label: "Calendar" },
+      // Most of the slate is history at any given moment; the Archive is where
+      // that history lives, so it belongs with the Repo, not with Operations.
+      { href: "/archive", label: "Archive" },
     ],
   },
   {
@@ -60,7 +64,6 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/attention", label: "Needs Attention" },
       { href: "/activity", label: "Activity" },
-      { href: "/archive", label: "Archive" },
     ],
   },
 ];

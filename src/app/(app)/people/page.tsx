@@ -1,21 +1,28 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, hasRole } from "@/lib/auth";
 import { labelFor, PERSON_ROLE_TYPES } from "@/lib/taxonomy";
 import { RecordTable } from "@/components/record-table";
+import { RowArchive } from "@/components/row-status";
+import { Pagination } from "@/components/pagination";
 import { orderForPeople, parseSort } from "@/lib/directory-sort";
 
 export const metadata = { title: "Industry People" };
 
+const PAGE_SIZE = 50;
+
 export default async function PeoplePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; role?: string; sort?: string; view?: string }>;
+  searchParams: Promise<{ q?: string; role?: string; sort?: string; view?: string; page?: string }>;
 }) {
-  await requireUser();
-  const { q, role, sort: sortParam, view: viewParam } = await searchParams;
+  const user = await requireUser();
+  const { q, role, sort: sortParam, view: viewParam, page: pageParam } = await searchParams;
   const sort = parseSort(sortParam, "name");
   const view = viewParam === "cards" ? "cards" : "table";
+  const page = Math.max(1, Number(pageParam ?? 1) || 1);
+  const canEdit = hasRole(user, "EDITOR");
   const keep = (extra: Record<string, string>) => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
@@ -24,25 +31,33 @@ export default async function PeoplePage({
     for (const [k, v] of Object.entries(extra)) p.set(k, v);
     return `/people?${p.toString()}`;
   };
-  const people = await db.industryPerson.findMany({
-    where: {
-      archived: false,
-      ...(q?.trim() ? { name: { contains: q.trim(), mode: "insensitive" } } : {}),
-      ...(role ? { roleType: role } : {}),
-    },
-    orderBy: orderForPeople(sort) as never,
-    take: 200,
-    include: {
-      organizations: { include: { organization: { select: { name: true, slug: true } } } },
-      _count: { select: { creators: true, projects: true } },
-    },
-  });
+
+  const where: Prisma.IndustryPersonWhereInput = {
+    archived: false,
+    ...(q?.trim() ? { name: { contains: q.trim(), mode: "insensitive" } } : {}),
+    ...(role ? { roleType: role } : {}),
+  };
+
+  const [people, total] = await Promise.all([
+    db.industryPerson.findMany({
+      where,
+      orderBy: orderForPeople(sort) as never,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: {
+        organizations: { include: { organization: { select: { name: true, slug: true } } } },
+        _count: { select: { creators: true, projects: true } },
+      },
+    }),
+    db.industryPerson.count({ where }),
+  ]);
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
       <div className="mb-5 flex items-baseline gap-3">
         <h1 className="font-display text-3xl font-bold tracking-tight">INDUSTRY PEOPLE</h1>
-        <span className="text-sm text-muted">{people.length}</span>
+        <span className="text-sm text-muted">{total}</span>
       </div>
       <form className="mb-3 max-w-xs">
         <input type="search" name="q" placeholder="Search people…" defaultValue={q ?? ""} aria-label="Search people" />
@@ -78,6 +93,7 @@ export default async function PeoplePage({
             { label: "Organization", showAt: "hidden md:table-cell" },
             { label: "Email", showAt: "hidden lg:table-cell" },
             { label: "Projects", align: "right", showAt: "hidden md:table-cell" },
+            { label: "", align: "right" },
           ]}
           rows={people.map((p) => ({
             id: p.id,
@@ -91,6 +107,7 @@ export default async function PeoplePage({
               </span>,
               <span key="e" className="line-clamp-1 text-muted">{p.email ?? <span className="text-faint">—</span>}</span>,
               <span key="p" className="tabular-nums text-muted">{p._count.projects || <span className="text-faint">—</span>}</span>,
+              <RowArchive key="a" type="person" id={p.id} name={p.name} canEdit={canEdit} />,
             ],
           }))}
         />
@@ -113,6 +130,8 @@ export default async function PeoplePage({
         {people.length === 0 && <p className="text-sm text-faint">No people match.</p>}
       </div>
       )}
+
+      <Pagination page={page} pages={pages} />
     </div>
   );
 }

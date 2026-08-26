@@ -135,7 +135,7 @@ migrations, and seeds a fresh database automatically.
 
 ### The object model
 
-Eight first-class sections, all relational, all clickable in both directions:
+Ten first-class sections, all relational, all clickable in both directions:
 
 - **Talent** — athletes, hosts, chefs, streamers, comedians, entrepreneurs… a person can
   hold multiple categories. Only a name is required to create one; profiles enrich gradually.
@@ -156,6 +156,16 @@ Eight first-class sections, all relational, all clickable in both directions:
 - **Sports Calendar** — upcoming US professional and major world sports events,
   month-by-month, filterable by sport, fully editable, with a curated standard calendar
   one click away.
+- **Digital** (`/digital`) — the one place to look at the digital side: talent ranked by
+  the audience they actually own (per platform or across all of them, with engagement and
+  how fresh each number is), the formats built for those platforms, digital-native
+  projects, the platforms and creator-owned companies, and the contacts inside them.
+- **Archive** (`/archive`) — the Repo's long memory, and a first-class section rather than
+  a back office one: most of the slate is finished, shelved or paused at any given moment,
+  and this is where it lives. Search and filter across every record type, see what was
+  archived, why, by whom and from which document, and Restore anything straight back onto
+  the live lists — a format shelved on the slate comes back as a concept, so restoring
+  actually puts it somewhere you can see it.
 - **Collections & Saved Views** — hand-picked static lists vs. live filters that update as
   the database changes; both clearly labeled.
 
@@ -215,8 +225,15 @@ vocabulary — editable fields, link kinds, digest recipes — derives from one 
 (`src/lib/ingest/registry.ts`), so the AI layer has no hand-written schema knowledge.
 A daily cron (`/api/cron/ingest`) advances anything the in-browser runner left behind.
 
-**The Archive** (`/archive`) lists archived records of every type with the reason, who,
-when, and the source document, plus one-click Restore. Nothing is ever deleted.
+**The note box** (bottom right of every page) does what you ask rather than only writing
+it down. "Put this on hold, ESPN passed", typed while looking at a format, comes back as
+the concrete changes it would make in plain English — untick anything wrong, press Make
+the change. It goes through the same pipeline, apply engine, audit trail and undo as
+every other ingest; "Just save a note" still files it for later without touching anything.
+
+**Status and archiving from the row.** The status pill in any directory list is the
+control: pick a new status, or "Move to Archive", without opening the record. The same
+pill sits on every card on the development slate.
 
 Without an API key, AI Search falls back to structured keyword search and the inbox still
 captures notes.

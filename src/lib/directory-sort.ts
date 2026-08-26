@@ -20,7 +20,7 @@ export function nextSortValue(column: string, current: SortState): string {
   return current.desc ? column : `${column}-desc`;
 }
 
-const DESC_FIRST = new Set(["date", "updated", "created", "followers", "formats", "projects", "people", "year"]);
+const DESC_FIRST = new Set(["date", "updated", "created", "followers", "audience", "formats", "projects", "people", "year"]);
 
 type Dir = "asc" | "desc";
 const d = (s: SortState): Dir => (s.desc ? "desc" : "asc");

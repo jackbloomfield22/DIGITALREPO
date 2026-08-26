@@ -3,7 +3,7 @@ import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import { findRelatedCreators } from "@/lib/related";
-import { labelFor } from "@/lib/taxonomy";
+import { labelFor, socialLabel } from "@/lib/taxonomy";
 import { totalAudience } from "@/lib/format";
 
 // Read-only tools the AI can call. Every input is validated server-side with
@@ -191,18 +191,18 @@ export const AI_TOOLS: ToolDef[] = [
         opportunityNotes: creator.opportunityNotes,
         age: creator.age,
         categories: kind("creator_category"),
-        locations: creator.entityLinks.filter((l) => l.entity.kind === "location").map((l) => ({ name: l.entity.name, relationship: l.relationship || "linked" })),
+        locations: creator.entityLinks.filter((l) => l.entity.kind === "location").map((l) => ({ name: l.entity.name, relationship: labelFor(l.relationship) || "Linked" })),
         sports: kind("sport"),
         interests: [...kind("interest"), ...kind("hobby")],
-        socials: creator.socialProfiles.map((s) => ({ platform: s.platform, handle: s.handle, followers: s.followerCount })),
+        socials: creator.socialProfiles.map((s) => ({ platform: socialLabel(s.platform), handle: s.handle, followers: s.followerCount })),
         totalListedAudience: totalAudience(creator.socialProfiles),
-        projects: creator.credits.map((c) => ({ title: c.project.title, type: c.project.projectType, year: c.project.premiereYear, role: c.role })),
-        formats: creator.formats.map((f) => ({ title: f.format.title, status: f.format.status })),
-        organizations: creator.organizations.map((o) => ({ name: o.organization.name, relationship: o.relationship, status: o.status })),
-        representation: creator.people.map((p) => ({ name: p.person.name, relationship: p.relationship })),
+        projects: creator.credits.map((c) => ({ title: c.project.title, type: labelFor(c.project.projectType), year: c.project.premiereYear, role: labelFor(c.role) })),
+        formats: creator.formats.map((f) => ({ title: f.format.title, status: labelFor(f.format.status) })),
+        organizations: creator.organizations.map((o) => ({ name: o.organization.name, relationship: labelFor(o.relationship), status: labelFor(o.status) })),
+        representation: creator.people.map((p) => ({ name: p.person.name, relationship: labelFor(p.relationship) })),
         collaborators: [
-          ...creator.relationshipsA.map((r) => ({ name: r.creatorB.name, relationship: r.relationship })),
-          ...creator.relationshipsB.map((r) => ({ name: r.creatorA.name, relationship: r.relationship })),
+          ...creator.relationshipsA.map((r) => ({ name: r.creatorB.name, relationship: labelFor(r.relationship) })),
+          ...creator.relationshipsB.map((r) => ({ name: r.creatorA.name, relationship: labelFor(r.relationship) })),
         ],
       };
     },
@@ -252,12 +252,12 @@ export const AI_TOOLS: ToolDef[] = [
         registry.add({ type: "project", id: p.id, name: p.title, slug: p.slug, href: `/projects/${p.slug}`, sub: labelFor(p.projectType) });
         return {
           title: p.title,
-          type: p.projectType,
-          status: p.status,
+          type: labelFor(p.projectType),
+          status: labelFor(p.status),
           year: p.premiereYear,
           logline: p.logline,
-          talent: p.credits.map((c) => ({ name: c.creator.name, role: c.role })),
-          organizations: p.organizations.map((o) => ({ name: o.organization.name, relationship: o.relationship })),
+          talent: p.credits.map((c) => ({ name: c.creator.name, role: labelFor(c.role) })),
+          organizations: p.organizations.map((o) => ({ name: o.organization.name, relationship: labelFor(o.relationship) })),
         };
       });
     },
@@ -293,7 +293,7 @@ export const AI_TOOLS: ToolDef[] = [
         registry.add({ type: "format", id: f.id, name: f.title, slug: f.slug, href: `/formats/${f.slug}`, sub: labelFor(f.status) });
         return {
           title: f.title,
-          status: f.status,
+          status: labelFor(f.status),
           logline: f.logline,
           creators: f.creators.map((c) => c.creator.name),
           topics: f.entityLinks.map((l) => l.entity.name),
@@ -353,12 +353,12 @@ export const AI_TOOLS: ToolDef[] = [
       for (const t of viaProjects) registry.add({ type: "creator", id: t.creator.id, name: t.creator.name, slug: t.creator.slug, href: `/talent/${t.creator.slug}` });
       return {
         name: org.name,
-        types: org.types,
+        types: org.types.map(labelFor),
         description: org.description,
-        projects: org.projects.map((p) => ({ title: p.project.title, relationship: p.relationship })),
-        directCreators: org.creators.map((c) => ({ name: c.creator.name, relationship: c.relationship, status: c.status })),
+        projects: org.projects.map((p) => ({ title: p.project.title, relationship: labelFor(p.relationship) })),
+        directCreators: org.creators.map((c) => ({ name: c.creator.name, relationship: labelFor(c.relationship), status: labelFor(c.status) })),
         creatorsViaProjects: [...new Set(viaProjects.map((t) => `${t.creator.name} (${t.role} on ${t.project.title})`))],
-        formats: org.formats.map((f) => ({ title: f.format.title, relationship: f.relationship })),
+        formats: org.formats.map((f) => ({ title: f.format.title, relationship: labelFor(f.relationship) })),
         people: org.people.map((p) => ({ name: p.person.name, title: p.person.title })),
       };
     },
@@ -378,7 +378,7 @@ export const AI_TOOLS: ToolDef[] = [
       });
       return entities.map((e) => ({
         name: e.name,
-        kind: e.kind,
+        kind: labelFor(e.kind),
         creatorCount: e._count.creatorLinks,
         projectCount: e._count.projectLinks,
         formatCount: e._count.formatLinks,
@@ -410,9 +410,9 @@ export const AI_TOOLS: ToolDef[] = [
         return {
           name: p.name,
           title: p.title,
-          roleType: p.roleType,
+          roleType: labelFor(p.roleType),
           organization: p.organizations[0]?.organization.name ?? null,
-          represents: p.creators.map((c) => ({ name: c.creator.name, relationship: c.relationship })),
+          represents: p.creators.map((c) => ({ name: c.creator.name, relationship: labelFor(c.relationship) })),
         };
       });
     },
@@ -442,11 +442,11 @@ export const AI_TOOLS: ToolDef[] = [
         registry.add({ type: "opportunity", id: o.id, name: o.title, slug: o.slug, href: `/opportunities/${o.slug}`, sub: labelFor(o.status) });
         return {
           title: o.title,
-          type: o.type,
-          status: o.status,
+          type: labelFor(o.type),
+          status: labelFor(o.status),
           description: o.description,
           criteria: o.entityLinks.map((l) => l.entity.name),
-          creatorsUnderConsideration: o.creators.map((c) => ({ name: c.creator.name, status: c.status })),
+          creatorsUnderConsideration: o.creators.map((c) => ({ name: c.creator.name, status: labelFor(c.status) })),
         };
       });
     },
