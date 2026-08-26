@@ -9,7 +9,9 @@ import { Chip, EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/co
 import { LinkChips } from "@/components/link-editor";
 import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
 import { StickyMiniHeader, CopySummaryButton } from "@/components/profile-chrome";
-import { SourceList, AttachmentList } from "@/components/sources-attachments";
+import { SourceList } from "@/components/sources-attachments";
+import { AttachmentList } from "@/components/attachments";
+import { attachmentsFor, uploadLimit } from "@/lib/files";
 import { VerifyButton } from "@/components/talent/verify-button";
 import { TalentTypeSelect } from "@/components/talent/talent-type-select";
 import { RepList } from "@/components/talent/rep-list";
@@ -67,6 +69,7 @@ export default async function CreatorProfilePage({
   if (!creator || creator.archived) notFound();
 
   const canEdit = hasRole(user, "EDITOR");
+  const limits = uploadLimit();
   await recordRecentView(user.id, "creator", creator.id);
 
   const allTalentTypes = (
@@ -85,10 +88,7 @@ export default async function CreatorProfilePage({
       where: { targetType: "creator", targetId: creator.id },
       include: { source: true },
     }),
-    db.attachment.findMany({
-      where: { targetType: "creator", targetId: creator.id },
-      orderBy: { createdAt: "desc" },
-    }),
+    attachmentsFor("creator", creator.id),
     db.auditLog.findMany({
       where: { targetType: "creator", targetId: creator.id },
       orderBy: { createdAt: "desc" },
@@ -597,12 +597,9 @@ export default async function CreatorProfilePage({
               canEdit={canEdit}
               targetType="creator"
               targetId={creator.id}
-              attachments={attachments.map((a) => ({
-                id: a.id,
-                filename: a.filename,
-                url: `/api/files/${a.storedPath}`,
-                sizeBytes: a.sizeBytes,
-              }))}
+              attachments={attachments}
+              blobReady={limits.blob}
+              maxBytes={limits.bytes}
             />
           </Section>
 

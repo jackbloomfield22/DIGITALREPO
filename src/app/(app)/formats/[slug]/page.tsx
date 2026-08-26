@@ -7,7 +7,9 @@ import { recordRecentView } from "@/lib/actions/misc";
 import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
 import { LinkChips } from "@/components/link-editor";
 import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
-import { SourceList, AttachmentList } from "@/components/sources-attachments";
+import { SourceList } from "@/components/sources-attachments";
+import { AttachmentList } from "@/components/attachments";
+import { attachmentsFor, uploadLimit } from "@/lib/files";
 import { labelFor } from "@/lib/taxonomy";
 import { formatDate, relativeTime } from "@/lib/format";
 
@@ -31,6 +33,7 @@ export default async function FormatPage({
   if (!format || format.archived) notFound();
 
   const canEdit = hasRole(user, "EDITOR");
+  const limits = uploadLimit();
   await recordRecentView(user.id, "format", format.id);
 
   const [favorite, recordSources, attachments] = await Promise.all([
@@ -38,7 +41,7 @@ export default async function FormatPage({
       where: { userId_targetType_targetId: { userId: user.id, targetType: "format", targetId: format.id } },
     }),
     db.recordSource.findMany({ where: { targetType: "format", targetId: format.id }, include: { source: true } }),
-    db.attachment.findMany({ where: { targetType: "format", targetId: format.id } }),
+    attachmentsFor("format", format.id),
   ]);
 
   const facts = [
@@ -204,9 +207,9 @@ export default async function FormatPage({
               canEdit={canEdit}
               targetType="format"
               targetId={format.id}
-              attachments={attachments.map((a) => ({
-                id: a.id, filename: a.filename, url: `/api/files/${a.storedPath}`, sizeBytes: a.sizeBytes,
-              }))}
+              attachments={attachments}
+              blobReady={limits.blob}
+              maxBytes={limits.bytes}
             />
           </Section>
 

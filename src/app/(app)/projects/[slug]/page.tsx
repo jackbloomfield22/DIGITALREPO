@@ -8,7 +8,9 @@ import { findRelatedProjects } from "@/lib/related";
 import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
 import { LinkChips } from "@/components/link-editor";
 import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
-import { SourceList, AttachmentList } from "@/components/sources-attachments";
+import { SourceList } from "@/components/sources-attachments";
+import { AttachmentList } from "@/components/attachments";
+import { attachmentsFor, uploadLimit } from "@/lib/files";
 import {
   PERSON_PROJECT_ROLES,
   PROJECT_ORG_RELATIONSHIPS,
@@ -41,6 +43,7 @@ export default async function ProjectPage({
   if (!project || project.archived) notFound();
 
   const canEdit = hasRole(user, "EDITOR");
+  const limits = uploadLimit();
   await recordRecentView(user.id, "project", project.id);
 
   const [favorite, recordSources, attachments, related] = await Promise.all([
@@ -48,7 +51,7 @@ export default async function ProjectPage({
       where: { userId_targetType_targetId: { userId: user.id, targetType: "project", targetId: project.id } },
     }),
     db.recordSource.findMany({ where: { targetType: "project", targetId: project.id }, include: { source: true } }),
-    db.attachment.findMany({ where: { targetType: "project", targetId: project.id } }),
+    attachmentsFor("project", project.id),
     findRelatedProjects(project.id),
   ]);
 
@@ -265,9 +268,9 @@ export default async function ProjectPage({
               canEdit={canEdit}
               targetType="project"
               targetId={project.id}
-              attachments={attachments.map((a) => ({
-                id: a.id, filename: a.filename, url: `/api/files/${a.storedPath}`, sizeBytes: a.sizeBytes,
-              }))}
+              attachments={attachments}
+              blobReady={limits.blob}
+              maxBytes={limits.bytes}
             />
           </Section>
 

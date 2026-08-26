@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { databaseUsage, offsiteBackupConfigured } from "@/lib/backup";
+import { MAX_UPLOAD_BYTES, blobConfigured } from "@/lib/files";
 import { BackupControls, DeleteSnapshotButton } from "@/components/admin/backup-controls";
 import { formatDate, relativeTime } from "@/lib/format";
 
@@ -9,6 +10,7 @@ const mb = (n: number) => `${(n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 2 
 
 export default async function BackupsPage() {
   const usage = await databaseUsage();
+  const blobReady = blobConfigured();
   const snapshots = await db.snapshot.findMany({
     orderBy: { createdAt: "desc" },
     select: { id: true, kind: true, label: true, counts: true, sizeBytes: true, createdAt: true },
@@ -59,10 +61,23 @@ export default async function BackupsPage() {
               <div className="text-xs text-faint">{usage.snapshotCount} {usage.snapshotCount === 1 ? "snapshot" : "snapshots"}</div>
             </div>
           </div>
-          <p className="mt-2 text-xs text-faint">
-            Files are stored in the database itself, so uploads count against your Postgres
-            plan. If this starts climbing, moving file storage to a dedicated store (Vercel
-            Blob) is the next step.
+          <p className="mt-2 max-w-2xl text-xs text-faint">
+            {blobReady ? (
+              <>
+                ✓ File storage is connected. Uploads — decks, PDFs, images, video up to{" "}
+                {Math.round(MAX_UPLOAD_BYTES / 1024 ** 3)}GB each — go to Vercel Blob rather than
+                the database, so they don&apos;t count against these figures and survive a
+                database restore. Files are stored privately and reached through a signed link
+                that expires after an hour, so a copied URL doesn&apos;t outlive the session.
+              </>
+            ) : (
+              <>
+                <span className="text-warn">File storage isn&apos;t connected.</span> Uploads
+                currently go into the database itself and are capped at 15MB, so video and large
+                decks won&apos;t fit. To fix it: Vercel → Storage → Create → Blob, connect it to
+                this project, then redeploy. Nothing else changes — existing files keep working.
+              </>
+            )}
           </p>
         </div>
       )}

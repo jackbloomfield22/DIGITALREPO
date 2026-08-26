@@ -96,7 +96,7 @@ DATABASE_URL="…" IMPORT_BATCH_DIR=/path/to/batches \
 | `SIGNUP_CODE`       | prod: yes | The invite code required at `/signup`. **Sign-ups are closed in production until this is set** (this repo is public, so the code can't live in the source). A dev-only default applies locally. |
 | `ANTHROPIC_API_KEY` | no       | Enables AI Search + Ingest triage/proposals. **The app is fully functional without it** — AI Search degrades to structured keyword search. |
 | `ADMIN_EMAIL`       | no       | One or more emails (comma-separated; `ADMIN_EMAILS` also works). Each deploy promotes those accounts to ADMIN — accounts that don't exist yet are promoted once they sign up. |
-| `BLOB_READ_WRITE_TOKEN` | no   | Auto-set when a Vercel Blob store is connected — every backup then also uploads an encrypted copy *outside* the database (decrypt with `scripts/decrypt-backup.mjs`) |
+| `BLOB_READ_WRITE_TOKEN` | no   | Auto-set when a Vercel Blob store is connected. Turns on real file storage (decks, PDFs, video up to 2GB; without it uploads fall back to Postgres at 15MB), and makes every backup also upload an encrypted copy *outside* the database (decrypt with `scripts/decrypt-backup.mjs`) |
 | `AI_MODEL`          | no       | Override the Claude model (default `claude-opus-5`)            |
 | `AI_MODEL_TRIAGE`   | no       | Cheap model for ingest triage (default `claude-haiku-4-5`)      |
 | `INGEST_RAW_CAP_MB` | no       | Raw-file retention cap in Postgres (default 4)                  |
@@ -224,6 +224,27 @@ attributed with a Source link back to the document, and refresh the digest. The 
 vocabulary — editable fields, link kinds, digest recipes — derives from one registry
 (`src/lib/ingest/registry.ts`), so the AI layer has no hand-written schema knowledge.
 A daily cron (`/api/cron/ingest`) advances anything the in-browser runner left behind.
+
+**Files** — decks, PDFs, images, and video up to 2GB each — attach to talent, projects and
+formats. They are stored in [Vercel Blob](https://vercel.com/docs/vercel-blob) rather than in
+Postgres, and three details matter:
+
+- **Private, not public.** The Repo holds unannounced projects and confidential deals, so
+  blobs are stored private. Every read goes through `/api/attachments/[id]`, which checks the
+  session and then redirects to a signed URL valid for an hour — a copied link doesn't outlive
+  the session.
+- **Served by redirect, not by proxy.** The bytes travel from Blob's CDN straight to the
+  viewer, which is what makes scrubbing a two-hour cut work: range requests are handled there,
+  not by a function paying for every byte.
+- **Uploaded straight from the browser**, in parallel parts above 8MB, with a real progress
+  bar. A serverless request body caps out at 4.5MB, so anything real would fail if it went
+  through the app.
+
+Video and audio play in place; PDFs preview in a frame; images show themselves. Set
+`BLOB_READ_WRITE_TOKEN` (Vercel → Storage → Create → Blob) to switch it on. Without it the
+Repo falls back to storing files in Postgres, capped at 15MB — enough for a PDF, not for a
+cut — and Admin → Backups says so. Files served that way support range requests too, so
+legacy attachments still scrub.
 
 **Backups don't carry file contents.** A snapshot records every uploaded file — name,
 type, size, and the record it hangs off — but not its bytes. Copying them in made each

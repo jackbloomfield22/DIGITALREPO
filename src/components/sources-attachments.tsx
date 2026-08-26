@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addSourceToRecord, removeRecordSource, deleteAttachment } from "@/lib/actions/sources";
+import { addSourceToRecord, removeRecordSource } from "@/lib/actions/sources";
 import { SOURCE_TYPES } from "@/lib/taxonomy";
 import { useToast } from "@/components/toast";
 
@@ -118,106 +118,6 @@ export function SourceList({
             </button>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-export type AttachmentVM = {
-  id: string;
-  filename: string;
-  url: string;
-  sizeBytes: number | null;
-};
-
-export function AttachmentList({
-  attachments,
-  targetType,
-  targetId,
-  canEdit,
-}: {
-  attachments: AttachmentVM[];
-  targetType: string;
-  targetId: string;
-  canEdit: boolean;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const router = useRouter();
-  const { toast } = useToast();
-
-  return (
-    <div className="space-y-2">
-      <ul className="space-y-1.5">
-        {attachments.map((a) => (
-          <li key={a.id} className="flex items-baseline gap-2 text-sm">
-            <a
-              href={a.url}
-              target="_blank"
-              rel="noreferrer"
-              className="truncate underline underline-offset-2 hover:text-accent-deep"
-            >
-              {a.filename}
-            </a>
-            {a.sizeBytes != null && (
-              <span className="shrink-0 text-xs text-faint">
-                {(a.sizeBytes / 1024 / 1024).toFixed(1)}MB
-              </span>
-            )}
-            {canEdit && (
-              <button
-                aria-label={`Delete ${a.filename}`}
-                className="shrink-0 text-muted hover:text-accent"
-                onClick={async () => {
-                  if (!window.confirm(`Delete ${a.filename}?`)) return;
-                  const res = await deleteAttachment(a.id);
-                  toast(res.ok ? "Attachment deleted" : (res.error ?? "Failed"), res.ok ? {} : { tone: "error" });
-                  router.refresh();
-                }}
-              >
-                ×
-              </button>
-            )}
-          </li>
-        ))}
-        {attachments.length === 0 && <li className="text-sm text-faint">No files attached.</li>}
-      </ul>
-      {canEdit && (
-        <>
-          <input
-            ref={fileRef}
-            type="file"
-            className="hidden"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              setUploading(true);
-              const form = new FormData();
-              form.append("file", file);
-              form.append("targetType", targetType);
-              form.append("targetId", targetId);
-              try {
-                const res = await fetch("/api/upload", { method: "POST", body: form });
-                const body = await res.json();
-                if (res.ok) {
-                  toast(`Attached ${file.name}`);
-                  router.refresh();
-                } else toast(body.error ?? "Upload failed", { tone: "error" });
-              } catch {
-                toast("Upload failed", { tone: "error" });
-              }
-              setUploading(false);
-              e.target.value = "";
-            }}
-          />
-          <button
-            className="chip border-dashed text-muted"
-            disabled={uploading}
-            onClick={() => fileRef.current?.click()}
-          >
-            {uploading ? "Uploading…" : "+ Attach File"}
-          </button>
-        </>
       )}
     </div>
   );

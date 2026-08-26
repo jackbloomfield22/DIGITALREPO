@@ -637,13 +637,23 @@ model RecordSource {
 }
 
 model Attachment {
-  id           String   @id @default(cuid())
-  targetType   String
-  targetId     String
-  filename     String
-  storedPath   String
+  id         String @id @default(cuid())
+  targetType String
+  targetId   String
+  filename   String
+  /// Blob pathname when storage is "blob"; StoredFile key when storage is "db".
+  storedPath String
+  /// Where the bytes actually live: "blob" (Vercel Blob) or "db" (Postgres).
+  /// Files stopped living in the database once real media arrived — a rough
+  /// cut is gigabytes, and Postgres is the wrong place for it.
+  storage      String   @default("db")
+  /// The blob's own URL. Kept for deletes and for `head` checks; never handed
+  /// to a browser, since private blobs are reached through a signed redirect.
+  blobUrl      String?
   mimeType     String?
   sizeBytes    Int?
+  /// Video and audio only, when the browser could read it before uploading.
+  durationSeconds Int?
   uploadedById String?
   createdAt    DateTime @default(now())
 

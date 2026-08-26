@@ -5,8 +5,6 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { unlink } from "fs/promises";
-import path from "path";
 
 const sourceSchema = z.object({
   targetType: z.string().min(1).max(30),
@@ -63,29 +61,5 @@ export async function removeRecordSource(
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not remove source." };
-  }
-}
-
-export async function deleteAttachment(
-  attachmentId: string,
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const user = await requireRole("EDITOR");
-    const attachment = await db.attachment.delete({ where: { id: attachmentId } });
-    await unlink(
-      path.join(process.cwd(), "uploads", path.basename(attachment.storedPath)),
-    ).catch(() => {});
-    await logAudit(user, {
-      targetType: attachment.targetType,
-      targetId: attachment.targetId,
-      targetLabel: attachment.filename,
-      action: "unlinked",
-      field: "attachment",
-      oldValue: attachment.filename,
-    });
-    revalidatePath("/", "layout");
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Could not delete attachment." };
   }
 }
