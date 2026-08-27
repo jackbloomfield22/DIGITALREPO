@@ -73,7 +73,8 @@ const WEB_RESEARCH_RULES = [
 // point of the switch: the same page of names is a slate of documentaries or a
 // list of channels to chase, and nothing in the text itself says which.
 const YOUTUBE_RULES = [
-  "THIS MATERIAL IS FOR THE ATHLETE YOUTUBE CHANNELS BUSINESS. Read it that way.",
+  "THIS WHOLE DOCUMENT IS FOR THE ATHLETE YOUTUBE CHANNELS BUSINESS. Read all of it that way,",
+  "including passages that would be ambiguous on their own.",
   "- An athlete named as someone we want to work with on YouTube is a `channel` record,",
   "  not a talent-only note and not a format. Its name is the athlete's name unless the",
   "  document gives the channel one.",
@@ -169,17 +170,28 @@ export async function triageItemCore(
     await recordUsage(itemId, "triage", usage);
     const verdict = triageOutputSchema.parse(output);
 
+    // The uploader's own switch always wins. Only fill the lane in when they
+    // did not set one — a stated intent is worth more than a read of the text,
+    // and silently overruling it would make the switch untrustworthy.
+    const inferredWorkspace =
+      item.workspace === null && verdict.workspace === "youtube" ? "youtube" : undefined;
+
     await db.ingestItem.update({
       where: { id: itemId },
       data: {
         status: verdict.relevant ? "triaged" : "irrelevant",
         error: null,
+        ...(inferredWorkspace ? { workspace: inferredWorkspace } : {}),
         relevance: {
           score: verdict.score,
           reasons: verdict.reasons,
           candidateRecords: verdict.candidateRecords,
           newRecordCandidates: verdict.newRecordCandidates,
           sections: verdict.sections,
+          // Recorded so the review screen can say the section was worked out
+          // rather than chosen, which is the difference between a reader
+          // trusting it and wondering where it came from.
+          workspaceInferred: !!inferredWorkspace,
           matchedDigestIds: candidates.map((c) => c.id),
         },
       },
@@ -203,6 +215,8 @@ RULES:
 - Only facts stated in the source. Never embellish, never infer beyond the text. Every change carries verbatim evidence copied exactly from the source.
 - Prefer editing an existing record over creating a new one: when a record in the knowledge index matches, use its id in targetId/aId/bId and explain the match in the rationale.
 - "Formats" are internal 4.4.Forty concepts in development; "Projects" are real existing productions. Never confuse them.
+- "Channels" are the athlete YouTube channels business: an ongoing channel 4.4.Forty builds and runs for a person, as opposed to one show. Use a channel record whenever the source is about a person's channel rather than about a single title — a named YouTube channel or handle, subscriber or view counts, upload cadence, "@" handles, "his channel", "the channel we'd build for her", or a person listed among people we want to work with on YouTube. A one-off documentary or series remains a Format or a Project even when it will be posted on YouTube; the distinction is a running channel versus a single title.
+- When a source lists things a person's channel could make — a doc series, a podcast, a recurring bit, "content with the dogs" — those belong in that channel's \`ideas\` field, one per line, not as a Format each.
 - Propose "archive" (never delete) only when the source clearly says a record is no longer valid (project cancelled, rep relationship ended, company dissolved), with the reason.
 - For updates to fields that may already have content, write the value as the complete new text; the reviewer sees a before/after diff. In the rationale, say which sentences changed and why.
 - Mark sensitive: true on anything about compensation, deal terms, fees, personal phone numbers, home addresses, health, or family details. Still propose it.

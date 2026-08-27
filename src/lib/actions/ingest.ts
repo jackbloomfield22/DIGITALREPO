@@ -133,6 +133,50 @@ export async function applyIngestChanges(
   }
 }
 
+/**
+ * Move an item between lanes and read it again. Triage works the section out
+ * from the text, and when it gets that wrong the proposals are wrong in a way
+ * no amount of approving and rejecting fixes — so the reader needs to be able
+ * to say "this is channels material" (or isn't) and have it re-read.
+ */
+export async function setIngestWorkspace(
+  itemId: string,
+  workspace: "youtube" | null,
+): Promise<Result> {
+  try {
+    await requireRole("EDITOR");
+    const item = await db.ingestItem.findUnique({ where: { id: itemId } });
+    if (!item) return { ok: false, error: "That item is no longer here." };
+    if (item.workspace === workspace) return { ok: true };
+
+    const applied = await db.ingestChange.count({ where: { itemId, status: "applied" } });
+    if (applied > 0) {
+      return {
+        ok: false,
+        error: "Some of this has already been applied. Undo it from Add Info first, then change the section.",
+      };
+    }
+
+    // Proposals were made under the old reading, so they go and the item drops
+    // back to where new ones get made. The reviewer re-runs it.
+    await db.ingestChange.deleteMany({ where: { itemId } });
+    await db.ingestItem.update({
+      where: { id: itemId },
+      data: {
+        workspace,
+        status: "parsed",
+        relevance: item.relevance
+          ? { ...(item.relevance as object), workspaceInferred: false }
+          : undefined,
+      },
+    });
+    revalidatePath(`/ingest/${itemId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed." };
+  }
+}
+
 export async function markIrrelevant(itemId: string): Promise<Result> {
   try {
     await requireRole("EDITOR");

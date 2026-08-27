@@ -87,3 +87,102 @@ describe("ideas arriving from an ingest", () => {
     expect(ideas.map((i) => i.title)).toEqual(["Real idea"]);
   });
 });
+
+describe("finding the YouTube lane without being told", () => {
+  it("offers the section as a triage output, so a document can route itself", async () => {
+    const { triageToolSchema, triageOutputSchema } = await import("@/lib/ingest/ops");
+    const schema = triageToolSchema() as {
+      properties: { workspace?: { enum?: string[]; description?: string } };
+    };
+    expect(schema.properties.workspace?.enum).toEqual(["youtube", "general"]);
+    // The description is what does the work; without it the field is noise.
+    expect(schema.properties.workspace?.description).toMatch(/handles|subscriber/i);
+
+    // A verdict that says nothing about the section is "general", never a crash.
+    const parsed = triageOutputSchema.parse({ relevant: true, score: 0.8, reasons: [] });
+    expect(parsed.workspace).toBe("general");
+  });
+
+  it("tells every document how to spot a channel, toggle or no toggle", async () => {
+    const { describeOpVocabulary } = await import("@/lib/ingest/ops");
+    // The vocabulary alone has to carry the channel type, since the always-on
+    // rules reference it for documents with no switch set.
+    expect(describeOpVocabulary()).toContain("channel");
+  });
+});
+
+describe("what actually reaches the model", () => {
+  const usage = { model: "test", inputTokens: 1, outputTokens: 1, cacheReadTokens: 0 };
+
+  /** Run an item through triage and propose with a stub, capturing both prompts. */
+  async function prompts(extractedText: string, workspace: string | null) {
+    const item = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} ${extractedText}`, status: "parsed", workspace },
+    });
+    const { triageItemCore, proposeItemCore } = await import("@/lib/ingest/pipeline");
+    let triage = "";
+    await triageItemCore(item.id, async (req) => {
+      triage = req.userContent;
+      return {
+        output: { relevant: true, score: 0.9, reasons: ["ok"], workspace: "general", candidateRecords: [], newRecordCandidates: [], sections: [] },
+        usage,
+      };
+    });
+    let propose = { system: "", user: "" };
+    await proposeItemCore(item.id, async (req) => {
+      propose = { system: req.systemStable ?? "", user: req.userContent };
+      return { output: { changes: [] }, usage };
+    });
+    await db.ingestItem.delete({ where: { id: item.id } });
+    return { triage, propose };
+  }
+
+  it("teaches every document how to spot a channel, with the switch off", async () => {
+    const { propose } = await prompts("Notes about a few things.", null);
+    // The always-on rules are what make the switch optional rather than required.
+    expect(propose.system).toContain("athlete YouTube channels business");
+    expect(propose.system).toMatch(/subscriber or view counts/i);
+    expect(propose.system).toMatch(/running channel versus a single title/i);
+    // …and the document-level assertion is absent, because nobody made it.
+    expect(propose.user).not.toContain("THIS WHOLE DOCUMENT");
+  });
+
+  it("adds the document-level assertion only when the switch is on", async () => {
+    const { triage, propose } = await prompts("Channels we'd like to work on.", "youtube");
+    expect(propose.user).toContain("THIS WHOLE DOCUMENT");
+    // Triage needs it too, or a channels document can be judged irrelevant
+    // before anything gets the chance to propose from it.
+    expect(triage).toContain("THIS WHOLE DOCUMENT");
+  });
+
+  it("keeps a lane triage worked out, and never overrules one that was set", async () => {
+    const { triageItemCore } = await import("@/lib/ingest/pipeline");
+
+    const guessed = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} Tyrese channel ideas`, status: "parsed" },
+    });
+    await triageItemCore(guessed.id, async () => ({
+      output: { relevant: true, score: 0.9, reasons: [], workspace: "youtube", candidateRecords: [], newRecordCandidates: [], sections: [] },
+      usage,
+    }));
+    const after = await db.ingestItem.findUnique({ where: { id: guessed.id } });
+    expect(after?.workspace).toBe("youtube");
+    expect((after?.relevance as { workspaceInferred?: boolean }).workspaceInferred).toBe(true);
+
+    // Someone switched this to YouTube by hand. A read of the text saying
+    // otherwise does not get to undo that, or the switch stops meaning
+    // anything the moment the model disagrees with it.
+    const stated = await db.ingestItem.create({
+      data: { kind: "text", extractedText: `${P} a page about a documentary`, status: "parsed", workspace: "youtube" },
+    });
+    await triageItemCore(stated.id, async () => ({
+      output: { relevant: true, score: 0.9, reasons: [], workspace: "general", candidateRecords: [], newRecordCandidates: [], sections: [] },
+      usage,
+    }));
+    const stayed = await db.ingestItem.findUnique({ where: { id: stated.id } });
+    expect(stayed?.workspace).toBe("youtube");
+    expect((stayed?.relevance as { workspaceInferred?: boolean }).workspaceInferred).toBe(false);
+
+    await db.ingestItem.deleteMany({ where: { id: { in: [guessed.id, stated.id] } } });
+  });
+});

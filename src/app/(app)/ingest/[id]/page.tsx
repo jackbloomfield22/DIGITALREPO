@@ -61,6 +61,7 @@ export default async function IngestItemPage({
     context: item.context,
     webResearch: item.webResearch,
     workspace: item.workspace,
+    workspaceInferred: !!(relevance as { workspaceInferred?: boolean } | null)?.workspaceInferred,
     relevance: relevance ? { score: relevance.score ?? null, reasons: relevance.reasons ?? [] } : null,
     proposeInfo: (meta.proposeInfo as ItemVM["proposeInfo"]) ?? null,
   };

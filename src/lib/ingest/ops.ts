@@ -95,6 +95,9 @@ const candidate = z.object({ targetType, name: clampMin(1, 300) });
 export const triageOutputSchema = z.object({
   relevant: z.boolean(),
   score: z.number().min(0).max(1),
+  // Which part of the Repo this is for, when the document makes it obvious.
+  // Lets a document reach the right section without the uploader flagging it.
+  workspace: z.enum(["youtube", "general"]).default("general").catch("general"),
   reasons: clampArr(clamp(300), 6).catch([]),
   candidateRecords: clampArr(candidate, 20).default([]).catch([]),
   newRecordCandidates: clampArr(candidate, 20).default([]).catch([]),
@@ -285,6 +288,12 @@ export function triageToolSchema(): Record<string, unknown> {
     properties: {
       relevant: { type: "boolean" },
       score: { type: "number", minimum: 0, maximum: 1 },
+      workspace: {
+        type: "string",
+        enum: ["youtube", "general"],
+        description:
+          "Say 'youtube' when this document is mainly about the athlete YouTube channels business — people whose channels we run or want to run, channel names or @handles, subscriber/view counts, upload cadence, or lists of things a person's channel could make. Say 'general' otherwise, including for a one-off documentary or series that merely happens to be destined for YouTube.",
+      },
       reasons: { type: "array", items: str },
       candidateRecords: { type: "array", items: rec, description: "Existing records this document is about" },
       newRecordCandidates: { type: "array", items: rec, description: "People/companies/projects mentioned that appear to be new" },

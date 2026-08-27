@@ -19,8 +19,63 @@ import {
 } from "@/lib/actions/ingest";
 import { wordDiff } from "@/lib/word-diff";
 import { useToast } from "@/components/toast";
+import { setIngestWorkspace } from "@/lib/actions/ingest";
 import { StatusPill } from "@/components/ui";
 import type { ApplyOutcome } from "@/lib/ingest/apply";
+
+/**
+ * Correcting the section an item was read as. A wrong reading is not something
+ * approving and rejecting can fix — the proposals themselves are the wrong
+ * shape — so this drops them and sends the item back to be read again.
+ */
+function WorkspaceSwitch({ item }: { item: ItemVM }) {
+  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+  const isYouTube = item.workspace === "youtube";
+
+  const move = async () => {
+    const next = isYouTube ? null : "youtube";
+    if (
+      !window.confirm(
+        next
+          ? "Read this as YouTube channels material? The current proposals are replaced."
+          : "Read this as general Repo material? The current proposals are replaced.",
+      )
+    )
+      return;
+    setBusy(true);
+    const res = await setIngestWorkspace(item.id, next);
+    if (!res.ok) {
+      setBusy(false);
+      return toast(res.error ?? "Could not change that.", { tone: "error" });
+    }
+    // Read it again straight away, so the reader sees the new proposals rather
+    // than an item sitting in a state they have to understand.
+    for (const stage of ["triage", "propose"] as const) {
+      const r = await fetch("/api/ingest/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, stage }),
+      });
+      const out = (await r.json().catch(() => ({}))) as { ok?: boolean; status?: string; error?: string };
+      if (!out.ok) {
+        toast(out.error ?? "Moved, but re-reading failed — press Retry.", { tone: "error" });
+        break;
+      }
+      if (out.status === "irrelevant") break;
+    }
+    setBusy(false);
+    toast(next ? "Re-read as YouTube channels material" : "Re-read as general material");
+    router.refresh();
+  };
+
+  return (
+    <button className="btn btn-secondary btn-sm" disabled={busy} onClick={move}>
+      {busy ? "Re-reading…" : isYouTube ? "Not YouTube" : "Read as YouTube"}
+    </button>
+  );
+}
 
 function RetryButton({ item }: { item: ItemVM }) {
   const [busy, setBusy] = useState(false);
@@ -70,6 +125,7 @@ export type ItemVM = {
   context: string | null;
   webResearch: boolean;
   workspace: string | null;
+  workspaceInferred: boolean;
   relevance: { score: number | null; reasons: string[] } | null;
   proposeInfo: { coveredChars: number; totalChars: number; invalidOps?: string[] } | null;
 };
@@ -121,7 +177,7 @@ function afterText(change: ChangeVM): string {
     .join(" · ");
 }
 
-function SourcePane({ item, activeSpans }: { item: ItemVM; activeSpans: { start: number; end: number }[] }) {
+function SourcePane({ item, activeSpans, canEdit }: { item: ItemVM; activeSpans: { start: number; end: number }[]; canEdit: boolean }) {
   const spanRef = useRef<HTMLElement>(null);
   useEffect(() => {
     spanRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -143,13 +199,26 @@ function SourcePane({ item, activeSpans }: { item: ItemVM; activeSpans: { start:
   let firstActiveRendered = false;
   return (
     <div className="card sticky top-4 max-h-[80vh] overflow-y-auto p-4 text-sm leading-relaxed">
-      {(item.context || item.webResearch || item.workspace) && (
+      {(item.context || item.webResearch || item.workspace || canEdit) && (
         <div className="mb-3 rounded bg-wash px-3 py-2 text-xs">
-          {item.workspace === "youtube" && (
-            <div className="mb-1 font-semibold text-accent-deep">
-              Read as YouTube channels material
-            </div>
-          )}
+          {/* Which part of the Repo this was read as, and a way to disagree.
+              A wrong reading is not something approving and rejecting can fix,
+              so the correction has to sit where the reader notices it. */}
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+            <span className={item.workspace === "youtube" ? "font-semibold text-accent-deep" : "text-muted"}>
+              {item.workspace === "youtube" ? (
+                <>
+                  Read as YouTube channels material
+                  {item.workspaceInferred && (
+                    <span className="font-normal text-muted"> — worked out from the text, not set by hand</span>
+                  )}
+                </>
+              ) : (
+                "Read as general Repo material"
+              )}
+            </span>
+            {canEdit && <WorkspaceSwitch item={item} />}
+          </div>
           {item.context && (
             <div>
               <span className="font-semibold">Uploader context: </span>
@@ -524,7 +593,7 @@ export function ReviewBoard({ item, changes, canEdit }: { item: ItemVM; changes:
       )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(280px,2fr)_3fr]">
-        <SourcePane item={item} activeSpans={active?.evidence ?? []} />
+        <SourcePane item={item} activeSpans={active?.evidence ?? []} canEdit={canEdit} />
         <div className="space-y-5">
           {groups.map(([group, groupChanges]) => (
             <section key={group}>

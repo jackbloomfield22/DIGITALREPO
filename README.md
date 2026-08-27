@@ -169,11 +169,19 @@ Twelve first-class sections, all relational, all clickable in both directions:
   state from idea to published. Distinct from Formats, which are single shows: a channel
   is the place a run of them lives.
 
-  Ingest has a **YouTube switch**. The same page of names is a slate of documentaries or a
-  list of channels to chase, and nothing in the text says which — so the uploader does.
-  With it on, a name becomes a channel prospect rather than a format, bullets underneath
-  become that channel's idea queue, and attached companies and people become links on the
-  channel. A note written anywhere inside the section sets it automatically.
+  Ingest routes material here on its own. Every document is told how to tell a channel from
+  a format — a running channel for a person versus a single title, subscriber counts,
+  handles, cadence — so channel material lands in this section whether or not anyone
+  flagged it, and triage records which section it decided on. The **YouTube switch** on the
+  upload panel is the stronger, document-level version: it asserts the *whole* document is
+  channels material, which settles passages that would be ambiguous alone. A note written
+  anywhere inside the section sets it automatically.
+
+  An explicit switch always beats a guess — the guess only fills in where nobody chose. The
+  review screen says which section an item was read as and whether that was worked out or
+  set by hand, with one button to disagree: it drops the proposals and reads the document
+  again the other way, because a wrong reading is not something approving and rejecting can
+  fix.
 - **Dev Slate** (`/dev-slate`) — the working development slate, kept in the Repo rather
   than linked from it, as a document you edit in place. It saves itself: there is no Save
   button, because a document with one is a document someone eventually loses work in. An
