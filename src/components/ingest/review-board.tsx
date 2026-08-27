@@ -69,6 +69,7 @@ export type ItemVM = {
   error: string | null;
   context: string | null;
   webResearch: boolean;
+  workspace: string | null;
   relevance: { score: number | null; reasons: string[] } | null;
   proposeInfo: { coveredChars: number; totalChars: number; invalidOps?: string[] } | null;
 };
@@ -142,8 +143,13 @@ function SourcePane({ item, activeSpans }: { item: ItemVM; activeSpans: { start:
   let firstActiveRendered = false;
   return (
     <div className="card sticky top-4 max-h-[80vh] overflow-y-auto p-4 text-sm leading-relaxed">
-      {(item.context || item.webResearch) && (
+      {(item.context || item.webResearch || item.workspace) && (
         <div className="mb-3 rounded bg-wash px-3 py-2 text-xs">
+          {item.workspace === "youtube" && (
+            <div className="mb-1 font-semibold text-accent-deep">
+              Read as YouTube channels material
+            </div>
+          )}
           {item.context && (
             <div>
               <span className="font-semibold">Uploader context: </span>

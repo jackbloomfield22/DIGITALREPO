@@ -24,7 +24,7 @@ export async function refreshLinkSides(p: LinkPayload) {
 export type { LinkPayload };
 export type LinkResult = { ok: true } | { ok: false; error: string };
 
-export async function label(table: "creator" | "project" | "organization" | "format" | "opportunity" | "entity" | "person" | "collection", recordId: string): Promise<string> {
+export async function label(table: "creator" | "project" | "organization" | "format" | "opportunity" | "entity" | "person" | "collection" | "channel", recordId: string): Promise<string> {
   try {
     switch (table) {
       case "creator": return (await db.creator.findUnique({ where: { id: recordId } }))?.name ?? "?";
@@ -35,6 +35,7 @@ export async function label(table: "creator" | "project" | "organization" | "for
       case "entity": return (await db.entity.findUnique({ where: { id: recordId } }))?.name ?? "?";
       case "person": return (await db.industryPerson.findUnique({ where: { id: recordId } }))?.name ?? "?";
       case "collection": return (await db.collection.findUnique({ where: { id: recordId } }))?.name ?? "?";
+      case "channel": return (await db.channel.findUnique({ where: { id: recordId } }))?.name ?? "?";
     }
   } catch {
     return "?";
@@ -55,6 +56,8 @@ export async function auditInfo(p: LinkPayload): Promise<{ targetType: string; t
     case "project_person": return { targetType: "project", targetId: p.projectId, targetLabel: await label("project", p.projectId), other: `${await label("person", p.personId)} (${p.role})` };
     case "format_entity": return { targetType: "format", targetId: p.formatId, targetLabel: await label("format", p.formatId), other: await label("entity", p.entityId) };
     case "format_org": return { targetType: "format", targetId: p.formatId, targetLabel: await label("format", p.formatId), other: await label("organization", p.organizationId) };
+    case "channel_org": return { targetType: "channel", targetId: p.channelId, targetLabel: await label("channel", p.channelId), other: await label("organization", p.organizationId) };
+    case "channel_person": return { targetType: "channel", targetId: p.channelId, targetLabel: await label("channel", p.channelId), other: await label("person", p.personId) };
     case "opportunity_creator": return { targetType: "opportunity", targetId: p.opportunityId, targetLabel: await label("opportunity", p.opportunityId), other: await label("creator", p.creatorId) };
     case "opportunity_format": return { targetType: "opportunity", targetId: p.opportunityId, targetLabel: await label("opportunity", p.opportunityId), other: await label("format", p.formatId) };
     case "opportunity_project": return { targetType: "opportunity", targetId: p.opportunityId, targetLabel: await label("opportunity", p.opportunityId), other: await label("project", p.projectId) };
@@ -158,6 +161,24 @@ export async function upsertLink(p: LinkPayload): Promise<void> {
       });
       return;
     }
+    case "channel_org": {
+      const relationship = p.relationship ?? "partner";
+      await db.channelOrganization.upsert({
+        where: { channelId_organizationId_relationship: { channelId: p.channelId, organizationId: p.organizationId, relationship } },
+        update: {},
+        create: { channelId: p.channelId, organizationId: p.organizationId, relationship },
+      });
+      return;
+    }
+    case "channel_person": {
+      const relationship = p.relationship ?? "contact";
+      await db.channelPerson.upsert({
+        where: { channelId_personId_relationship: { channelId: p.channelId, personId: p.personId, relationship } },
+        update: {},
+        create: { channelId: p.channelId, personId: p.personId, relationship },
+      });
+      return;
+    }
     case "opportunity_creator":
       await db.opportunityCreator.upsert({
         where: { opportunityId_creatorId: { opportunityId: p.opportunityId, creatorId: p.creatorId } },
@@ -239,6 +260,12 @@ export async function deleteLink(p: LinkPayload): Promise<void> {
     case "format_entity":
       await db.formatEntityLink.deleteMany({ where: { formatId: p.formatId, entityId: p.entityId } });
       return;
+    case "channel_org":
+      await db.channelOrganization.deleteMany({ where: { channelId: p.channelId, organizationId: p.organizationId } });
+      break;
+    case "channel_person":
+      await db.channelPerson.deleteMany({ where: { channelId: p.channelId, personId: p.personId } });
+      break;
     case "format_org":
       await db.formatOrganization.deleteMany({ where: { formatId: p.formatId, organizationId: p.organizationId } });
       return;

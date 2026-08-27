@@ -69,6 +69,31 @@ const WEB_RESEARCH_RULES = [
   "- At most a few targeted searches — this is gap-filling, not open-ended research.",
 ].join("\n");
 
+// Shown when the uploader said this is channels-business material. The whole
+// point of the switch: the same page of names is a slate of documentaries or a
+// list of channels to chase, and nothing in the text itself says which.
+const YOUTUBE_RULES = [
+  "THIS MATERIAL IS FOR THE ATHLETE YOUTUBE CHANNELS BUSINESS. Read it that way.",
+  "- An athlete named as someone we want to work with on YouTube is a `channel` record,",
+  "  not a talent-only note and not a format. Its name is the athlete's name unless the",
+  "  document gives the channel one.",
+  "- Bullets under an athlete — a doc series, a podcast, a drill, 'content with the dogs' —",
+  "  are things that channel could make. Put them in the channel's `ideas` field, one per",
+  "  line; they become the channel's idea queue. Do not invent a Format for each one.",
+  "- A channel's status is where it stands with us: prospect (we'd like to), in_talks,",
+  "  signed, building, live, paused, ended. 'Hopefully meeting with him next week' is",
+  "  in_talks; 'channels we'd like to work on' is prospect.",
+  "- Subscriber counts, view counts and upload cadence belong on the channel.",
+  "- Companies attached to a channel (production partner, management, MCN, brand) are",
+  "  channel_org links; people to call about it are channel_person links.",
+  "- Only make a Format when the document describes a show being developed and sold as a",
+  "  show. A channel is where a run of them lives; the two are not the same record.",
+].join("\n");
+
+function workspaceRules(item: { workspace: string | null }): string {
+  return item.workspace === "youtube" ? YOUTUBE_RULES : "";
+}
+
 function uploaderContext(item: { context: string | null }): string {
   return item.context
     ? `NOTE FROM THE UPLOADER (what this is and why it matters — trust it when judging relevance and deciding what to extract):\n${item.context}`
@@ -129,6 +154,7 @@ export async function triageItemCore(
       userContent: [
         candidateBlock(candidates),
         "",
+        workspaceRules(item),
         uploaderContext(item),
         describeSource(item),
         "",
@@ -293,6 +319,7 @@ async function linkAlreadyExists(op: Extract<ProposedOp, { op: "link" }>, aId: s
     creator_org: "creatorOrganization", creator_person: "creatorPerson", creator_creator: "creatorRelationship",
     project_org: "projectOrganization", project_entity: "projectEntityLink", project_person: "personProject",
     format_entity: "formatEntityLink", format_org: "formatOrganization",
+    channel_org: "channelOrganization", channel_person: "channelPerson",
     opportunity_creator: "opportunityCreator", opportunity_format: "opportunityFormat",
     opportunity_project: "opportunityProject", opportunity_org: "opportunityOrganization",
     opportunity_entity: "opportunityEntityLink",
@@ -345,6 +372,7 @@ export async function proposeItemCore(
         userContent: [
           candidateBlock(candidates),
           thread,
+          workspaceRules(item),
           item.webResearch ? WEB_RESEARCH_RULES : "",
           uploaderContext(item),
           describeSource(item),

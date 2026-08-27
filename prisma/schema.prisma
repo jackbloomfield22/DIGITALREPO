@@ -175,6 +175,7 @@ model Organization {
   formats       FormatOrganization[]
 
   @@index([name])
+  channels      ChannelOrganization[]
 }
 
 model IndustryPerson {
@@ -200,6 +201,7 @@ model IndustryPerson {
   projects      PersonProject[]
 
   @@index([name])
+  channels     ChannelPerson[]
 }
 
 model Format {
@@ -798,6 +800,10 @@ model IngestItem {
   extractedText String?
   context       String? // optional uploader note: what this is and why it matters
   webResearch   Boolean  @default(false) // allow web search to fill gaps during propose
+  /// Which part of the Repo this material is for, when the uploader knows.
+  /// "youtube" routes it at the channels business, so the model reads a name
+  /// on a list as a channel prospect rather than as a film in development.
+  workspace     String?
   metadata      Json?
   parentId      String?
   threadId      String?
@@ -934,9 +940,11 @@ model Channel {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  creator Creator? @relation(fields: [creatorId], references: [id], onDelete: SetNull)
-  owner   User?    @relation("ChannelOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  ideas   ChannelIdea[]
+  creator       Creator?              @relation(fields: [creatorId], references: [id], onDelete: SetNull)
+  owner         User?                 @relation("ChannelOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  ideas         ChannelIdea[]
+  organizations ChannelOrganization[]
+  people        ChannelPerson[]
 
   @@index([status])
   @@index([creatorId])
@@ -959,4 +967,35 @@ model ChannelIdea {
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@index([channelId, sortOrder])
+}
+
+/// A company involved in a channel — the production partner cutting it, the
+/// MCN, the brand paying for it. The channels business runs on these and they
+/// were previously only recoverable from a paragraph of notes.
+model ChannelOrganization {
+  id             String @id @default(cuid())
+  channelId      String
+  organizationId String
+  relationship   String @default("partner")
+
+  channel      Channel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, organizationId, relationship])
+  @@index([organizationId])
+}
+
+/// A person to talk to about a channel: the athlete's manager, the YouTube
+/// partner manager, the editor who actually cuts it.
+model ChannelPerson {
+  id           String @id @default(cuid())
+  channelId    String
+  personId     String
+  relationship String @default("contact")
+
+  channel Channel        @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  person  IndustryPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, personId, relationship])
+  @@index([personId])
 }

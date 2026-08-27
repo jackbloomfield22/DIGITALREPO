@@ -63,6 +63,33 @@ async function resolveRef(
   return resolved.id;
 }
 
+/**
+ * `ideas` is the one field on a channel that is not a column: it arrives as a
+ * list and becomes rows in the queue. Anything already queued under the same
+ * title is left alone, so re-ingesting the same page of the slate does not
+ * produce four copies of "doc series".
+ */
+export async function applyChannelIdeas(channelId: string, raw: unknown): Promise<void> {
+  const titles = String(raw ?? "")
+    .split(/[\n;•]+/)
+    .map((t) => t.replace(/^[-*\d.)\s]+/, "").trim())
+    .filter((t) => t.length > 1 && t.length <= 300);
+  if (!titles.length) return;
+
+  const existing = await db.channelIdea.findMany({
+    where: { channelId },
+    select: { title: true, sortOrder: true },
+  });
+  const seen = new Set(existing.map((e) => e.title.toLowerCase()));
+  let order = existing.reduce((n, e) => Math.max(n, e.sortOrder), 0);
+
+  for (const title of titles) {
+    if (seen.has(title.toLowerCase())) continue;
+    seen.add(title.toLowerCase());
+    await db.channelIdea.create({ data: { channelId, title, sortOrder: ++order } });
+  }
+}
+
 async function applyCreate(op: Extract<ProposedOp, { op: "create" }>, user: SessionUser, touched: Touched) {
   if (op.targetType === "entity") {
     const r = await resolveEntity(op.entityKind ?? "tag", op.name);
@@ -98,6 +125,10 @@ async function applyCreate(op: Extract<ProposedOp, { op: "create" }>, user: Sess
   const record = await recordSlug(op.targetType, resolved.id);
   const patch: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(op.fields ?? {})) {
+    if (op.targetType === "channel" && key === "ideas") {
+      await applyChannelIdeas(resolved.id, value);
+      continue;
+    }
     if (!spec.createFields.includes(key) && !spec.fields.some((f) => f.name === key)) continue;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const current = (await (db as any)[spec.prismaModel].findUnique({ where: { id: resolved.id } }))?.[key];
@@ -120,6 +151,16 @@ async function applyUpdate(
   const targetId = await resolveRef(op.targetType, op.targetId, op.targetName, user, touched);
   const field = spec.fields.find((f) => f.name === op.field);
   if (!field) throw new Error(`Field ${op.field} is not ingest-editable.`);
+
+  if (op.targetType === "channel" && op.field === "ideas") {
+    await applyChannelIdeas(targetId, effectiveValue);
+    await logAudit(user, {
+      targetType: "channel", targetId,
+      targetLabel: op.targetName, action: "updated",
+      field: "ideas (ingest)", newValue: String(effectiveValue).slice(0, 300),
+    });
+    return "applied";
+  }
 
   let value: unknown = effectiveValue;
   if (field.kind === "number" || field.kind === "year") value = Number(value);

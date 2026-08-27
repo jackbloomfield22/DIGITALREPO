@@ -49,45 +49,7 @@ export function ChannelIdeas({
 
       <ul className="space-y-1.5">
         {ideas.map((idea) => (
-          <li key={idea.id} className="card flex flex-wrap items-center gap-2 px-3 py-2">
-            <span className="min-w-0 flex-1 text-sm">{idea.title}</span>
-            {canEdit ? (
-              <span className="relative inline-flex items-center">
-                <StatusPill status={idea.status} label={labelFor(idea.status)} />
-                <span aria-hidden className="ml-0.5 text-[9px] text-faint">▾</span>
-                <select
-                  aria-label={`Status for ${idea.title}`}
-                  className="absolute inset-0 cursor-pointer opacity-0"
-                  value={idea.status}
-                  onChange={async (e) => {
-                    const res = await setChannelIdea(idea.id, { status: e.target.value });
-                    if (!res.ok) return toast(res.error ?? "Could not update.", { tone: "error" });
-                    router.refresh();
-                  }}
-                >
-                  {CHANNEL_IDEA_STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
-              </span>
-            ) : (
-              <StatusPill status={idea.status} label={labelFor(idea.status)} />
-            )}
-            {canEdit && (
-              <button
-                aria-label={`Remove ${idea.title}`}
-                className="text-muted hover:text-accent"
-                onClick={async () => {
-                  if (!window.confirm(`Remove "${idea.title}" from the queue?`)) return;
-                  const res = await removeChannelIdea(idea.id);
-                  if (!res.ok) return toast(res.error ?? "Could not remove.", { tone: "error" });
-                  router.refresh();
-                }}
-              >
-                ×
-              </button>
-            )}
-          </li>
+          <ChannelIdeaRow key={idea.id} idea={idea} canEdit={canEdit} />
         ))}
       </ul>
 
@@ -112,5 +74,56 @@ export function ChannelIdeas({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * One idea, editable in place. Shared by a channel's own queue and by the
+ * cross-channel production list, so an idea behaves the same in both.
+ */
+export function ChannelIdeaRow({ idea, canEdit }: { idea: IdeaVM; canEdit: boolean }) {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  return (
+    <li className="card flex flex-wrap items-center gap-2 px-3 py-2">
+      <span className="min-w-0 flex-1 text-sm">{idea.title}</span>
+      {canEdit ? (
+        <span className="relative inline-flex items-center">
+          <StatusPill status={idea.status} label={labelFor(idea.status)} />
+          <span aria-hidden className="ml-0.5 text-[9px] text-faint">▾</span>
+          <select
+            aria-label={`Status for ${idea.title}`}
+            className="absolute inset-0 cursor-pointer opacity-0"
+            value={idea.status}
+            onChange={async (e) => {
+              const res = await setChannelIdea(idea.id, { status: e.target.value });
+              if (!res.ok) return toast(res.error ?? "Could not update.", { tone: "error" });
+              router.refresh();
+            }}
+          >
+            {CHANNEL_IDEA_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </span>
+      ) : (
+        <StatusPill status={idea.status} label={labelFor(idea.status)} />
+      )}
+      {canEdit && (
+        <button
+          aria-label={`Remove ${idea.title}`}
+          className="text-muted hover:text-accent"
+          onClick={async () => {
+            if (!window.confirm(`Remove "${idea.title}" from the queue?`)) return;
+            const res = await removeChannelIdea(idea.id);
+            if (!res.ok) return toast(res.error ?? "Could not remove.", { tone: "error" });
+            router.refresh();
+          }}
+        >
+          ×
+        </button>
+      )}
+    </li>
   );
 }

@@ -82,6 +82,8 @@ export const TABLE_ORDER = [
   "docRevision",
   "channel",
   "channelIdea",
+  "channelOrganization",
+  "channelPerson",
   // Rebuildable at any time (scripts/rebuild-digests.ts), but included so the
   // dump is complete and the coverage test stays honest.
   "knowledgeDigest",

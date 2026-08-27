@@ -207,6 +207,10 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       text("cadence", "Upload Cadence", 120),
       longtext("revenueModel", "How it makes money"),
       longtext("notes", "Notes"),
+      // Not a column. The apply engine splits this into ChannelIdea rows,
+      // because the list of things a channel could make is the work of the
+      // business and belongs in the queue rather than in a paragraph.
+      longtext("ideas", "Ideas for this channel (one per line)"),
       { name: "subscribers", label: "Subscribers", kind: "number" },
       { name: "totalViews", label: "Total Views", kind: "number" },
       { name: "videoCount", label: "Videos", kind: "number" },
@@ -337,6 +341,34 @@ export const LINK_SPECS: Record<LinkPayload["kind"], LinkSpec> = {
       { value: "sponsor_target", label: "Sponsor Target" },
       { value: "partner", label: "Partner" },
       { value: "associated", label: "Associated" },
+    ],
+  },
+  channel_org: {
+    kind: "channel_org", ingest: true,
+    a: { targetType: "channel", idField: "channelId" },
+    b: { targetType: "organization", idField: "organizationId" },
+    roleField: "relationship",
+    roleVocab: () => [
+      { value: "production_partner", label: "Production Partner" },
+      { value: "management", label: "Management" },
+      { value: "network", label: "MCN / Network" },
+      { value: "brand", label: "Brand Partner" },
+      { value: "platform", label: "Platform" },
+      { value: "partner", label: "Partner" },
+    ],
+  },
+  channel_person: {
+    kind: "channel_person", ingest: true,
+    a: { targetType: "channel", idField: "channelId" },
+    b: { targetType: "person", idField: "personId" },
+    roleField: "relationship",
+    roleVocab: () => [
+      { value: "contact", label: "Contact" },
+      { value: "manager", label: "Manager" },
+      { value: "agent", label: "Agent" },
+      { value: "producer", label: "Producer" },
+      { value: "editor", label: "Editor" },
+      { value: "partner_manager", label: "Platform Partner Manager" },
     ],
   },
   opportunity_creator: {

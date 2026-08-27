@@ -25,6 +25,10 @@ export async function POST(request: Request) {
   // item in the batch and fed to triage and propose as trusted context.
   const context = String(form.get("context") ?? "").trim().slice(0, 2000) || null;
   const webResearch = form.get("webResearch") === "1";
+  // Which part of the Repo the uploader says this is for. Only a known lane is
+  // accepted — an unrecognised one would silently change how everything is read.
+  const workspaceRaw = String(form.get("workspace") ?? "").trim();
+  const workspace = workspaceRaw === "youtube" ? "youtube" : null;
   // Optional human label for pasted text, so a note is recognisable in the
   // queue and in Add Info rather than showing up as one more "Pasted text".
   const label = String(form.get("label") ?? "").trim().slice(0, 120) || null;
@@ -56,6 +60,7 @@ export async function POST(request: Request) {
         sizeBytes: file.size,
         context,
         webResearch,
+        workspace,
         createdById: user.id,
         status: "uploaded",
       },
@@ -73,6 +78,7 @@ export async function POST(request: Request) {
         sizeBytes: pasted.length,
         context,
         webResearch,
+        workspace,
         createdById: user.id,
         status: "parsed", // pasted text needs no parse stage
       },

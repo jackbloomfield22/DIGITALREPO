@@ -23,6 +23,10 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
   const [text, setText] = useState("");
   const [context, setContext] = useState("");
   const [webResearch, setWebResearch] = useState(false);
+  // Which part of the Repo this is for. Knowing it up front changes what the
+  // reader looks for — a list of names is a slate of films or a list of
+  // channel prospects depending entirely on this.
+  const [youtube, setYoutube] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [progress, setProgress] = useState<Progress>(null);
   const stopRef = useRef(false);
@@ -63,6 +67,7 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
     if (text.trim()) form.append("text", text.trim());
     if (context.trim()) form.append("context", context.trim());
     if (webResearch) form.append("webResearch", "1");
+    if (youtube) form.append("workspace", "youtube");
     setProgress({ done: 0, total: files.length || 1, label: "Uploading…" });
     try {
       const res = await fetch("/api/ingest/upload", { method: "POST", body: form });
@@ -151,6 +156,19 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
             <span className="font-medium">Internet research</span> — let the AI run a few web
             searches to fill gaps the document leaves open (web-sourced facts are marked and
             get lower confidence)
+          </span>
+        </label>
+        <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-current"
+            checked={youtube}
+            onChange={(e) => setYoutube(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium">YouTube channels</span> — this is material for the
+            athlete channels business, so read it that way: a name on a list is a channel to
+            chase, and a bullet under one is something that channel could make
           </span>
         </label>
         <div className="mt-2 flex items-center justify-between gap-2">

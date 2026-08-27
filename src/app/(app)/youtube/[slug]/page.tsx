@@ -5,9 +5,12 @@ import { requireUser, hasRole } from "@/lib/auth";
 import { Section } from "@/components/ui";
 import { RowStatus } from "@/components/row-status";
 import { ChannelIdeas } from "@/components/channel-ideas";
+import { LinkChips } from "@/components/link-editor";
+import { LINK_SPECS } from "@/lib/ingest/registry";
 import { AttachmentList } from "@/components/attachments";
 import { attachmentsFor, uploadLimit } from "@/lib/files";
 import { compactNumber, formatDate, relativeTime, isStale } from "@/lib/format";
+import { labelFor } from "@/lib/taxonomy";
 
 const STALE_DAYS = 60;
 
@@ -29,6 +32,8 @@ export default async function ChannelPage({ params }: { params: Promise<{ slug: 
       creator: { select: { name: true, slug: true, headline: true } },
       owner: { select: { name: true } },
       ideas: { orderBy: { sortOrder: "asc" } },
+      organizations: { include: { organization: { select: { name: true, slug: true } } } },
+      people: { include: { person: { select: { name: true, slug: true, title: true } } } },
     },
   });
   if (!channel) notFound();
@@ -99,6 +104,66 @@ export default async function ChannelPage({ params }: { params: Promise<{ slug: 
               <p className="whitespace-pre-line text-sm text-charcoal">{channel.revenueModel}</p>
             </Section>
           )}
+
+          <Section title="Companies">
+            <LinkChips
+              canEdit={canEdit}
+              emptyMessage="No companies attached yet."
+              items={channel.organizations.map((o) => ({
+                key: o.id,
+                label: o.organization.name,
+                href: `/organizations/${o.organization.slug}`,
+                sub: labelFor(o.relationship),
+                removePayload: {
+                  kind: "channel_org",
+                  channelId: channel.id,
+                  organizationId: o.organizationId,
+                  relationship: o.relationship,
+                },
+              }))}
+              addConfig={{
+                template: { kind: "channel_org", channelId: channel.id },
+                idField: "organizationId",
+                lookupType: "organization",
+                roleField: "relationship",
+                roleOptions: LINK_SPECS.channel_org.roleVocab?.() ?? [],
+                roleDefault: "production_partner",
+                createKind: "organization",
+                buttonLabel: "+ Add Company",
+                placeholder: "Production partner, management, MCN, brand…",
+              }}
+            />
+          </Section>
+
+          <Section title="People">
+            <LinkChips
+              canEdit={canEdit}
+              emptyMessage="Nobody attached yet."
+              items={channel.people.map((p) => ({
+                key: p.id,
+                label: p.person.name,
+                href: `/people/${p.person.slug}`,
+                sub: [labelFor(p.relationship), p.person.title].filter(Boolean).join(" · "),
+                removePayload: {
+                  kind: "channel_person",
+                  channelId: channel.id,
+                  personId: p.personId,
+                  relationship: p.relationship,
+                },
+              }))}
+              addConfig={{
+                template: { kind: "channel_person", channelId: channel.id },
+                idField: "personId",
+                lookupType: "person",
+                roleField: "relationship",
+                roleOptions: LINK_SPECS.channel_person.roleVocab?.() ?? [],
+                roleDefault: "contact",
+                createKind: "person",
+                buttonLabel: "+ Add Person",
+                placeholder: "Manager, agent, producer, editor…",
+              }}
+            />
+          </Section>
 
           <Section title="Files">
             <AttachmentList

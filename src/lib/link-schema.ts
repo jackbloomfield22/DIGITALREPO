@@ -24,6 +24,8 @@ export const linkPayloadSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("project_person"), projectId: id, personId: id, role: rel }),
   z.object({ kind: z.literal("format_entity"), formatId: id, entityId: id }),
   z.object({ kind: z.literal("format_org"), formatId: id, organizationId: id, relationship: z.string().max(60).optional() }),
+  z.object({ kind: z.literal("channel_org"), channelId: id, organizationId: id, relationship: z.string().max(60).optional() }),
+  z.object({ kind: z.literal("channel_person"), channelId: id, personId: id, relationship: z.string().max(60).optional() }),
   z.object({ kind: z.literal("opportunity_creator"), opportunityId: id, creatorId: id, status: z.string().max(30).optional() }),
   z.object({ kind: z.literal("opportunity_format"), opportunityId: id, formatId: id }),
   z.object({ kind: z.literal("opportunity_project"), opportunityId: id, projectId: id }),

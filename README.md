@@ -156,13 +156,24 @@ Twelve first-class sections, all relational, all clickable in both directions:
 - **Sports Calendar** — upcoming US professional and major world sports events,
   month-by-month, filterable by sport, fully editable, with a curated standard calendar
   one click away.
-- **YouTube Channels** (`/youtube`) — the athlete channels business, as its own section
-  rather than a filter. A channel is a thing the company pitches, signs, launches and then
-  runs, so it has a pipeline (prospect → in talks → signed → building → live), its own
-  numbers with a date on them (a subscriber count nobody has checked in two months is
-  flagged as stale), and — the part that is the actual work — a queue of ideas for what it
-  could make, added by typing one and pressing enter. Distinct from Formats, which are
-  single shows: a channel is the place a run of them lives.
+- **YouTube** (`/youtube`) — the athlete channels business as a knowledge base of its own,
+  with its own sections: an **Overview** of where every channel stands and what needs
+  chasing, **Channels** as a board or list, an **Ideas** queue across every channel,
+  **Talent** split into who we run a channel for and who has a YouTube audience we
+  haven't touched (computed, so adding a channel takes someone off it), **Partners** —
+  the companies and people attached to channels — and a **Playbook** document.
+
+  A channel has the pipeline it moves through (prospect → in talks → signed → building →
+  live), numbers with the date they were taken (a subscriber count nobody has checked in
+  two months is flagged), and a queue of ideas for what it could make, each with its own
+  state from idea to published. Distinct from Formats, which are single shows: a channel
+  is the place a run of them lives.
+
+  Ingest has a **YouTube switch**. The same page of names is a slate of documentaries or a
+  list of channels to chase, and nothing in the text says which — so the uploader does.
+  With it on, a name becomes a channel prospect rather than a format, bullets underneath
+  become that channel's idea queue, and attached companies and people become links on the
+  channel. A note written anywhere inside the section sets it automatically.
 - **Dev Slate** (`/dev-slate`) — the working development slate, kept in the Repo rather
   than linked from it, as a document you edit in place. It saves itself: there is no Save
   button, because a document with one is a document someone eventually loses work in. An

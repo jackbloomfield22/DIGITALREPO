@@ -201,6 +201,10 @@ export function QuickCapture() {
         form.set("text", from?.isRecord ? `About: ${from.label} (${pathname})\n\n${note}` : note);
         form.set("context", act ? instructionContext(from) : (from?.context ?? ""));
         form.set("label", from ? `Note — ${from.label}` : "Note");
+        // A note written inside the YouTube section is about the channels
+        // business, and saying so changes how it is read — the same sentence
+        // is a channel or a film depending on it.
+        if (pathname.startsWith("/youtube")) form.set("workspace", "youtube");
 
         const res = await fetch("/api/ingest/upload", { method: "POST", body: form });
         const data = (await res.json()) as { items?: { id: string }[]; error?: string };

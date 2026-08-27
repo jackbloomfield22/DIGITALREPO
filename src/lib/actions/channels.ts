@@ -52,6 +52,22 @@ export async function createChannel(input: ChannelInput): Promise<ChannelResult>
     if (data.status && !CHANNEL_STATUSES.some((s) => s.value === data.status)) {
       return { ok: false, error: "That isn't a status a channel can have." };
     }
+    // A second "Tyrese Maxey" is almost always a mistake, not a second
+    // channel — the ingest path already matches by name, and the form should
+    // agree with it rather than quietly producing a duplicate.
+    const normalize = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const existing = await db.channel.findMany({ select: { name: true, slug: true, archived: true } });
+    const clash = existing.find((c) => normalize(c.name) === normalize(data.name));
+    if (clash) {
+      return {
+        ok: false,
+        error: clash.archived
+          ? `"${clash.name}" is already in the Repo, in the Archive. Restore it rather than adding it again.`
+          : `"${clash.name}" is already a channel. Open it instead of adding a second one.`,
+        slug: clash.slug,
+      };
+    }
+
     const taken = await db.channel.findMany({
       where: { slug: { startsWith: slugify(data.name) } },
       select: { slug: true },
