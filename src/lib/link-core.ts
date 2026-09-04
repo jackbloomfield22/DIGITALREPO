@@ -57,6 +57,8 @@ export async function auditInfo(p: LinkPayload): Promise<{ targetType: string; t
     case "format_entity": return { targetType: "format", targetId: p.formatId, targetLabel: await label("format", p.formatId), other: await label("entity", p.entityId) };
     case "format_org": return { targetType: "format", targetId: p.formatId, targetLabel: await label("format", p.formatId), other: await label("organization", p.organizationId) };
     case "channel_org": return { targetType: "channel", targetId: p.channelId, targetLabel: await label("channel", p.channelId), other: await label("organization", p.organizationId) };
+    case "person_org": return { targetType: "person", targetId: p.personId, targetLabel: await label("person", p.personId), other: await label("organization", p.organizationId) };
+    case "channel_creator": return { targetType: "channel", targetId: p.channelId, targetLabel: await label("channel", p.channelId), other: await label("creator", p.creatorId) };
     case "channel_person": return { targetType: "channel", targetId: p.channelId, targetLabel: await label("channel", p.channelId), other: await label("person", p.personId) };
     case "opportunity_creator": return { targetType: "opportunity", targetId: p.opportunityId, targetLabel: await label("opportunity", p.opportunityId), other: await label("creator", p.creatorId) };
     case "opportunity_format": return { targetType: "opportunity", targetId: p.opportunityId, targetLabel: await label("opportunity", p.opportunityId), other: await label("format", p.formatId) };
@@ -161,6 +163,17 @@ export async function upsertLink(p: LinkPayload): Promise<void> {
       });
       return;
     }
+    case "person_org": {
+      const role = p.role ?? "other";
+      const existing = await db.personOrganization.findFirst({ where: { personId: p.personId, organizationId: p.organizationId } });
+      if (existing) await db.personOrganization.update({ where: { id: existing.id }, data: { role, current: p.current ?? true } });
+      else await db.personOrganization.create({ data: { personId: p.personId, organizationId: p.organizationId, role, current: p.current ?? true } });
+      return;
+    }
+    case "channel_creator":
+      // One athlete per channel: this is an assignment, not an addition.
+      await db.channel.update({ where: { id: p.channelId }, data: { creatorId: p.creatorId } });
+      return;
     case "channel_org": {
       const relationship = p.relationship ?? "partner";
       await db.channelOrganization.upsert({
@@ -260,6 +273,12 @@ export async function deleteLink(p: LinkPayload): Promise<void> {
     case "format_entity":
       await db.formatEntityLink.deleteMany({ where: { formatId: p.formatId, entityId: p.entityId } });
       return;
+    case "person_org":
+      await db.personOrganization.deleteMany({ where: { personId: p.personId, organizationId: p.organizationId } });
+      break;
+    case "channel_creator":
+      await db.channel.updateMany({ where: { id: p.channelId, creatorId: p.creatorId }, data: { creatorId: null } });
+      break;
     case "channel_org":
       await db.channelOrganization.deleteMany({ where: { channelId: p.channelId, organizationId: p.organizationId } });
       break;

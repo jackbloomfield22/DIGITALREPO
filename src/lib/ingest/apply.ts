@@ -8,7 +8,9 @@ import { logAudit } from "@/lib/audit";
 import { clearDigestMemo, refreshDigest } from "@/lib/ingest/digest";
 import { resolveByType, resolveEntity } from "@/lib/ingest/resolve";
 import { LINK_SPECS, RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
-import type { ProposedOp } from "@/lib/ingest/ops";
+import { splitList, type ProposedOp } from "@/lib/ingest/ops";
+import { convertRecord, type ConvertOutcome } from "@/lib/convert";
+import { labelFor } from "@/lib/taxonomy";
 import type { SessionUser } from "@/lib/roles";
 import type { LinkPayload } from "@/lib/link-schema";
 
@@ -19,7 +21,11 @@ export type ApplyOutcome = {
   touched: { targetType: string; targetId: string; name: string; path: string | null }[];
 };
 
-const STAGE_ORDER: Record<string, number> = { create: 0, update: 1, link: 2, note: 3, archive: 4 };
+// Restores first so a revived record can then be edited; a move last so every
+// edit lands on the record before it is carried across.
+const STAGE_ORDER: Record<string, number> = {
+  restore: 0, create: 1, rename: 2, update: 3, unlink: 4, link: 5, note: 6, archive: 7, convert: 8,
+};
 
 type Touched = Map<string, { targetType: string; targetId: string; name: string; path: string | null }>;
 
@@ -175,6 +181,7 @@ async function applyUpdate(
   let value: unknown = effectiveValue;
   if (field.kind === "number" || field.kind === "year") value = Number(value);
   if (field.kind === "date") value = new Date(String(value));
+  if (field.kind === "list" || field.kind === "vocablist") value = Array.isArray(value) ? value : splitList(String(value));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const model = (db as any)[spec.prismaModel];
@@ -202,7 +209,7 @@ async function applyUpdate(
     action: "updated",
     field: `${op.field} (ingest)`,
     oldValue: current[op.field] != null ? String(current[op.field]).slice(0, 300) : null,
-    newValue: String(value).slice(0, 300),
+    newValue: (Array.isArray(value) ? value.join(", ") : String(value)).slice(0, 300),
   });
   return "applied";
 }
@@ -244,6 +251,104 @@ async function applyArchive(op: Extract<ProposedOp, { op: "archive" }>, user: Se
     field: `ingest ${itemId}`,
     newValue: op.reason,
   });
+}
+
+/**
+ * A record that must already exist — by id, or by exact name including the
+ * Archive. Unlike resolveRef this never creates: renaming, restoring, moving
+ * or unlinking something that isn't there is an error, not an invitation.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function findExisting(targetType: IngestTargetType, id: string | undefined, name: string): Promise<any> {
+  const spec = RECORD_REGISTRY[targetType];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const model = (db as any)[spec.prismaModel];
+  if (id) {
+    const byId = await model.findUnique({ where: { id } });
+    if (byId) return byId;
+  }
+  const rows = await model.findMany({ where: { [spec.nameField]: { equals: name.trim(), mode: "insensitive" } }, take: 2 });
+  // A live record wins over an archived namesake.
+  const live = rows.find((r: { archived?: boolean }) => !r.archived);
+  const found = live ?? rows[0];
+  if (!found) throw new Error(`${spec.displayName} "${name}" is not on record.`);
+  return found;
+}
+
+async function applyRename(op: Extract<ProposedOp, { op: "rename" }>, user: SessionUser, touched: Touched, versions: Versions) {
+  const spec = RECORD_REGISTRY[op.targetType];
+  const current = await findExisting(op.targetType, op.targetId, op.targetName);
+  const oldName: string = current[spec.nameField];
+  const data: Record<string, unknown> = { [spec.nameField]: op.newName };
+  // The old name stays findable where the record keeps aliases.
+  if (spec.fields.some((f) => f.name === "aliases") && oldName !== op.newName) {
+    const aliases: string[] = Array.isArray(current.aliases) ? current.aliases : [];
+    if (!aliases.some((a) => a.toLowerCase() === oldName.toLowerCase())) data.aliases = [...aliases, oldName];
+  }
+  if (spec.hasVersion) data.version = { increment: 1 };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (db as any)[spec.prismaModel].update({ where: { id: current.id }, data });
+  // The bump is this batch's own doing; later edits in it must not trip over it.
+  if (spec.hasVersion) versions.set(`${op.targetType}:${current.id}`, current.version + 1);
+  touch(touched, op.targetType, current.id, op.newName, current.slug);
+  await logAudit(user, {
+    targetType: op.targetType, targetId: current.id, targetLabel: op.newName,
+    action: "updated", field: `${spec.nameField} (ingest)`, oldValue: oldName, newValue: op.newName,
+  });
+}
+
+/** Returns the link payload it removed, so undo can put it back. */
+async function applyUnlink(op: Extract<ProposedOp, { op: "unlink" }>, user: SessionUser, touched: Touched): Promise<LinkPayload> {
+  const spec = LINK_SPECS[op.kind as keyof typeof LINK_SPECS];
+  const a = await findExisting(spec.a.targetType, op.aId, op.aName);
+  const b = await findExisting(spec.b.targetType, op.bId, op.bName);
+  const payload: Record<string, unknown> = { kind: op.kind, [spec.a.idField]: a.id, [spec.b.idField]: b.id };
+  if (spec.roleField && op.role) payload[spec.roleField] = op.role;
+  if (op.kind === "creator_entity" && !op.role) payload.relationship = "";
+
+  const { linkPayloadSchema } = await import("@/lib/link-schema");
+  const { auditInfo, deleteLink, refreshLinkSides } = await import("@/lib/link-core");
+  const parsed = linkPayloadSchema.parse(payload) as LinkPayload;
+  await deleteLink(parsed);
+  const info = await auditInfo(parsed);
+  await logAudit(user, { ...info, action: "unlinked", field: "ingest", oldValue: info.other });
+  await refreshLinkSides(parsed);
+  const aSpec = RECORD_REGISTRY[spec.a.targetType];
+  touch(touched, spec.a.targetType, a.id, a[aSpec.nameField], a.slug);
+  return parsed;
+}
+
+const REVIVE: Record<string, string> = { format: "concept", project: "announced", opportunity: "researching", creator: "active", channel: "prospect" };
+
+async function applyRestore(op: Extract<ProposedOp, { op: "restore" }>, user: SessionUser, touched: Touched, versions: Versions) {
+  const spec = RECORD_REGISTRY[op.targetType];
+  const current = await findExisting(op.targetType, op.targetId, op.targetName);
+  if (!current.archived) return; // already live — nothing to do, and not an error
+  const data: Record<string, unknown> = { archived: false, archivedReason: null, archivedAt: null };
+  // "archived" was once a status too; a restored record needs a live one.
+  if (current.status === "archived" && REVIVE[op.targetType]) data.status = REVIVE[op.targetType];
+  if (spec.hasVersion) data.version = { increment: 1 };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (db as any)[spec.prismaModel].update({ where: { id: current.id }, data });
+  if (spec.hasVersion) versions.set(`${op.targetType}:${current.id}`, current.version + 1);
+  touch(touched, op.targetType, current.id, current[spec.nameField], current.slug);
+  await logAudit(user, {
+    targetType: op.targetType, targetId: current.id, targetLabel: current[spec.nameField],
+    action: "updated", field: "restored (ingest)", oldValue: current.archivedReason ?? null,
+  });
+}
+
+async function applyConvert(op: Extract<ProposedOp, { op: "convert" }>, user: SessionUser, touched: Touched): Promise<ConvertOutcome> {
+  const current = await findExisting(op.targetType, op.targetId, op.targetName);
+  const outcome = await convertRecord(user, { type: op.targetType, id: current.id }, op.toType, {
+    newName: op.newName,
+    fields: op.fields,
+  });
+  // The old page is touched too: it is what the reviewer was looking at, and it now forwards.
+  const fromSpec = RECORD_REGISTRY[op.targetType];
+  touch(touched, op.targetType, current.id, current[fromSpec.nameField], current.slug);
+  touch(touched, op.toType, outcome.toId, outcome.toName, outcome.toSlug);
+  return outcome;
 }
 
 async function applyNote(op: Extract<ProposedOp, { op: "note" }>, user: SessionUser, touched: Touched) {
@@ -340,6 +445,30 @@ export async function applyIngestChangesCore(itemId: string, user: SessionUser):
       } else if (op.op === "link") await applyLink(op, user, touched);
       else if (op.op === "archive") await applyArchive(op, user, touched, itemId);
       else if (op.op === "note") await applyNote(op, user, touched);
+      else if (op.op === "rename") await applyRename(op, user, touched, versions);
+      else if (op.op === "restore") await applyRestore(op, user, touched, versions);
+      else if (op.op === "unlink") {
+        // Keep what was removed, so undo can put the connection back.
+        const removed = await applyUnlink(op, user, touched);
+        await db.ingestChange.update({ where: { id: change.id }, data: { before: removed as object } });
+      } else if (op.op === "convert") {
+        const moved = await applyConvert(op, user, touched);
+        await db.ingestChange.update({
+          where: { id: change.id },
+          data: {
+            destination: {
+              ...(change.destination as object),
+              movedToType: moved.toType,
+              movedToId: moved.toId,
+              movedToPath: moved.toPath,
+            },
+            after: {
+              movedTo: moved.toType, name: moved.toName, path: moved.toPath,
+              rehomed: moved.rehomed, label: labelFor(moved.toType) || moved.toType,
+            },
+          },
+        });
+      }
 
       await db.ingestChange.update({
         where: { id: change.id },

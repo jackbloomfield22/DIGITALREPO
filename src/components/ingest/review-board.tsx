@@ -156,6 +156,10 @@ const OP_BADGE: Record<string, string> = {
   link: "bg-accent-wash text-accent-deep",
   archive: "bg-ink text-paper",
   note: "bg-wash text-muted",
+  rename: "bg-[#f5efdd] text-warn",
+  unlink: "bg-[#f6e3e0] text-[#8a3a30]",
+  restore: "bg-[#eef2ec] text-ok",
+  convert: "bg-accent-wash text-accent-deep",
 };
 
 function afterText(change: ChangeVM): string {
@@ -172,6 +176,10 @@ function afterText(change: ChangeVM): string {
   if (change.opType === "link") return [after.a, "→", after.b, after.role ? `(${after.role})` : ""].filter(Boolean).join(" ");
   if (change.opType === "note") return String(after.text ?? "");
   if (change.opType === "archive") return `Archive — ${after.reason}`;
+  if (change.opType === "unlink") return ["Remove", after.a, "→", after.b, after.role ? `(${after.role})` : ""].filter(Boolean).join(" ");
+  if (change.opType === "restore") return "Bring back from the Archive";
+  if (change.opType === "convert") return `Move to ${after.label ?? after.movedTo}${after.name ? ` as "${after.name}"` : ""}`;
+  if (change.opType === "rename") return String(after ?? "");
   return Object.entries(after ?? {})
     .map(([k, v]) => `${k}: ${v}`)
     .join(" · ");

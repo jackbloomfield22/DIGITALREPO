@@ -53,7 +53,21 @@ export async function applyPageEdit(
 
     const outcome = await applyIngestChangesCore(itemId, user);
 
-    if (sweep && outcome.applied > 0) await markBroughtUpToDate(user, sweep, outcome.applied);
+    if (sweep && outcome.applied > 0) {
+      await markBroughtUpToDate(user, sweep, outcome.applied);
+      // A page that was moved has a new home; the mark goes with it so the
+      // sweep does not offer the same record twice.
+      const moves = await db.ingestChange.findMany({
+        where: { itemId, opType: "convert", status: "applied" },
+        select: { destination: true },
+      });
+      for (const m of moves) {
+        const d = (m.destination ?? {}) as { movedToType?: string; movedToId?: string };
+        if (d.movedToType && d.movedToId) {
+          await markBroughtUpToDate(user, { targetType: d.movedToType, targetId: d.movedToId, name: sweep.name }, outcome.applied);
+        }
+      }
+    }
 
     revalidatePath("/", "layout");
     return {

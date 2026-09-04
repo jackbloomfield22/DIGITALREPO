@@ -14,9 +14,13 @@ import type { ProposedOp } from "@/lib/ingest/ops";
 /** A value as the reader would say it — vocab codes become their labels. */
 function readable(targetType: string | null, field: string | undefined, value: unknown): string {
   if (value == null || value === "") return "";
+  if (Array.isArray(value)) return value.map((v) => (typeof v === "string" ? labelFor(v) || v : String(v))).join(", ");
+  if (typeof value === "boolean") return value ? "yes" : "no";
   if (typeof value === "object") {
     const o = value as Record<string, unknown>;
     if ("text" in o) return String(o.text ?? "");
+    if ("movedTo" in o) return `${labelFor(String(o.movedTo)) || String(o.movedTo)}: ${o.name ?? ""}`.trim();
+    if ("archived" in o && Object.keys(o).length === 1) return o.archived ? "archived" : "back on the live lists";
     if ("reason" in o) return String(o.reason ?? "");
     if ("a" in o && "b" in o) return [o.a, "→", o.b, o.role ? `(${labelFor(String(o.role))})` : ""].filter(Boolean).join(" ");
     return Object.entries(o).map(([k, v]) => `${k}: ${v}`).join(" · ");
@@ -24,6 +28,9 @@ function readable(targetType: string | null, field: string | undefined, value: u
   const spec = targetType ? RECORD_REGISTRY[targetType as IngestTargetType] : null;
   const f = spec?.fields.find((x) => x.name === field);
   if (f?.kind === "vocab") return labelFor(String(value)) || String(value);
+  if (f?.kind === "vocablist" || f?.kind === "list") {
+    return String(value).split(/[,;\n]+/).map((v) => v.trim()).filter(Boolean).map((v) => (f.kind === "vocablist" ? labelFor(v) || v : v)).join(", ");
+  }
   return String(value);
 }
 

@@ -11,8 +11,14 @@ import {
   type IngestTargetType,
 } from "@/lib/ingest/registry";
 import { ENTITY_KINDS } from "@/lib/taxonomy";
+import { CONVERSIONS } from "@/lib/conversions";
 
 const TARGET_TYPES = Object.keys(RECORD_REGISTRY) as IngestTargetType[];
+
+/** A list field arrives as prose — "brand, agency; podcast company" — and is stored as items. */
+export function splitList(raw: string): string[] {
+  return [...new Set(raw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean))];
+}
 
 const targetType = z.enum(TARGET_TYPES as [IngestTargetType, ...IngestTargetType[]]);
 const confidence = z.number().min(0).max(1).default(0.6);
@@ -80,6 +86,49 @@ export const proposedOpSchema = z.discriminatedUnion("op", [
     aboutId: clamp(50).optional(),
     ...baseChange,
   }),
+  // The page's own name. Its address does not change — a renamed page keeps
+  // its URL and gains the old name as an alias — so links keep working.
+  z.object({
+    op: z.literal("rename"),
+    targetType,
+    targetName: clampMin(1, 300),
+    targetId: clamp(50).optional(),
+    newName: clampMin(1, 300),
+    ...baseChange,
+  }),
+  // The mirror of link: a connection that should not be there.
+  z.object({
+    op: z.literal("unlink"),
+    kind: z.enum(INGEST_LINK_KINDS as [string, ...string[]]),
+    aName: clampMin(1, 300),
+    aId: clamp(50).optional(),
+    bName: clampMin(1, 300),
+    bId: clamp(50).optional(),
+    role: clamp(60).optional(),
+    entityKind: clamp(30).optional(),
+    ...baseChange,
+  }),
+  // Out of the Archive and back onto the live lists.
+  z.object({
+    op: z.literal("restore"),
+    targetType,
+    targetName: clampMin(1, 300),
+    targetId: clamp(50).optional(),
+    ...baseChange,
+  }),
+  // A page that is in the wrong part of the Repo: an existing production filed
+  // as a format, an agent filed as talent, a running channel filed as a show.
+  // Everything on it moves with it, and the old address forwards.
+  z.object({
+    op: z.literal("convert"),
+    targetType,
+    targetName: clampMin(1, 300),
+    targetId: clamp(50).optional(),
+    toType: targetType,
+    newName: clamp(300).optional(),
+    fields: z.record(z.string(), z.union([clamp(8000), z.number()])).optional(),
+    ...baseChange,
+  }),
 ]);
 
 export type ProposedOp = z.infer<typeof proposedOpSchema>;
@@ -130,9 +179,63 @@ export function validateOp(op: ProposedOp): { ok: true; op: ProposedOp } | { ok:
         const v = norm(String(value));
         if (!field.vocab!().some((o) => o.value === v)) continue;
         fields[key] = v;
+      } else if (field.kind === "vocablist") {
+        const kept = splitList(String(value)).map(norm).filter((v) => field.vocab!().some((o) => o.value === v));
+        if (kept.length) fields[key] = kept.join(", ");
       } else fields[key] = value;
     }
     return { ok: true, op: { ...op, fields } };
+  }
+
+  if (op.op === "rename") {
+    if (["entity", "event"].includes(op.targetType)) {
+      return { ok: false, error: `rename: ${op.targetType} records cannot be renamed by ingest` };
+    }
+    const newName = op.newName.trim();
+    if (!newName) return { ok: false, error: "rename: the new name is empty" };
+    if (newName === op.targetName.trim()) return { ok: false, error: "rename: the new name is the same as the old one" };
+    return { ok: true, op: { ...op, newName } };
+  }
+
+  if (op.op === "unlink") {
+    const spec = LINK_SPECS[op.kind as keyof typeof LINK_SPECS];
+    if (!spec?.ingest) return { ok: false, error: `unlink: kind "${op.kind}" is not available to ingest` };
+    const role = op.role ? norm(op.role) : undefined;
+    if (spec.b.targetType === "entity" || spec.a.targetType === "entity") {
+      const kind = norm(op.entityKind ?? "interest");
+      if (!(ENTITY_KINDS as readonly string[]).includes(kind)) {
+        return { ok: false, error: `unlink ${op.kind}: unknown entity kind "${op.entityKind}"` };
+      }
+      return { ok: true, op: { ...op, role, entityKind: kind } };
+    }
+    return { ok: true, op: { ...op, role } };
+  }
+
+  if (op.op === "restore") {
+    if (!["creator", "project", "organization", "format", "person", "opportunity", "channel"].includes(op.targetType)) {
+      return { ok: false, error: `restore: ${op.targetType} records cannot be restored by ingest` };
+    }
+    return { ok: true, op };
+  }
+
+  if (op.op === "convert") {
+    if (!(CONVERSIONS[op.targetType] ?? []).includes(op.toType)) {
+      return { ok: false, error: `convert: a ${op.targetType} can't be moved to ${op.toType}` };
+    }
+    // Fields are for the *new* record, so they validate against its spec.
+    const target = RECORD_REGISTRY[op.toType];
+    const fields: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(op.fields ?? {})) {
+      const field = target.fields.find((f) => f.name === key);
+      if (!field) continue;
+      if (field.kind === "vocab") {
+        const v = norm(String(value));
+        if (target.fields && field.vocab!().some((o) => o.value === v)) fields[key] = v;
+      } else fields[key] = value;
+    }
+    // A role for the talent being carried across, when the new type needs one.
+    if (typeof op.fields?.role === "string") fields.role = norm(op.fields.role);
+    return { ok: true, op: { ...op, fields, newName: op.newName?.trim() || undefined } };
   }
 
   if (op.op === "update") {
@@ -148,6 +251,16 @@ export function validateOp(op: ProposedOp): { ok: true; op: ProposedOp } | { ok:
         return { ok: false, error: `update ${op.targetType}.${op.field}: "${value}" is not in the vocabulary` };
       }
       value = v;
+    }
+    if (field.kind === "vocablist") {
+      const kept = splitList(String(value)).map(norm).filter((v) => field.vocab!().some((o) => o.value === v));
+      if (!kept.length) {
+        return { ok: false, error: `update ${op.targetType}.${op.field}: none of "${value}" is in the vocabulary` };
+      }
+      value = kept.join(", ");
+    }
+    if (field.kind === "list") {
+      value = splitList(String(value)).join(", ");
     }
     if (field.kind === "number" || field.kind === "year") {
       const n = Number(value);
@@ -210,6 +323,8 @@ export function describeOpVocabulary(): string {
     const fields = spec.fields
       .map((f) => {
         if (f.kind === "vocab") return `${f.name} (one of: ${f.vocab!().map((o) => o.value).join("|")})`;
+        if (f.kind === "vocablist") return `${f.name} (comma-separated, each one of: ${f.vocab!().map((o) => o.value).join("|")})`;
+        if (f.kind === "list") return `${f.name} (comma-separated list)`;
         if (f.kind === "number" || f.kind === "year") return `${f.name} (number)`;
         if (f.kind === "date") return `${f.name} (YYYY-MM-DD)`;
         return f.name;
@@ -219,6 +334,12 @@ export function describeOpVocabulary(): string {
   }
   lines.push("");
   lines.push(`ENTITY KINDS (taxonomy): ${ENTITY_KINDS.join(", ")}`);
+  lines.push("");
+  lines.push("OTHER CHANGES:");
+  lines.push("- rename: change a record's name (targetType, targetName, newName). Its address is kept and the old name becomes an alias.");
+  lines.push("- unlink: remove a relationship (same fields as link). Use when a connection on the page is wrong or over.");
+  lines.push("- restore: bring an archived record back (targetType, targetName).");
+  lines.push(`- convert: move a record to a different part of the Repo (targetType, targetName, toType, optional newName, optional fields for the new record). Allowed: ${Object.entries(CONVERSIONS).map(([k, v]) => `${k}→${v.join("/")}`).join(", ")}. Everything on the page moves with it and the old address forwards. Use it when a page is simply in the wrong section — an existing production listed as a format, an agent listed as talent, a running channel listed as a show.`);
   lines.push("");
   lines.push("LINK KINDS (relationships between records):");
   for (const kind of INGEST_LINK_KINDS) {
@@ -243,7 +364,7 @@ export function proposalToolSchema(): Record<string, unknown> {
         items: {
           type: "object",
           properties: {
-            op: { type: "string", enum: ["create", "update", "link", "archive", "note"] },
+            op: { type: "string", enum: ["create", "update", "link", "archive", "note", "rename", "unlink", "restore", "convert"] },
             targetType: { type: "string", enum: TARGET_TYPES },
             name: str,
             entityKind: str,
@@ -259,6 +380,8 @@ export function proposalToolSchema(): Record<string, unknown> {
             bId: str,
             role: str,
             reason: str,
+            newName: { ...str, description: "rename: the new name; convert: a name for the moved record if it should differ" },
+            toType: { type: "string", enum: TARGET_TYPES, description: "convert: the part of the Repo to move the record to" },
             text: str,
             aboutType: { type: "string", enum: TARGET_TYPES },
             aboutName: str,

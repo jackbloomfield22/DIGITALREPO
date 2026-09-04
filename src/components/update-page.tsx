@@ -68,18 +68,28 @@ function ChangeCard({
 }) {
   const isTextUpdate = p.opType === "update" && (p.before.length > 40 || p.after.length > 40);
   const aboutThisPage = !p.targetName || p.targetName === pageName;
+  // A rename reads like a short update: old name struck through, new name after it.
+  const beforeAfter = p.opType === "update" || p.opType === "rename";
 
   // What to call it: the field for an update, the kind of thing for the rest.
   const heading =
     p.opType === "update"
       ? p.field ?? "Field"
-      : p.opType === "link"
-        ? "Connection"
-        : p.opType === "create"
-          ? "New record"
-          : p.opType === "archive"
-            ? "Archive"
-            : "Note";
+      : p.opType === "rename"
+        ? "Name"
+        : p.opType === "link"
+          ? "Connection"
+          : p.opType === "unlink"
+            ? "Remove connection"
+            : p.opType === "create"
+              ? "New record"
+              : p.opType === "archive"
+                ? "Archive"
+                : p.opType === "restore"
+                  ? "Back from the Archive"
+                  : p.opType === "convert"
+                    ? "Move this page"
+                    : "Note";
 
   return (
     <label
@@ -99,7 +109,7 @@ function ChangeCard({
             {p.confidence < 0.5 && <span className="text-accent-deep">Not certain</span>}
           </div>
 
-          {p.opType === "update" ? (
+          {beforeAfter ? (
             isTextUpdate ? (
               <div className="mt-1.5 text-sm leading-relaxed">
                 {p.before ? (
@@ -132,6 +142,15 @@ function ChangeCard({
           ) : p.opType === "note" && aboutThisPage ? (
             // On the page the note is about, "Note on <this page>:" is noise.
             <div className="mt-1 text-sm">{p.after}</div>
+          ) : p.opType === "convert" ? (
+            <div className="mt-1 text-sm">
+              <div>
+                Becomes <span className="font-medium">{p.after || p.summary}</span>
+              </div>
+              <div className="mt-0.5 text-xs text-muted">
+                Everything on this page goes with it — files, connections, sources. This address will forward to the new one.
+              </div>
+            </div>
           ) : (
             <div className="mt-1 text-sm">{p.summary}</div>
           )}

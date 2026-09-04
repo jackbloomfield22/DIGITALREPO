@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { requireUser, hasRole } from "@/lib/auth";
 import { Section } from "@/components/ui";
@@ -38,6 +39,12 @@ export default async function ChannelPage({ params }: { params: Promise<{ slug: 
     },
   });
   if (!channel) notFound();
+  // A page that was moved forwards to its new home; anything else archived is simply gone from here.
+  if (channel.archived) {
+    const to = movedTo(channel.archivedReason);
+    if (to) redirect(to);
+    notFound();
+  }
 
   const [attachments, activity] = await Promise.all([
     attachmentsFor("channel", channel.id),

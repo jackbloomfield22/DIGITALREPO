@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
@@ -41,7 +42,13 @@ export default async function ProjectPage({
       opportunities: { include: { opportunity: { select: { title: true, slug: true } } } },
     },
   });
-  if (!project || project.archived) notFound();
+  if (!project) notFound();
+  // A page that was moved forwards to its new home; anything else archived is simply gone from here.
+  if (project.archived) {
+    const to = movedTo(project.archivedReason);
+    if (to) redirect(to);
+    notFound();
+  }
 
   const canEdit = hasRole(user, "EDITOR");
   const limits = uploadLimit();

@@ -11,6 +11,7 @@ import {
   CHANNEL_STATUSES,
   CREATOR_STATUSES,
   FORMAT_STATUSES,
+  ORG_TYPES,
   FORMAT_TYPES,
   LOCATION_RELATIONSHIPS,
   OPPORTUNITY_STATUSES,
@@ -39,7 +40,7 @@ export type IngestTargetType =
 export type EditableField = {
   name: string;
   label: string;
-  kind: "text" | "longtext" | "number" | "year" | "date" | "vocab";
+  kind: "text" | "longtext" | "number" | "year" | "date" | "vocab" | "list" | "vocablist";
   maxLength?: number;
   vocab?: () => LabeledValue[];
   description?: string;
@@ -69,6 +70,12 @@ const longtext = (name: string, label: string): EditableField => ({
 const vocab = (name: string, label: string, source: () => LabeledValue[]): EditableField => ({
   name, label, kind: "vocab", vocab: source,
 });
+/** A free list — aliases — stored as an array, spoken as "a, b, c". */
+const list = (name: string, label: string): EditableField => ({ name, label, kind: "list" });
+/** A list drawn from a vocabulary — an organization's types. */
+const vocablist = (name: string, label: string, source: () => LabeledValue[]): EditableField => ({
+  name, label, kind: "vocablist", vocab: source,
+});
 
 export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
   creator: {
@@ -88,6 +95,9 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       longtext("internalNotes", "Internal Notes"),
       { name: "age", label: "Age", kind: "number" },
       vocab("status", "Status", () => CREATOR_STATUSES),
+      list("aliases", "Also known as"),
+      text("imageUrl", "Image URL", 500),
+      { name: "birthday", label: "Birthday", kind: "date" },
     ],
   },
   project: {
@@ -110,6 +120,14 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       { name: "endYear", label: "End Year", kind: "year" },
       { name: "seasons", label: "Seasons", kind: "number" },
       { name: "episodes", label: "Episodes", kind: "number" },
+      { name: "runtimeMinutes", label: "Runtime (minutes)", kind: "number" },
+      text("country", "Country", 80),
+      list("aliases", "Also known as"),
+      text("imageUrl", "Image URL", 500),
+      text("trailerUrl", "Trailer URL", 500),
+      text("officialUrl", "Official URL", 500),
+      text("imdbUrl", "IMDb URL", 500),
+      text("youtubeUrl", "YouTube URL", 500),
     ],
   },
   organization: {
@@ -126,6 +144,9 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       text("website", "Website", 500),
       text("location", "Location", 120),
       longtext("internalNotes", "Internal Notes"),
+      vocablist("types", "Types", () => ORG_TYPES),
+      list("aliases", "Also known as"),
+      text("imageUrl", "Image URL", 500),
     ],
   },
   format: {
@@ -148,6 +169,8 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       longtext("episodeStructure", "Episode Structure"),
       longtext("sponsorFit", "Sponsor Fit"),
       longtext("notes", "Notes"),
+      text("productionScale", "Production Scale", 120),
+      text("location", "Location", 120),
     ],
   },
   person: {
@@ -188,6 +211,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       text("platformRequirements", "Platform Requirements", 2000),
       longtext("outcome", "Outcome"),
       longtext("notes", "Notes"),
+      { name: "deadline", label: "Deadline", kind: "date" },
     ],
   },
   channel: {
@@ -216,6 +240,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       { name: "videoCount", label: "Videos", kind: "number" },
       { name: "launchedAt", label: "Launched", kind: "date" },
       { name: "lastActivityAt", label: "Last Activity", kind: "date" },
+      text("platform", "Platform", 40),
     ],
   },
   entity: {
@@ -342,6 +367,20 @@ export const LINK_SPECS: Record<LinkPayload["kind"], LinkSpec> = {
       { value: "partner", label: "Partner" },
       { value: "associated", label: "Associated" },
     ],
+  },
+  person_org: {
+    kind: "person_org", ingest: true,
+    a: { targetType: "person", idField: "personId" },
+    b: { targetType: "organization", idField: "organizationId" },
+    roleField: "role",
+    roleVocab: () => PERSON_ROLE_TYPES,
+    note: "Where an industry person works, and what they do there.",
+  },
+  channel_creator: {
+    kind: "channel_creator", ingest: true,
+    a: { targetType: "channel", idField: "channelId" },
+    b: { targetType: "creator", idField: "creatorId" },
+    note: "The athlete whose channel it is. A channel has one; linking another replaces it.",
   },
   channel_org: {
     kind: "channel_org", ingest: true,

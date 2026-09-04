@@ -299,6 +299,21 @@ over (so a sweep can be resumed after a break) and offers the next record alphab
 so the whole Repo can be worked through A to Z without going back to a list. Same pipeline
 as every other ingest underneath, so every change is audited and undoable from Add Info.
 
+The panel reaches every part of a page, not only its fields. Every column a record has is
+editable by name, including list-valued ones like an organization's types or a name's
+aliases. "Call it X" renames the page in place: the address stays, and the old name becomes
+an alias so old links and searches still land. "She was never on this" removes a
+connection; "it's back on" restores an archived record. And "this is actually a project" /
+"he's an agent, not talent" / "this should be under YouTube" moves the page to the right
+part of the Repo (`src/lib/convert.ts`): a new record of the right type with the fields
+mapped across, every connection carried where the new type has a place for it (and written
+into the notes where it does not, so nothing is lost), files, sources, favourites and
+collection entries re-pointed, and the old page archived with a forwarding address —
+its URL redirects to the new one. Each of these is an ingest op (`rename`, `unlink`,
+`restore`, `convert`) alongside the original five, so the same review, audit and undo
+apply: a move undone deletes the new record, puts the old one back on the live lists, and
+returns everything that followed it.
+
 **The note box** (bottom right of every page) does what you ask rather than only writing
 it down. "Put this on hold, ESPN passed", typed while looking at a format, comes back as
 the concrete changes it would make in plain English — untick anything wrong, press Make

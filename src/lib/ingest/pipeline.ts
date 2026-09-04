@@ -224,6 +224,10 @@ RULES:
 - A status changes only when the source says so about the record itself. One party's decision is not the record's status: a buyer passing, a brand declining, a partner dropping out, or a single meeting going badly is a fact about that relationship — record it as a note against the record and leave the status alone. Where nothing states a status, say so in the rationale rather than choosing one.
 - When a document is organised under headings that name a state (IN PRODUCTION, ON HOLD, DEVELOPMENT ARCHIVE, COMPLETED, TRACKING), the heading a record sits under is the authority on its status and outranks anything implied by discussion elsewhere. A status line under that heading is more specific still: use the heading for the overall state and the status line for the detail.
 - Dates in the source belong on the record: when the text carries a date for when something last moved, set lastActivityAt. Never invent one.
+- "rename" when the source gives a record's correct or new name (a working title that became the real title, a misspelt person). The page keeps its address; the old name is kept as an alias.
+- "convert" when a record is in the wrong part of the Repo, not merely wrong in a field: a Format that is actually an existing production (→ project), a Project that is really an internal concept in development (→ format), a Talent who is really an industry contact — agent, manager, executive (→ person), an industry person who is really talent (→ creator), or a Format/Project that is really a running athlete channel (→ channel). Everything on the record moves with it. Put any fields for the new record, including its status, in "fields".
+- "unlink" when the source says a connection on a record is wrong or over: a rep no longer represents someone, a company is not involved, a person was never on that project. Removing a connection is not archiving either record.
+- "restore" when the source says an archived record is back: revived, un-shelved, picked up again.
 - If an earlier email in this thread already established a fact (listed under ALREADY CAPTURED), do not re-propose it.
 - Respond ONLY by calling the submit_changes tool.
 
@@ -310,10 +314,44 @@ function opDestination(op: ProposedOp, byDigestId: Map<string, DigestCandidate>,
         path: hit && spec ? spec.path(hit.slug) : null, name: hit?.name ?? op.aboutName ?? "This item",
       };
     }
+    case "rename": {
+      const hit = find(op.targetId, op.targetName, op.targetType);
+      const spec = RECORD_REGISTRY[op.targetType];
+      // The name field is the "field" so undo can put the old name back the same way it puts back any other field.
+      return {
+        targetType: op.targetType, targetId: hit?.targetId ?? null, field: spec.nameField,
+        path: hit ? spec.path(hit.slug) : null, name: hit?.name ?? op.targetName,
+      };
+    }
+    case "unlink": {
+      const spec = LINK_SPECS[op.kind as keyof typeof LINK_SPECS];
+      const aHit = find(op.aId, op.aName, spec.a.targetType);
+      const aSpec = RECORD_REGISTRY[spec.a.targetType];
+      return {
+        targetType: spec.a.targetType, targetId: aHit?.targetId ?? null, linkKind: op.kind,
+        path: aHit ? aSpec.path(aHit.slug) : null, name: aHit?.name ?? op.aName,
+      };
+    }
+    case "restore": {
+      const hit = find(op.targetId, op.targetName, op.targetType);
+      const spec = RECORD_REGISTRY[op.targetType];
+      return {
+        targetType: op.targetType, targetId: hit?.targetId ?? null, field: "archived",
+        path: hit ? spec.path(hit.slug) : null, name: hit?.name ?? op.targetName,
+      };
+    }
+    case "convert": {
+      const hit = find(op.targetId, op.targetName, op.targetType);
+      const spec = RECORD_REGISTRY[op.targetType];
+      return {
+        targetType: op.targetType, targetId: hit?.targetId ?? null,
+        path: hit ? spec.path(hit.slug) : null, name: hit?.name ?? op.targetName,
+      };
+    }
   }
 }
 
-const OP_ORDER: Record<string, number> = { create: 0, update: 100, link: 200, archive: 300, note: 400 };
+const OP_ORDER: Record<string, number> = { restore: 0, create: 0, rename: 50, update: 100, unlink: 150, link: 200, archive: 300, convert: 350, note: 400 };
 
 /** Current DB value for an update op's field (before), plus record version. */
 async function captureBefore(op: Extract<ProposedOp, { op: "update" }>, targetId: string): Promise<{ before: unknown; version: number | null }> {
@@ -324,9 +362,12 @@ async function captureBefore(op: Extract<ProposedOp, { op: "update" }>, targetId
   return { before: record[op.field] ?? null, version: spec.hasVersion ? record.version : null };
 }
 
-async function linkAlreadyExists(op: Extract<ProposedOp, { op: "link" }>, aId: string | null, bId: string | null): Promise<boolean> {
+async function linkAlreadyExists(op: { kind: string; role?: string }, aId: string | null, bId: string | null): Promise<boolean> {
   if (!aId || !bId) return false;
   const spec = LINK_SPECS[op.kind as keyof typeof LINK_SPECS];
+  if (op.kind === "channel_creator") {
+    return !!(await db.channel.findFirst({ where: { id: aId, creatorId: bId }, select: { id: true } }));
+  }
   const where: Record<string, unknown> = { [spec.a.idField]: aId, [spec.b.idField]: bId };
   const tableByKind: Record<string, string> = {
     creator_entity: "creatorEntityLink", creator_format: "creatorFormat", creator_project: "creatorProjectCredit",
@@ -334,6 +375,7 @@ async function linkAlreadyExists(op: Extract<ProposedOp, { op: "link" }>, aId: s
     project_org: "projectOrganization", project_entity: "projectEntityLink", project_person: "personProject",
     format_entity: "formatEntityLink", format_org: "formatOrganization",
     channel_org: "channelOrganization", channel_person: "channelPerson",
+    person_org: "personOrganization",
     opportunity_creator: "opportunityCreator", opportunity_format: "opportunityFormat",
     opportunity_project: "opportunityProject", opportunity_org: "opportunityOrganization",
     opportunity_entity: "opportunityEntityLink",
@@ -458,7 +500,27 @@ export async function proposeItemCore(
       } else if (op.op === "archive") {
         payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
         after = { archived: true, reason: op.reason };
-      } else {
+      } else if (op.op === "rename") {
+        payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
+        before = destination.targetId ? destination.name : null;
+        after = op.newName;
+        if (before === after) continue;
+      } else if (op.op === "unlink") {
+        const spec = LINK_SPECS[op.kind as keyof typeof LINK_SPECS];
+        const aHit = op.aId ? byDigestId.get(op.aId) : byName.get(`${spec.a.targetType}:${op.aName.toLowerCase()}`);
+        const bHit = op.bId ? byDigestId.get(op.bId) : byName.get(`${spec.b.targetType}:${op.bName.toLowerCase()}`);
+        // Nothing to remove if both sides are known and the connection isn't there.
+        if (aHit && bHit && !(await linkAlreadyExists({ kind: op.kind }, aHit.targetId, bHit.targetId))) continue;
+        payload = { ...op, aId: aHit?.targetId ?? undefined, bId: bHit?.targetId ?? undefined } as ProposedOp;
+        after = { kind: op.kind, a: op.aName, b: op.bName, role: op.role ?? null, removed: true };
+      } else if (op.op === "restore") {
+        payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
+        before = true;
+        after = { archived: false };
+      } else if (op.op === "convert") {
+        payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
+        after = { movedTo: op.toType, name: op.newName ?? destination.name };
+      } else if (op.op === "note") {
         after = { text: op.text };
       }
 

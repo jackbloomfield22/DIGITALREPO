@@ -218,6 +218,7 @@ const UNDO_MODELS: Record<string, string> = {
   format: "format",
   opportunity: "opportunity",
   person: "industryPerson",
+  channel: "channel",
 };
 
 export type IngestUndoOutcome = {
@@ -251,6 +252,8 @@ export async function revertIngestChanges(itemId: string): Promise<IngestUndoOut
         field?: string;
         createdTargetType?: string;
         createdTargetId?: string;
+        movedToType?: string;
+        movedToId?: string;
       };
 
       try {
@@ -274,7 +277,34 @@ export async function revertIngestChanges(itemId: string): Promise<IngestUndoOut
             await db.collectionItem.deleteMany({ where: { targetType: type!, targetId: id } });
             deleted++;
           }
-        } else if (change.opType === "update" || change.opType === "note" || change.opType === "archive") {
+        } else if (change.opType === "convert") {
+          if (!dest.targetType || !dest.targetId || !dest.movedToType || !dest.movedToId) {
+            skipped.push(`${change.group} (moved before undo was recorded — move it back by hand)`);
+            continue;
+          }
+          const { revertConversion } = await import("@/lib/convert");
+          await revertConversion(
+            { type: dest.targetType, id: dest.targetId },
+            { type: dest.movedToType, id: dest.movedToId },
+          );
+          reverted++;
+        } else if (change.opType === "unlink") {
+          // What was removed was kept in `before`; putting it back is a link.
+          const removed = change.before as Record<string, unknown> | null;
+          if (!removed || typeof removed !== "object" || !("kind" in removed)) {
+            skipped.push(`${change.group} (connection removed before undo was recorded)`);
+            continue;
+          }
+          const { linkPayloadSchema } = await import("@/lib/link-schema");
+          const { refreshLinkSides, upsertLink } = await import("@/lib/link-core");
+          const parsed = linkPayloadSchema.parse(removed);
+          await upsertLink(parsed);
+          await refreshLinkSides(parsed);
+          reverted++;
+        } else if (
+          change.opType === "update" || change.opType === "note" || change.opType === "archive" ||
+          change.opType === "rename" || change.opType === "restore"
+        ) {
           const model = dest.targetType ? UNDO_MODELS[dest.targetType] : undefined;
           if (!model || !dest.targetId || !dest.field) {
             skipped.push(change.group);

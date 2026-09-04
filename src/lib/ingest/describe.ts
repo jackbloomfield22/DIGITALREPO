@@ -48,5 +48,18 @@ export function describeOp(op: ProposedOp): string {
       return op.aboutName
         ? `Note on ${op.aboutName}: ${shorten(op.text, 140)}`
         : `Note: ${shorten(op.text, 140)}`;
+    case "rename":
+      return `Rename ${op.targetName} to "${op.newName}"`;
+    case "unlink": {
+      const role = op.role ? ` (${labelFor(op.role) || op.role})` : "";
+      return `Remove the connection between ${op.aName} and ${op.bName}${role}`;
+    }
+    case "restore":
+      return `Bring ${op.targetName} back out of the Archive`;
+    case "convert": {
+      const to = displayName(op.toType);
+      const as = op.newName && op.newName !== op.targetName ? ` as "${op.newName}"` : "";
+      return `Move ${op.targetName} to ${to === "Talent" ? "Talent" : `${to}s`}${as} — everything on the page goes with it, and the old address forwards`;
+    }
   }
 }

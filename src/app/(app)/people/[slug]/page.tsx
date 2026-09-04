@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
@@ -25,7 +26,13 @@ export default async function PersonPage({
       projects: { include: { project: { select: { id: true, title: true, slug: true } } } },
     },
   });
-  if (!person || person.archived) notFound();
+  if (!person) notFound();
+  // A page that was moved forwards to its new home; anything else archived is simply gone from here.
+  if (person.archived) {
+    const to = movedTo(person.archivedReason);
+    if (to) redirect(to);
+    notFound();
+  }
 
   const canEdit = hasRole(user, "EDITOR");
   await recordRecentView(user.id, "person", person.id);
