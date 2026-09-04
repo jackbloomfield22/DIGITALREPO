@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { applyIngestChangesCore } from "@/lib/ingest/apply";
+import { markBroughtUpToDate } from "@/lib/sweep";
 
 export type PageEditResult = {
   ok: boolean;
@@ -20,7 +21,12 @@ export type PageEditResult = {
   touched?: { name: string; path: string | null }[];
 };
 
-export async function applyPageEdit(itemId: string, approvedIds: string[]): Promise<PageEditResult> {
+export async function applyPageEdit(
+  itemId: string,
+  approvedIds: string[],
+  /** Set when the edit came from the page's own update panel: marks the page as swept. */
+  sweep?: { targetType: string; targetId: string; name: string },
+): Promise<PageEditResult> {
   try {
     const user = await requireRole("EDITOR");
     const item = await db.ingestItem.findUnique({ where: { id: itemId }, select: { id: true, createdById: true } });
@@ -46,6 +52,9 @@ export async function applyPageEdit(itemId: string, approvedIds: string[]): Prom
     });
 
     const outcome = await applyIngestChangesCore(itemId, user);
+
+    if (sweep && outcome.applied > 0) await markBroughtUpToDate(user, sweep, outcome.applied);
+
     revalidatePath("/", "layout");
     return {
       ok: true,

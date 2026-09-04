@@ -286,6 +286,19 @@ kept growing on its own. Restoring brings back every record and every attachment
 the files themselves are re-uploaded, and asking for one that wasn't in the backup says so
 instead of handing over an empty file. Admin → Backups shows the live storage breakdown.
 
+**Bringing a page up to date.** Most of the Repo was imported from two years of old notes
+and emails, so most pages are somewhere between stale and wrong — and nobody is going to
+open an edit form four hundred times to fix that. Every record page carries a panel at the
+top of its main column: say, loosely, where the thing actually stands, press *Show me the
+changes*, and every change to the page comes back as before → after — a status as
+strikethrough-then-new, a rewritten description as a word-level diff, a new connection as a
+line — ticked by default, with one button to make them all. What you type is treated as
+the truth over what the page says: where they disagree, the page is wrong, and stale values
+are replaced rather than annotated. The panel then records that the page has been gone
+over (so a sweep can be resumed after a break) and offers the next record alphabetically,
+so the whole Repo can be worked through A to Z without going back to a list. Same pipeline
+as every other ingest underneath, so every change is audited and undoable from Add Info.
+
 **The note box** (bottom right of every page) does what you ask rather than only writing
 it down. "Put this on hold, ESPN passed", typed while looking at a format, comes back as
 the concrete changes it would make in plain English — untick anything wrong, press Make

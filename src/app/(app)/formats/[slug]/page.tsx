@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
@@ -76,6 +77,14 @@ export default async function FormatPage({
 
       <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0">
+          <UpdatePanel
+            user={user}
+            targetType="format"
+            targetId={format.id}
+            name={format.title}
+            path={`/formats/${format.slug}`}
+            recordType="format in development"
+          />
           {(format.description || canEdit) && (
             <Section title="Description">
               {format.description ? (

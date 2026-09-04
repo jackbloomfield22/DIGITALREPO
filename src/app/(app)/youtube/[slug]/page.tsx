@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { UpdatePanel } from "@/components/update-panel";
 import { requireUser, hasRole } from "@/lib/auth";
 import { Section } from "@/components/ui";
 import { RowStatus } from "@/components/row-status";
@@ -85,6 +86,15 @@ export default async function ChannelPage({ params }: { params: Promise<{ slug: 
 
       <div className="mt-5 grid gap-x-10 gap-y-6 lg:grid-cols-[1fr_18rem]">
         <div className="min-w-0">
+          <UpdatePanel
+            user={user}
+            targetType="channel"
+            targetId={channel.id}
+            name={channel.name}
+            path={`/youtube/${channel.slug}`}
+            recordType="YouTube channel"
+            workspace="youtube"
+          />
           {channel.premise && (
             <Section title="What it is">
               <p className="whitespace-pre-line text-sm text-charcoal">{channel.premise}</p>

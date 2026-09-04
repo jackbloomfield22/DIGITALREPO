@@ -141,11 +141,21 @@ async function applyCreate(op: Extract<ProposedOp, { op: "create" }>, user: Sess
   touch(touched, op.targetType, resolved.id, resolved.name, record?.slug);
 }
 
+/**
+ * Versions this apply has itself moved past, by record. The optimistic check
+ * exists to catch someone else editing a record while a proposal sat open; a
+ * version bumped by the previous change in this same batch is not that. Without
+ * this, an overview touching three fields on one page applied the first and
+ * bounced the other two as "superseded" — by itself.
+ */
+type Versions = Map<string, number>;
+
 async function applyUpdate(
   op: Extract<ProposedOp, { op: "update" }> & { expectedVersion?: number },
   effectiveValue: unknown,
   user: SessionUser,
   touched: Touched,
+  versions: Versions,
 ): Promise<"applied" | "superseded"> {
   const spec = RECORD_REGISTRY[op.targetType];
   const targetId = await resolveRef(op.targetType, op.targetId, op.targetName, user, touched);
@@ -171,7 +181,9 @@ async function applyUpdate(
   const current = await model.findUnique({ where: { id: targetId } });
   if (!current) throw new Error("Record disappeared before apply.");
 
-  if (spec.hasVersion && op.expectedVersion != null && current.version !== op.expectedVersion) {
+  const key = `${op.targetType}:${targetId}`;
+  const expected = versions.get(key) ?? op.expectedVersion;
+  if (spec.hasVersion && expected != null && current.version !== expected) {
     return "superseded";
   }
 
@@ -182,6 +194,7 @@ async function applyUpdate(
       ...(spec.hasVersion ? { version: { increment: 1 } } : {}),
     },
   });
+  if (spec.hasVersion) versions.set(key, current.version + 1);
   await logAudit(user, {
     targetType: op.targetType,
     targetId,
@@ -268,6 +281,7 @@ export async function applyIngestChangesCore(itemId: string, user: SessionUser):
   );
 
   const touched: Touched = new Map();
+  const versions: Versions = new Map();
   let applied = 0, failed = 0, superseded = 0;
 
   for (const change of ordered) {
@@ -305,7 +319,7 @@ export async function applyIngestChangesCore(itemId: string, user: SessionUser):
           change.status === "edited" && change.editedAfter != null
             ? (change.editedAfter as { value?: unknown }).value ?? change.editedAfter
             : op.value;
-        const outcome = await applyUpdate(op, effective, user, touched);
+        const outcome = await applyUpdate(op, effective, user, touched, versions);
         if (outcome === "superseded") {
           // Refresh `before` from the live record and send it back to review.
           const spec = RECORD_REGISTRY[op.targetType];

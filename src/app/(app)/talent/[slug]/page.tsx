@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
@@ -267,6 +268,14 @@ export default async function CreatorProfilePage({
       <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
         {/* Main column */}
         <div className="min-w-0">
+          <UpdatePanel
+            user={user}
+            targetType="creator"
+            targetId={creator.id}
+            name={creator.name}
+            path={`/talent/${creator.slug}`}
+            recordType="talent profile"
+          />
           {(creator.miniBio || canEdit) && (
             <Section title="Overview">
               {creator.miniBio ? (

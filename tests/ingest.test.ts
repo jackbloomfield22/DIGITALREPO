@@ -685,3 +685,80 @@ describe("apply engine", () => {
     await db.ingestItem.delete({ where: { id: item.id } });
   });
 });
+
+describe("a batch does not supersede itself", () => {
+  // The audit trail hangs off a real user row, so the actor has to exist.
+  beforeAll(async () => {
+    await db.user.upsert({
+      where: { id: "u-batch-test" },
+      update: {},
+      create: { id: "u-batch-test", email: "zz-batch-test@example.test", name: "Batch Tester", role: "EDITOR", passwordHash: "x" },
+    });
+  });
+  afterAll(async () => {
+    await db.user.deleteMany({ where: { id: "u-batch-test" } });
+  });
+
+  it("applies every update to one record, not just the first", async () => {
+    // The overview panel's normal case: three fields on one page, one apply.
+    const project = await db.project.create({
+      data: { title: `${P} Multi Field`, slug: slugify(`${P} multi field`), status: "announced", logline: "old", premiereYear: 2024 },
+    });
+    const user = { id: "u-batch-test", name: "Batch Tester", role: "EDITOR" } as never;
+    const item = await db.ingestItem.create({ data: { kind: "text", filename: `${P} batch`, status: "proposed" } });
+    const dest = (field: string) => ({ targetType: "project", targetId: project.id, field, path: `/projects/${project.slug}`, name: project.title });
+    const update = (field: string, value: string | number, sortOrder: number) => ({
+      itemId: item.id, sortOrder, group: "Project", opType: "update", destination: dest(field),
+      status: "approved", confidence: 0.9, after: value,
+      // Every proposal captured the same version, exactly as propose does.
+      payload: { op: "update", targetType: "project", targetName: project.title, targetId: project.id, field, value, confidence: 0.9, rationale: "", evidence: ["x"], sensitive: false, expectedVersion: project.version } as object,
+    });
+    await db.ingestChange.createMany({
+      data: [update("status", "in_production", 1), update("logline", "new logline", 2), update("premiereYear", 2026, 3)],
+    });
+
+    const { applyIngestChangesCore } = await import("@/lib/ingest/apply");
+    const outcome = await applyIngestChangesCore(item.id, user);
+    expect(outcome.superseded).toBe(0);
+    expect(outcome.failed).toBe(0);
+    expect(outcome.applied).toBe(3);
+
+    const after = await db.project.findUnique({ where: { id: project.id } });
+    expect(after?.status).toBe("in_production");
+    expect(after?.logline).toBe("new logline");
+    expect(after?.premiereYear).toBe(2026);
+    // Three updates, three version bumps — the check still works for real
+    // conflicts, it just no longer trips over its own footsteps.
+    expect(after?.version).toBe(project.version + 3);
+
+    await db.ingestItem.delete({ where: { id: item.id } });
+    await db.project.delete({ where: { id: project.id } });
+  });
+
+  it("still refuses when someone else really did edit in between", async () => {
+    const project = await db.project.create({
+      data: { title: `${P} Conflict`, slug: slugify(`${P} conflict`), status: "announced" },
+    });
+    const user = { id: "u-batch-test", name: "Batch Tester", role: "EDITOR" } as never;
+    const item = await db.ingestItem.create({ data: { kind: "text", filename: `${P} conflict`, status: "proposed" } });
+    await db.ingestChange.create({
+      data: {
+        itemId: item.id, sortOrder: 1, group: "Project", opType: "update", status: "approved", confidence: 0.9,
+        destination: { targetType: "project", targetId: project.id, field: "status", path: "", name: project.title },
+        after: "released",
+        payload: { op: "update", targetType: "project", targetName: project.title, targetId: project.id, field: "status", value: "released", confidence: 0.9, rationale: "", evidence: ["x"], sensitive: false, expectedVersion: project.version },
+      },
+    });
+    // A colleague edits the record while the proposal is open.
+    await db.project.update({ where: { id: project.id }, data: { logline: "edited by someone", version: { increment: 1 } } });
+
+    const { applyIngestChangesCore } = await import("@/lib/ingest/apply");
+    const outcome = await applyIngestChangesCore(item.id, user);
+    expect(outcome.superseded).toBe(1);
+    expect(outcome.applied).toBe(0);
+    expect((await db.project.findUnique({ where: { id: project.id } }))?.status).toBe("announced");
+
+    await db.ingestItem.delete({ where: { id: item.id } });
+    await db.project.delete({ where: { id: project.id } });
+  });
+});

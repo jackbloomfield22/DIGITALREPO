@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
@@ -55,6 +56,14 @@ export default async function PersonPage({
       </div>
 
       <div className="max-w-3xl">
+        <UpdatePanel
+          user={user}
+          targetType="person"
+          targetId={person.id}
+          name={person.name}
+          path={`/people/${person.slug}`}
+          recordType="industry contact"
+        />
         {(person.email || person.phone || person.contactUrl || person.assistantName || person.assistantEmail) && (
           <Section title="Contact">
             <div className="card space-y-1 px-4 py-3 text-sm">
