@@ -81,10 +81,24 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
       setContext("");
       const skipped =(body.items as { skipped?: string; filename: string | null }[]).filter((i) => i.skipped);
       if (skipped.length) toast(`Skipped: ${skipped.map((s) => s.filename).join(", ")}`, { tone: "error" });
-      const created = (body.items as { id: string; filename: string | null; skipped?: string }[]).filter((i) => !i.skipped && i.id);
-      toast(`Ingesting ${created.length} item${created.length === 1 ? "" : "s"}…`);
+      type Created = { id: string; filename: string | null; skipped?: string; ready?: boolean; stored?: number; invalid?: number; malformed?: number };
+      const created = (body.items as Created[]).filter((i) => !i.skipped && i.id);
+      // A changes file is already on the review board; there is nothing to run.
+      const ready = created.filter((c) => c.ready);
+      const toRun = created.filter((c) => !c.ready);
+      for (const r of ready) {
+        const problems = (r.invalid ?? 0) + (r.malformed ?? 0);
+        toast(
+          `${r.stored ?? 0} change${r.stored === 1 ? "" : "s"} ready to review` +
+            (problems ? ` — ${problems} could not be read and were left out` : ""),
+          { tone: problems ? "error" : undefined },
+        );
+      }
+      if (toRun.length) toast(`Ingesting ${toRun.length} item${toRun.length === 1 ? "" : "s"}…`);
       router.refresh();
-      await runAll(created.map((c) => ({ id: c.id, label: c.filename ?? "pasted text" })));
+      if (toRun.length) await runAll(toRun.map((c) => ({ id: c.id, label: c.filename ?? "pasted text" })));
+      else setProgress(null);
+      if (ready.length === 1 && !toRun.length) router.push(`/ingest/${ready[0].id}`);
     } catch {
       toast("Upload failed", { tone: "error" });
       setProgress(null);
@@ -109,14 +123,15 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
           if (files.length) upload(files);
         }}
       >
-        Drop emails and documents here — .eml, .mbox, .zip, .pdf, .docx, .pptx, .xlsx, .csv, .txt, .md, .html
+        Drop emails and documents here — .eml, .mbox, .zip, .pdf, .docx, .pptx, .xlsx, .csv, .txt, .md, .html — or a
+        changes file (.json) from Claude, which goes straight to review with no AI call
         <div className="mt-2">
           <input
             ref={fileRef}
             type="file"
             multiple
             className="hidden"
-            accept=".eml,.msg,.mbox,.zip,.pdf,.docx,.pptx,.xlsx,.csv,.txt,.md,.html,.htm"
+            accept=".eml,.msg,.mbox,.zip,.pdf,.docx,.pptx,.xlsx,.csv,.txt,.md,.html,.htm,.json"
             onChange={(e) => {
               const files = [...(e.target.files ?? [])];
               if (files.length) upload(files);

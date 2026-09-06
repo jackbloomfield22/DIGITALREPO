@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { storeRawBytes } from "@/lib/ingest/storage";
 import { classifyKind } from "@/lib/ingest/parse";
+import { loadChangesFile, parseChangesFile } from "@/lib/ingest/changes-file";
 
 export const maxDuration = 60;
 
@@ -44,10 +45,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Upload exceeds 100MB — split it into smaller batches." }, { status: 400 });
   }
 
-  const created: { id: string; filename: string | null; skipped?: string }[] = [];
+  const created: {
+    id: string; filename: string | null; skipped?: string;
+    /** A changes file lands already proposed — nothing to parse or read. */
+    ready?: boolean; stored?: number; invalid?: number; malformed?: number;
+  }[] = [];
 
   for (const file of files) {
     const extension = file.name.toLowerCase().split(".").pop() ?? "";
+    if (extension === "json") {
+      const changes = parseChangesFile(await file.text());
+      if (!changes) {
+        created.push({ id: "", filename: file.name, skipped: "Not a 4.4.Forty changes file" });
+        continue;
+      }
+      const loaded = await loadChangesFile(user.id, changes, file.name, workspace);
+      created.push({
+        id: loaded.itemId, filename: file.name, ready: true,
+        stored: loaded.stored, invalid: loaded.invalid.length, malformed: loaded.malformed,
+      });
+      continue;
+    }
     if (!ACCEPTED.has(extension)) {
       created.push({ id: "", filename: file.name, skipped: `Unsupported type .${extension}` });
       continue;

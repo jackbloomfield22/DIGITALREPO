@@ -148,6 +148,10 @@ export async function setIngestWorkspace(
     const item = await db.ingestItem.findUnique({ where: { id: itemId } });
     if (!item) return { ok: false, error: "That item is no longer here." };
     if (item.workspace === workspace) return { ok: true };
+    // A changes file's proposals are fixed; re-reading it would only erase them.
+    if (item.kind === "changes") {
+      return { ok: false, error: "This came from a changes file, so there is nothing to re-read. Load a new file instead." };
+    }
 
     const applied = await db.ingestChange.count({ where: { itemId, status: "applied" } });
     if (applied > 0) {

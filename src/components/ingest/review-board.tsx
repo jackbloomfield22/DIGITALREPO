@@ -225,7 +225,7 @@ function SourcePane({ item, activeSpans, canEdit }: { item: ItemVM; activeSpans:
                 "Read as general Repo material"
               )}
             </span>
-            {canEdit && <WorkspaceSwitch item={item} />}
+            {canEdit && item.kind !== "changes" && <WorkspaceSwitch item={item} />}
           </div>
           {item.context && (
             <div>

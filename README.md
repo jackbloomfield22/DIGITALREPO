@@ -314,6 +314,13 @@ its URL redirects to the new one. Each of these is an ingest op (`rename`, `unli
 apply: a move undone deletes the new record, puts the old one back on the live lists, and
 returns everything that followed it.
 
+**Changes files.** The panel's reader costs an API call per page. The same proposals can be
+written outside the site — by Claude in a chat, working from a downloaded backup and the
+owner's page-by-page corrections — and dropped onto Add Info as a `.json` changes file. It
+lands on the normal review board already proposed, with no model call: same before → after,
+same tick-to-apply, same undo. The format and the workflow are in
+[`docs/changes-file.md`](docs/changes-file.md).
+
 **The note box** (bottom right of every page) does what you ask rather than only writing
 it down. "Put this on hold, ESPN passed", typed while looking at a format, comes back as
 the concrete changes it would make in plain English — untick anything wrong, press Make

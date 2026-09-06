@@ -31,6 +31,13 @@ export default async function UploadsPage() {
       show: isAdmin,
     },
     {
+      href: "/ingest",
+      title: "A changes file from Claude",
+      body: "Walk the site, tell Claude what is wrong and what is true, and drop the .json it gives back here. It lands on the review board already worked out — before and after on every change, one button to apply, undo afterwards — with no AI call on the site.",
+      cta: "Go to Ingest",
+      show: true,
+    },
+    {
       href: "/admin/bulk-upload",
       title: "A prepared knowledge bundle",
       body: "A .json file covering many records at once — organizations, people, talent, projects, formats, opportunities. Shows you what's inside before it writes anything.",
@@ -45,7 +52,7 @@ export default async function UploadsPage() {
     <div className="max-w-3xl">
       <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">ADD INFORMATION</h1>
       <p className="mb-6 max-w-2xl text-sm text-muted">
-        Three ways in, depending on what you have. Everything you submit is listed below with
+        A few ways in, depending on what you have. Everything you submit is listed below with
         what it did, and anything can be taken back out — so it is always safe to try.
       </p>
 

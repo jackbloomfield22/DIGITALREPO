@@ -396,12 +396,154 @@ function evidenceWithOffsets(snippets: string[], text: string): { snippet: strin
   });
 }
 
+/**
+ * Turn proposed ops into reviewable IngestChange rows: validate each against
+ * the registry, resolve names to records, capture the current value for the
+ * diff, drop anything already true, and store them in review order. Shared
+ * by the model path and by a changes file loaded straight in, so both land
+ * on the same review board with the same before/after.
+ */
+export async function shapeAndStoreProposals(
+  itemId: string,
+  collected: ProposedOp[],
+  text: string,
+  candidates: DigestCandidate[],
+): Promise<{ stored: number; invalid: string[]; dropped: number }> {
+  const byDigestId = new Map(candidates.map((c) => [c.id, c]));
+  const byName = new Map(candidates.map((c) => [`${c.targetType}:${c.name.toLowerCase()}`, c]));
+  // Mechanical dedupe across chunks + registry validation
+  const seen = new Set<string>();
+  const invalid: string[] = [];
+  const rows: {
+    group: string; destination: Destination; opType: string; payload: ProposedOp;
+    before: unknown; after: unknown; confidence: number; rationale: string;
+    evidence: unknown; sensitive: boolean; sortOrder: number;
+  }[] = [];
+
+  for (const rawOp of collected) {
+    const validated = validateOp(rawOp);
+    if (!validated.ok) {
+      invalid.push(validated.error);
+      continue;
+    }
+    const op = validated.op;
+    const destination = opDestination(op, byDigestId, byName);
+
+    let before: unknown = null;
+    let after: unknown;
+    let payload: ProposedOp = op;
+
+    if (op.op === "update") {
+      if (destination.targetId) {
+        const captured = await captureBefore(op, destination.targetId);
+        before = captured.before;
+        payload = { ...op, targetId: destination.targetId } as ProposedOp;
+        if (captured.version != null) {
+          (payload as Record<string, unknown>).expectedVersion = captured.version;
+        }
+        // Value identical to current — nothing to change
+        if (String(captured.before ?? "") === String(op.value)) continue;
+      }
+      after = op.value;
+    } else if (op.op === "link") {
+      const spec = LINK_SPECS[op.kind as keyof typeof LINK_SPECS];
+      const aHit = op.aId ? byDigestId.get(op.aId) : byName.get(`${spec.a.targetType}:${op.aName.toLowerCase()}`);
+      const bHit = op.bId ? byDigestId.get(op.bId) : byName.get(`${spec.b.targetType}:${op.bName.toLowerCase()}`);
+      if (await linkAlreadyExists(op, aHit?.targetId ?? null, bHit?.targetId ?? null)) continue;
+      payload = { ...op, aId: aHit?.targetId ?? undefined, bId: bHit?.targetId ?? undefined } as ProposedOp;
+      after = { kind: op.kind, a: op.aName, b: op.bName, role: op.role ?? null };
+    } else if (op.op === "create") {
+      if (byName.get(`${op.targetType}:${op.name.toLowerCase()}`)) continue; // exists — links will reference it
+      after = { name: op.name, ...op.fields };
+    } else if (op.op === "archive") {
+      payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
+      after = { archived: true, reason: op.reason };
+    } else if (op.op === "rename") {
+      payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
+      before = destination.targetId ? destination.name : null;
+      after = op.newName;
+      if (before === after) continue;
+    } else if (op.op === "unlink") {
+      const spec = LINK_SPECS[op.kind as keyof typeof LINK_SPECS];
+      const aHit = op.aId ? byDigestId.get(op.aId) : byName.get(`${spec.a.targetType}:${op.aName.toLowerCase()}`);
+      const bHit = op.bId ? byDigestId.get(op.bId) : byName.get(`${spec.b.targetType}:${op.bName.toLowerCase()}`);
+      // Nothing to remove if both sides are known and the connection isn't there.
+      if (aHit && bHit && !(await linkAlreadyExists({ kind: op.kind }, aHit.targetId, bHit.targetId))) continue;
+      payload = { ...op, aId: aHit?.targetId ?? undefined, bId: bHit?.targetId ?? undefined } as ProposedOp;
+      after = { kind: op.kind, a: op.aName, b: op.bName, role: op.role ?? null, removed: true };
+    } else if (op.op === "restore") {
+      payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
+      before = true;
+      after = { archived: false };
+    } else if (op.op === "convert") {
+      payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
+      after = { movedTo: op.toType, name: op.newName ?? destination.name };
+    } else if (op.op === "note") {
+      after = { text: op.text };
+    }
+
+    const key = JSON.stringify({ op: op.op, d: destination, a: after });
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const spec = destination.targetType ? RECORD_REGISTRY[destination.targetType as IngestTargetType] : null;
+    const group =
+      op.op === "note" && !destination.targetType
+        ? "Notes"
+        : op.op === "create"
+          ? `New · ${spec?.displayName ?? destination.targetType}`
+          : `${spec?.displayName ?? "Record"} › ${destination.name}`;
+
+    rows.push({
+      group,
+      destination,
+      opType: op.op === "archive" ? "archive" : op.op,
+      payload,
+      before,
+      after,
+      confidence: op.confidence,
+      rationale: op.rationale,
+      evidence: evidenceWithOffsets(op.evidence, text),
+      sensitive: op.sensitive,
+      sortOrder: (OP_ORDER[op.op] ?? 500) + (op.sensitive ? 1000 : 0),
+    });
+  }
+
+  // Replace prior un-reviewed proposals; keep applied history
+  await db.ingestChange.deleteMany({
+    where: { itemId, status: { in: ["pending", "rejected", "superseded", "approved", "edited"] } },
+  });
+  let order = 0;
+  for (const row of [...rows].sort((a, b) => a.sortOrder - b.sortOrder)) {
+    await db.ingestChange.create({
+      data: {
+        itemId,
+        group: row.group,
+        destination: row.destination as object,
+        opType: row.opType,
+        payload: row.payload as object,
+        before: row.before === null ? undefined : (row.before as object),
+        after: row.after as object,
+        confidence: row.confidence,
+        rationale: row.rationale,
+        evidence: row.evidence as object,
+        sensitive: row.sensitive,
+        sortOrder: order++,
+      },
+    });
+  }
+
+  return { stored: rows.length, invalid, dropped: collected.length - rows.length - invalid.length };
+}
+
 export async function proposeItemCore(
   itemId: string,
   runner: ModelRunner = anthropicRunner,
 ): Promise<StageResult> {
   const item = await db.ingestItem.findUnique({ where: { id: itemId } });
   if (!item) return { ok: false, error: "Item not found." };
+  // A changes file arrives already proposed; there is nothing for the model to read.
+  if (item.kind === "changes") return { ok: true, status: item.status };
   if (!["triaged", "proposed", "failed"].includes(item.status)) {
     return { ok: false, error: `Cannot propose for an item in status "${item.status}" — triage it first.` };
   }
@@ -413,8 +555,6 @@ export async function proposeItemCore(
 
   try {
     const candidates = await matchCandidates(text);
-    const byDigestId = new Map(candidates.map((c) => [c.id, c]));
-    const byName = new Map(candidates.map((c) => [`${c.targetType}:${c.name.toLowerCase()}`, c]));
     const thread = await threadContext(item);
     const chunks = chunkText(text);
 
@@ -453,127 +593,7 @@ export async function proposeItemCore(
       if (droppedMalformed) console.warn(`Ingest ${itemId}: dropped ${droppedMalformed} malformed proposal(s).`);
     }
 
-    // Mechanical dedupe across chunks + registry validation
-    const seen = new Set<string>();
-    const invalid: string[] = [];
-    const rows: {
-      group: string; destination: Destination; opType: string; payload: ProposedOp;
-      before: unknown; after: unknown; confidence: number; rationale: string;
-      evidence: unknown; sensitive: boolean; sortOrder: number;
-    }[] = [];
-
-    for (const rawOp of collected) {
-      const validated = validateOp(rawOp);
-      if (!validated.ok) {
-        invalid.push(validated.error);
-        continue;
-      }
-      const op = validated.op;
-      const destination = opDestination(op, byDigestId, byName);
-
-      let before: unknown = null;
-      let after: unknown;
-      let payload: ProposedOp = op;
-
-      if (op.op === "update") {
-        if (destination.targetId) {
-          const captured = await captureBefore(op, destination.targetId);
-          before = captured.before;
-          payload = { ...op, targetId: destination.targetId } as ProposedOp;
-          if (captured.version != null) {
-            (payload as Record<string, unknown>).expectedVersion = captured.version;
-          }
-          // Value identical to current — nothing to change
-          if (String(captured.before ?? "") === String(op.value)) continue;
-        }
-        after = op.value;
-      } else if (op.op === "link") {
-        const spec = LINK_SPECS[op.kind as keyof typeof LINK_SPECS];
-        const aHit = op.aId ? byDigestId.get(op.aId) : byName.get(`${spec.a.targetType}:${op.aName.toLowerCase()}`);
-        const bHit = op.bId ? byDigestId.get(op.bId) : byName.get(`${spec.b.targetType}:${op.bName.toLowerCase()}`);
-        if (await linkAlreadyExists(op, aHit?.targetId ?? null, bHit?.targetId ?? null)) continue;
-        payload = { ...op, aId: aHit?.targetId ?? undefined, bId: bHit?.targetId ?? undefined } as ProposedOp;
-        after = { kind: op.kind, a: op.aName, b: op.bName, role: op.role ?? null };
-      } else if (op.op === "create") {
-        if (byName.get(`${op.targetType}:${op.name.toLowerCase()}`)) continue; // exists — links will reference it
-        after = { name: op.name, ...op.fields };
-      } else if (op.op === "archive") {
-        payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
-        after = { archived: true, reason: op.reason };
-      } else if (op.op === "rename") {
-        payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
-        before = destination.targetId ? destination.name : null;
-        after = op.newName;
-        if (before === after) continue;
-      } else if (op.op === "unlink") {
-        const spec = LINK_SPECS[op.kind as keyof typeof LINK_SPECS];
-        const aHit = op.aId ? byDigestId.get(op.aId) : byName.get(`${spec.a.targetType}:${op.aName.toLowerCase()}`);
-        const bHit = op.bId ? byDigestId.get(op.bId) : byName.get(`${spec.b.targetType}:${op.bName.toLowerCase()}`);
-        // Nothing to remove if both sides are known and the connection isn't there.
-        if (aHit && bHit && !(await linkAlreadyExists({ kind: op.kind }, aHit.targetId, bHit.targetId))) continue;
-        payload = { ...op, aId: aHit?.targetId ?? undefined, bId: bHit?.targetId ?? undefined } as ProposedOp;
-        after = { kind: op.kind, a: op.aName, b: op.bName, role: op.role ?? null, removed: true };
-      } else if (op.op === "restore") {
-        payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
-        before = true;
-        after = { archived: false };
-      } else if (op.op === "convert") {
-        payload = { ...op, targetId: destination.targetId ?? undefined } as ProposedOp;
-        after = { movedTo: op.toType, name: op.newName ?? destination.name };
-      } else if (op.op === "note") {
-        after = { text: op.text };
-      }
-
-      const key = JSON.stringify({ op: op.op, d: destination, a: after });
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      const spec = destination.targetType ? RECORD_REGISTRY[destination.targetType as IngestTargetType] : null;
-      const group =
-        op.op === "note" && !destination.targetType
-          ? "Notes"
-          : op.op === "create"
-            ? `New · ${spec?.displayName ?? destination.targetType}`
-            : `${spec?.displayName ?? "Record"} › ${destination.name}`;
-
-      rows.push({
-        group,
-        destination,
-        opType: op.op === "archive" ? "archive" : op.op,
-        payload,
-        before,
-        after,
-        confidence: op.confidence,
-        rationale: op.rationale,
-        evidence: evidenceWithOffsets(op.evidence, text),
-        sensitive: op.sensitive,
-        sortOrder: (OP_ORDER[op.op] ?? 500) + (op.sensitive ? 1000 : 0),
-      });
-    }
-
-    // Replace prior un-reviewed proposals; keep applied history
-    await db.ingestChange.deleteMany({
-      where: { itemId, status: { in: ["pending", "rejected", "superseded", "approved", "edited"] } },
-    });
-    let order = 0;
-    for (const row of [...rows].sort((a, b) => a.sortOrder - b.sortOrder)) {
-      await db.ingestChange.create({
-        data: {
-          itemId,
-          group: row.group,
-          destination: row.destination as object,
-          opType: row.opType,
-          payload: row.payload as object,
-          before: row.before === null ? undefined : (row.before as object),
-          after: row.after as object,
-          confidence: row.confidence,
-          rationale: row.rationale,
-          evidence: row.evidence as object,
-          sensitive: row.sensitive,
-          sortOrder: order++,
-        },
-      });
-    }
+    const shaped = await shapeAndStoreProposals(itemId, collected, text, candidates);
 
     await db.ingestItem.update({
       where: { id: itemId },
@@ -586,8 +606,8 @@ export async function proposeItemCore(
             chunks: chunks.length,
             coveredChars: Math.min(text.length, CHUNK_SIZE + (chunks.length - 1) * (CHUNK_SIZE - CHUNK_OVERLAP)),
             totalChars: text.length,
-            invalidOps: invalid.length ? invalid.slice(0, 10) : undefined,
-            droppedAsDuplicate: collected.length - rows.length - invalid.length,
+            invalidOps: shaped.invalid.length ? shaped.invalid.slice(0, 10) : undefined,
+            droppedAsDuplicate: shaped.dropped,
           },
         },
       },
