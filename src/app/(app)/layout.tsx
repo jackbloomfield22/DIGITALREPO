@@ -2,6 +2,7 @@ import { requireUser, hasRole } from "@/lib/auth";
 import { Sidebar } from "@/components/sidebar";
 import { CommandBar } from "@/components/command-bar";
 import { QuickCapture } from "@/components/quick-capture";
+import { isOwner } from "@/lib/hq/owner";
 
 export default async function AppLayout({
   children,
@@ -14,6 +15,7 @@ export default async function AppLayout({
       <Sidebar
         isAdmin={hasRole(user, "ADMIN")}
         isEditor={hasRole(user, "EDITOR")}
+        isOwner={isOwner(user)}
         userName={user.name}
       />
       <CommandBar />

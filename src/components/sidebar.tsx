@@ -83,11 +83,13 @@ const CREATE_ITEMS = [
 
 function NavLinks({
   isAdmin,
+  isOwner = false,
   isEditor,
   userName,
   onNavigate,
 }: {
   isAdmin: boolean;
+  isOwner?: boolean;
   isEditor: boolean;
   userName: string;
   onNavigate?: () => void;
@@ -196,6 +198,7 @@ function NavLinks({
       ))}
 
       <div className="mt-auto space-y-0.5 px-2 pb-4 pt-6">
+        {isOwner && row({ href: "/hq", label: "HQ" })}
         {isAdmin && row({ href: "/admin", label: "Admin" })}
         {row({ href: "/settings", label: "Settings" })}
         <div className="flex items-center justify-between px-3 pt-2 text-xs text-faint">
@@ -213,6 +216,7 @@ function NavLinks({
 
 export function Sidebar(props: {
   isAdmin: boolean;
+  isOwner?: boolean;
   isEditor: boolean;
   userName: string;
 }) {

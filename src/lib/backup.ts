@@ -35,6 +35,12 @@ const BYTE_COLUMNS: Partial<Record<(typeof TABLE_ORDER)[number], string[]>> = {
 const OMITTED_BYTES = { $bytes: "" } as const;
 
 // Prisma client property names, in FK-safe insert order.
+/** HQ tables: private to one person, so kept out of backups other admins can download. */
+export const PRIVATE_TABLES: ReadonlySet<string> = new Set([
+  "hqSettings", "hqConnection", "hqRelationship", "hqInteraction", "hqPipeline", "hqPipelineContact",
+  "hqTask", "hqEvent", "hqNote", "hqIdea", "hqStyleExample", "hqAiUsage",
+]);
+
 export const TABLE_ORDER = [
   "user",
   "entity",
@@ -87,6 +93,19 @@ export const TABLE_ORDER = [
   // Rebuildable at any time (scripts/rebuild-digests.ts), but included so the
   // dump is complete and the coverage test stays honest.
   "knowledgeDigest",
+  // HQ (private; skipped by buildBackup, present so coverage stays honest)
+  "hqSettings",
+  "hqConnection",
+  "hqRelationship",
+  "hqInteraction",
+  "hqPipeline",
+  "hqPipelineContact",
+  "hqTask",
+  "hqEvent",
+  "hqNote",
+  "hqIdea",
+  "hqStyleExample",
+  "hqAiUsage",
 ] as const;
 
 export type BackupFile = {
@@ -128,6 +147,8 @@ export async function buildBackup(): Promise<BackupFile> {
   const omitted = { files: 0, ingestDocuments: 0, totalBytes: 0 };
 
   for (const table of TABLE_ORDER) {
+    // The owner's private HQ is not part of the shared backup; it has its own export.
+    if (PRIVATE_TABLES.has(table)) continue;
     const byteColumns = BYTE_COLUMNS[table];
     // `omit` keeps the bytes out of the query itself, so a database full of
     // decks never has to fit in this process's memory to be backed up.

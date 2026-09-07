@@ -999,3 +999,241 @@ model ChannelPerson {
   @@unique([channelId, personId, relationship])
   @@index([personId])
 }
+
+// ---------------------------------------------------------------------------
+// HQ: the owner's private operating system. Every row carries ownerId and is
+// only ever read through the owner guard in src/lib/hq/owner.ts. These
+// tables are left out of shared backups; HQ has its own export.
+// ---------------------------------------------------------------------------
+
+model HqSettings {
+  ownerId         String    @id
+  aiEnabled       Boolean   @default(false)
+  aiDailyCapCents Int       @default(200)
+  styleGuide      String?
+  briefPrefs      Json?
+  seededAt        DateTime?
+  updatedAt       DateTime  @updatedAt
+}
+
+model HqConnection {
+  id           String    @id @default(cuid())
+  ownerId      String
+  provider     String // google
+  accountEmail String?
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  scopes       String[]  @default([])
+  status       String    @default("connected") // connected | error | disconnected
+  lastSyncAt   DateTime?
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([ownerId, provider])
+}
+
+model HqRelationship {
+  id            String    @id @default(cuid())
+  ownerId       String
+  personType    String // person | creator
+  personId      String
+  name          String
+  email         String?
+  tier          String    @default("warm") // inner | active | warm | cold
+  interests     String[]  @default([])
+  howWeMet      String?
+  notes         String?
+  opportunities String?
+  lastContactAt DateTime?
+  nextTouchAt   DateTime?
+  cadenceDays   Int?
+  source        String    @default("manual") // manual | seed | capture | google
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  interactions HqInteraction[]
+  tasks        HqTask[]
+  events       HqEvent[]
+  notes_       HqNote[]
+  pipelines    HqPipelineContact[]
+
+  @@unique([ownerId, personType, personId])
+  @@index([ownerId, tier])
+  @@index([ownerId, nextTouchAt])
+}
+
+model HqInteraction {
+  id             String   @id @default(cuid())
+  ownerId        String
+  relationshipId String
+  at             DateTime @default(now())
+  kind           String   @default("note") // meeting | call | email | text | intro | event | note
+  summary        String
+  source         String   @default("manual") // manual | google | seed
+  externalId     String?
+  createdAt      DateTime @default(now())
+
+  relationship HqRelationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, source, externalId])
+  @@index([relationshipId, at])
+}
+
+model HqPipeline {
+  id            String    @id @default(cuid())
+  ownerId       String
+  targetType    String? // project | format | channel | opportunity
+  targetId      String?
+  title         String
+  stage         String    @default("idea")
+  heat          Int       @default(2) // 1 cool · 2 warm · 3 hot
+  whyItMatters  String?
+  nextStep      String?
+  nextStepDue   DateTime?
+  lastContactAt DateTime?
+  notes         String?
+  order         Int       @default(0)
+  source        String    @default("manual") // manual | seed | capture
+  closedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  contacts HqPipelineContact[]
+  tasks    HqTask[]
+  events   HqEvent[]
+  notes_   HqNote[]
+
+  @@unique([ownerId, targetType, targetId])
+  @@index([ownerId, stage])
+}
+
+model HqPipelineContact {
+  id             String  @id @default(cuid())
+  pipelineId     String
+  relationshipId String
+  role           String  @default("other") // decision_maker | champion | talent | rep | partner | other
+  note           String?
+
+  pipeline     HqPipeline     @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  relationship HqRelationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  @@unique([pipelineId, relationshipId])
+}
+
+model HqTask {
+  id             String    @id @default(cuid())
+  ownerId        String
+  title          String
+  notes          String?
+  kind           String    @default("task") // task | follow_up
+  status         String    @default("open") // open | done | dropped
+  priority       Int       @default(2) // 1 high · 2 normal · 3 low
+  dueAt          DateTime?
+  completedAt    DateTime?
+  relationshipId String?
+  pipelineId     String?
+  linkTargetType String?
+  linkTargetId   String?
+  source         String    @default("manual") // manual | capture | seed | google
+  externalId     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  relationship HqRelationship? @relation(fields: [relationshipId], references: [id], onDelete: SetNull)
+  pipeline     HqPipeline?     @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, status, dueAt])
+}
+
+model HqEvent {
+  id             String    @id @default(cuid())
+  ownerId        String
+  title          String
+  startsAt       DateTime
+  endsAt         DateTime?
+  allDay         Boolean   @default(false)
+  location       String?
+  notes          String?
+  attendees      String[]  @default([])
+  source         String    @default("manual") // manual | ics | google
+  externalId     String?
+  calendarId     String?
+  relationshipId String?
+  pipelineId     String?
+  linkTargetType String?
+  linkTargetId   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  relationship HqRelationship? @relation(fields: [relationshipId], references: [id], onDelete: SetNull)
+  pipeline     HqPipeline?     @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+
+  @@unique([ownerId, source, externalId])
+  @@index([ownerId, startsAt])
+}
+
+model HqNote {
+  id             String    @id @default(cuid())
+  ownerId        String
+  title          String
+  body           String    @default("")
+  kind           String    @default("note") // note | meeting | research | template | email_template | talent_list | pitch
+  tags           String[]  @default([])
+  pinned         Boolean   @default(false)
+  relationshipId String?
+  pipelineId     String?
+  linkTargetType String?
+  linkTargetId   String?
+  source         String    @default("manual") // manual | capture | seed | import
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  relationship HqRelationship? @relation(fields: [relationshipId], references: [id], onDelete: SetNull)
+  pipeline     HqPipeline?     @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, updatedAt])
+}
+
+model HqIdea {
+  id             String    @id @default(cuid())
+  ownerId        String
+  title          String
+  body           String?
+  kind           String    @default("idea") // idea | format_mechanic | title | talent_pairing | rabbit_hole
+  status         String    @default("spark") // spark | developing | parked | promoted | dead
+  rating         Int       @default(0) // 0-5
+  tags           String[]  @default([])
+  promotedToType String?
+  promotedToId   String?
+  source         String    @default("manual") // manual | capture | seed | import
+  lastTouchedAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([ownerId, status, lastTouchedAt])
+}
+
+model HqStyleExample {
+  id        String   @id @default(cuid())
+  ownerId   String
+  kind      String   @default("other") // deck | logline | talent_summary | exec_email | one_sheet | other
+  title     String
+  body      String
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model HqAiUsage {
+  id           String   @id @default(cuid())
+  ownerId      String
+  feature      String // ask | draft
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costCents    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([ownerId, createdAt])
+}
