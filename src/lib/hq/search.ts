@@ -93,9 +93,13 @@ async function fts(ownerId: string, terms: string): Promise<Hit[]> {
 async function repo(terms: string): Promise<Hit[]> {
   if (!terms.trim()) return [];
   const q = Prisma.sql`websearch_to_tsquery('english', ${terms})`;
+  // Names and aliases live in searchVector; the words people ask about live
+  // in the summary. Both count, and a name match outranks a passing mention.
   const rows = await db.$queryRaw<{ id: string; targetType: string; targetId: string; name: string; slug: string; archived: boolean; snippet: string; rank: number; updatedAt: Date }[]>`
-    SELECT id, "targetType", "targetId", name, slug, archived, ts_headline('english', summary, ${q}, ${HEADLINE}) AS snippet, ts_rank("searchVector", ${q}) AS rank, "updatedAt"
-      FROM "KnowledgeDigest" WHERE "searchVector" @@ ${q} ORDER BY archived ASC, rank DESC LIMIT 40`;
+    SELECT id, "targetType", "targetId", name, slug, archived, ts_headline('english', summary, ${q}, ${HEADLINE}) AS snippet,
+           ts_rank("searchVector", ${q}) * 2 + ts_rank(to_tsvector('english', coalesce(summary, '')), ${q}) AS rank, "updatedAt"
+      FROM "KnowledgeDigest" WHERE "searchVector" @@ ${q} OR to_tsvector('english', coalesce(summary, '')) @@ ${q}
+      ORDER BY archived ASC, rank DESC LIMIT 40`;
   return rows.map((r) => ({
     source: "repo" as const, id: r.targetId, targetType: r.targetType, targetId: r.targetId,
     title: r.archived ? `${r.name} (archived)` : r.name, snippet: r.snippet ?? "", kind: r.targetType,
@@ -203,7 +207,7 @@ export async function searchBrain(ownerId: string, query: string): Promise<Searc
   if (!shared.length && terms) {
     // The digest's index can lag a fresh record; its plain text does not.
     const word = terms.split(" ").sort((a, b) => b.length - a.length)[0];
-    const rows = await db.knowledgeDigest.findMany({ where: { searchText: { contains: word, mode: "insensitive" } }, take: 15, orderBy: { archived: "asc" } }).catch(() => []);
+    const rows = await db.knowledgeDigest.findMany({ where: { OR: [{ searchText: { contains: word, mode: "insensitive" } }, { summary: { contains: word, mode: "insensitive" } }] }, take: 15, orderBy: { archived: "asc" } }).catch(() => []);
     shared = rows.map((d) => ({ source: "repo" as const, id: d.targetId, targetType: d.targetType, targetId: d.targetId, title: d.archived ? `${d.name} (archived)` : d.name, snippet: d.summary.slice(0, 160), kind: d.targetType, href: repoPath(d.targetType, d.slug) ?? "/", updatedAt: d.updatedAt, rank: 0.05 }));
   }
   if (!own.length && !shared.length) {

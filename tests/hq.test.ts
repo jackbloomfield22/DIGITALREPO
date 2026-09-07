@@ -161,7 +161,10 @@ describe("seeding and searching the brain", () => {
     const creator = await db.creator.create({ data: { name: `${P} Star`, slug: slugify(`${P} star`), status: "active" } });
     const person = await db.industryPerson.create({ data: { name: `${P} Agent`, slug: slugify(`${P} agent`), roleType: "agent", email: "agent@example.test" } });
     const format = await db.format.create({ data: { title: `${P} Prank Kings`, slug: slugify(`${P} prank kings`), status: "pitched", formatType: "docuseries", logline: "Retired quarterbacks run pranks on rookies.", ownerId: OWNER, creators: { create: { creatorId: creator.id, isPrimary: true } } } });
+    // A record whose *name* says nothing about pranks; only its logline does.
+    const quiet = await db.format.create({ data: { title: `${P} Locker Room`, slug: slugify(`${P} locker room`), status: "developing", formatType: "docuseries", logline: "Teammates prank each other for a season.", ownerId: OWNER } });
     await refreshDigest("format", format.id);
+    await refreshDigest("format", quiet.id);
     await refreshDigest("creator", creator.id);
 
     const first = await seedFromRepo(OWNER);
@@ -184,6 +187,7 @@ describe("seeding and searching the brain", () => {
     const r = await searchBrain(OWNER, "What athletes have we discussed for prank formats?");
     expect(r.terms).toBe("prank");
     expect(r.hits.some((h) => h.source === "repo" && h.title === format.title)).toBe(true);
+    expect(r.hits.some((h) => h.source === "repo" && h.title === quiet.title)).toBe(true);
     expect(r.hits.some((h) => h.source === "note")).toBe(true);
     const talentBlock = r.answer.find((b) => b.heading.startsWith("Talent attached"));
     expect(talentBlock?.items.map((i) => i.name)).toContain(`${P} Star`);
