@@ -38,7 +38,7 @@ const OMITTED_BYTES = { $bytes: "" } as const;
 /** HQ tables: private to one person, so kept out of backups other admins can download. */
 export const PRIVATE_TABLES: ReadonlySet<string> = new Set([
   "hqSettings", "hqConnection", "hqRelationship", "hqInteraction", "hqPipeline", "hqPipelineContact",
-  "hqTask", "hqEvent", "hqNote", "hqIdea", "hqStyleExample", "hqAiUsage",
+  "hqTask", "hqEvent", "hqNote", "hqIdea", "hqStyleExample", "hqAiUsage", "hqMention", "hqActivity",
 ]);
 
 export const TABLE_ORDER = [
@@ -106,6 +106,8 @@ export const TABLE_ORDER = [
   "hqIdea",
   "hqStyleExample",
   "hqAiUsage",
+  "hqMention",
+  "hqActivity",
 ] as const;
 
 export type BackupFile = {

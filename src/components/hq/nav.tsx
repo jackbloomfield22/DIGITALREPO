@@ -12,6 +12,7 @@ export const HQ_TABS = [
   { href: "/hq/ideas", label: "Ideas" },
   { href: "/hq/studio", label: "Studio" },
   { href: "/hq/calendar", label: "Calendar" },
+  { href: "/hq/review", label: "Review" },
   { href: "/hq/settings", label: "Settings" },
 ] as const;
 

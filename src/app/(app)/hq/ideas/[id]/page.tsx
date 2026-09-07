@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireOwner } from "@/lib/hq/owner";
 import { HqFrame } from "@/components/hq/nav";
 import { IdeaEditor } from "@/components/hq/ideas";
+import { Connections } from "@/components/hq/connections";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function IdeaPage({ params }: { params: Promise<{ id: strin
     <HqFrame active="/hq/ideas">
       <div className="mb-3 text-xs text-muted"><Link href="/hq/ideas" className="hover:text-accent">← Ideas</Link></div>
       <IdeaEditor idea={{ ...idea, lastTouchedAt: idea.lastTouchedAt.toISOString(), createdAt: idea.createdAt.toISOString() }} />
+      <div className="mt-6"><Connections ownerId={user.id} target={{ targetType: "idea", targetId: idea.id }} source={{ type: "idea", id: idea.id }} /></div>
     </HqFrame>
   );
 }

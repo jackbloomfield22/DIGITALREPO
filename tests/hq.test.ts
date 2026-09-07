@@ -215,3 +215,96 @@ describe("seeding and searching the brain", () => {
     for (const t of PRIVATE_TABLES) expect(backup.tables[t]).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// The network layer: mentions, strength, waiting-for, and the loops.
+// ---------------------------------------------------------------------------
+
+import { extractMentions, matchable } from "@/lib/hq/mentions";
+import { relationshipStrength, cardMomentum } from "@/lib/hq/strength";
+import { reindexAll, backlinksTo } from "@/lib/hq/network";
+
+describe("the mentions graph", () => {
+  const dict = [
+    { name: "Sam Rivers", targetType: "relationship" as const, targetId: "r1" },
+    { name: "Sam Rivers Productions", targetType: "repo" as const, targetId: "o1", targetKind: "organization" },
+    { name: "Will", targetType: "relationship" as const, targetId: "r2" },
+    { name: "Grit City", targetType: "pipeline" as const, targetId: "p1" },
+    { name: "Netflix", targetType: "repo" as const, targetId: "o2", targetKind: "organization", aliases: ["NFLX"] },
+  ];
+  it("links whole names, longest first, and ignores short common words", () => {
+    const hits = extractMentions("Lunch with Sam Rivers about Grit City; Sam Rivers Productions will co-produce. Netflix (NFLX) is circling. Will call later.", dict);
+    expect(hits.map((h) => `${h.targetType}:${h.targetId}`).sort()).toEqual(["pipeline:p1", "relationship:r1", "repo:o1", "repo:o2"]);
+    expect(matchable("Will")).toBe(false);
+    expect(matchable("Rivers")).toBe(true);
+    expect(matchable("golf")).toBe(false);
+    expect(extractMentions("gritcity is not grit city", dict).length).toBe(1);
+  });
+  it("indexes text and answers backlinks both ways", async () => {
+    const creator = await db.creator.create({ data: { name: `${P} Backlink Star`, slug: slugify(`${P} backlink star`), status: "active" } });
+    await refreshDigest("creator", creator.id);
+    const rel = await db.hqRelationship.create({ data: { ownerId: OWNER, personType: "creator", personId: creator.id, name: creator.name } });
+    const card = await db.hqPipeline.create({ data: { ownerId: OWNER, title: `${P} Backlink Show`, stage: "developing" } });
+    const note = await db.hqNote.create({ data: { ownerId: OWNER, title: "Coffee thoughts", body: `${creator.name} would be perfect for ${P} Backlink Show. Sam Rivers Productions could finance.` } });
+    const links = await reindexAll(OWNER);
+    expect(links).toBeGreaterThanOrEqual(2);
+    const aboutPerson = await backlinksTo(OWNER, { targetType: "relationship", targetId: rel.id });
+    expect(aboutPerson.map((b) => b.title)).toContain("Coffee thoughts");
+    const aboutCard = await backlinksTo(OWNER, { targetType: "pipeline", targetId: card.id });
+    expect(aboutCard.some((b) => b.sourceId === note.id)).toBe(true);
+    // The card's own notes do not link back to itself.
+    await db.hqPipeline.update({ where: { id: card.id }, data: { notes: `${P} Backlink Show is the one.` } });
+    await reindexAll(OWNER);
+    expect((await backlinksTo(OWNER, { targetType: "pipeline", targetId: card.id })).some((b) => b.sourceType === "pipeline" && b.sourceId === card.id)).toBe(false);
+  });
+});
+
+describe("strength and momentum", () => {
+  const d = (days: number) => new Date(NOW.getTime() - days * 86_400_000);
+  it("scores a live relationship high and a forgotten one low, and says why", () => {
+    const strong = relationshipStrength({ tier: "inner", lastContactAt: d(2), interactionDates: [d(2), d(10), d(30), d(70)], cardsTogether: 2, mentions: 5 }, NOW);
+    const dormant = relationshipStrength({ tier: "warm", lastContactAt: d(300), interactionDates: [d(300)], cardsTogether: 0, mentions: 0 }, NOW);
+    expect(strong.label).toBe("strong");
+    expect(dormant.label).toBe("dormant");
+    expect(strong.why).toContain("2d since contact");
+    expect(relationshipStrength({ tier: "warm", lastContactAt: null, interactionDates: [], cardsTogether: 0, mentions: 0 }, NOW).label).toBe("new");
+  });
+  it("scores a card with a plan and recent contact as moving", () => {
+    const moving = cardMomentum({ heat: 3, stage: "buyer_conversations", nextStep: "Send deck", nextStepDue: d(-3), lastContactAt: d(1), updatedAt: d(1), activity30: 4 }, NOW);
+    const stalled = cardMomentum({ heat: 1, stage: "developing", nextStep: null, nextStepDue: null, lastContactAt: d(80), updatedAt: d(80), activity30: 0 }, NOW);
+    expect(moving.label).toBe("moving");
+    expect(stalled.label).toBe("stalled");
+    expect(stalled.why).toContain("no next step");
+  });
+});
+
+describe("waiting-for and the loops", () => {
+  it("reads 'waiting on' as the ball in their court", () => {
+    const c = capture("waiting on Dana Whitfield for the deck notes", NOW);
+    expect(c).toMatchObject({ kind: "follow_up", status: "waiting", personName: "Dana Whitfield" });
+    expect(capture("sent the sizzle to Netflix", NOW).status).toBe("waiting");
+    expect(capture("call Dana tomorrow", NOW).status).toBe("open");
+  });
+  it("nudges after five days, resurfaces an old note, and asks for a review and a debrief", () => {
+    const d = (days: number) => new Date(NOW.getTime() + days * 86_400_000);
+    const brief = buildBrief({
+      tasks: [
+        { id: "w1", title: "Deck to Dana", kind: "follow_up", priority: 2, dueAt: null, status: "waiting", waitingSince: d(-9), relationshipName: "Dana" },
+        { id: "w2", title: "Notes to Sam", kind: "follow_up", priority: 2, dueAt: null, status: "waiting", waitingSince: d(-1) },
+      ],
+      events: [], pipelines: [], relationships: [], ideas: [],
+      notes: [{ id: "n1", title: "Upfront notes", kind: "meeting", updatedAt: d(-60), pinned: false }, { id: "n2", title: "Scratch", kind: "note", updatedAt: d(-90), pinned: false }],
+      lastReviewAt: d(-10),
+      pastEvents: [{ id: "e1", title: "Netflix pitch", startsAt: d(-1), endsAt: null, allDay: false, pipelineTitle: "Grit City" }],
+    }, NOW);
+    expect(brief.waiting.map((w) => [w.item.id, w.nudge])).toEqual([["w1", true], ["w2", false]]);
+    expect(brief.focus.find((f) => f.kind === "waiting")?.why).toContain("waiting 9 days on Dana");
+    expect(brief.reread?.id).toBe("n1");
+    expect(brief.reviewDue).toBe(true);
+    expect(brief.focus.some((f) => f.kind === "review")).toBe(true);
+    expect(brief.debriefs.map((e) => e.id)).toEqual(["e1"]);
+    expect(brief.focus.find((f) => f.kind === "debrief")?.href).toBe("/hq/prep/e1");
+    expect(brief.counts.waiting).toBe(2);
+    expect(brief.counts.openTasks).toBe(0);
+  });
+});

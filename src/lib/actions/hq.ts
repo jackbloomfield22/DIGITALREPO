@@ -12,6 +12,9 @@ import { capture } from "@/lib/hq/capture";
 import { parseIcs } from "@/lib/hq/ics";
 import { seedFromRepo, importBrainBundle, parseBrainBundle } from "@/lib/hq/seed";
 import { disconnectGoogle, runGoogleSync } from "@/lib/hq/google";
+import { journal } from "@/lib/hq/journal";
+import { forgetDictionary, reindexAll, reindexMentions } from "@/lib/hq/network";
+import { NOTE_TEMPLATES } from "@/lib/hq/vocab";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -35,6 +38,7 @@ async function relationshipFor(ownerId: string, personType: "person" | "creator"
   const created = await db.hqRelationship.create({
     data: { ownerId, personType, personId, name: record.name, email: (record as { email?: string | null }).email ?? null },
   });
+  forgetDictionary(ownerId);
   return created.id;
 }
 
@@ -78,7 +82,8 @@ export async function saveRelationship(input: z.input<typeof relationshipSchema>
     const user = await requireOwner();
     const { id: rid, ...data } = relationshipSchema.parse(input);
     const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
-    await db.hqRelationship.update({ where: { id: rid, ownerId: user.id }, data: { ...clean, source: "manual" } });
+    const row = await db.hqRelationship.update({ where: { id: rid, ownerId: user.id }, data: { ...clean, source: "manual" } });
+    await reindexMentions(user.id, { type: "relationship", id: rid }, [row.notes, row.opportunities, row.howWeMet].filter(Boolean).join("\n"), { targetType: "relationship", targetId: rid });
     bump();
     return { ok: true };
   } catch (e) { return fail(e); }
@@ -116,6 +121,8 @@ export async function logInteraction(input: z.input<typeof interactionSchema>): 
     }
     updates.source = "manual";
     await db.hqRelationship.update({ where: { id: rel.id }, data: updates });
+    await reindexMentions(user.id, { type: "interaction", id: made.id }, data.summary, { targetType: "relationship", targetId: rel.id });
+    await journal(user.id, "interaction", `${data.kind} with ${rel.name}: ${data.summary.slice(0, 120)}`, { type: "relationship", id: rel.id });
     bump();
     return { ok: true, id: made.id };
   } catch (e) { return fail(e); }
@@ -150,22 +157,32 @@ export async function captureQuick(text: string): Promise<Result<{ kind: string;
 
     if (c.kind === "idea") {
       const row = await db.hqIdea.create({ data: { ...base, title: c.title, body: c.body ?? null, tags } });
+      await reindexMentions(user.id, { type: "idea", id: row.id }, `${row.title}\n${row.body ?? ""}`);
+      await journal(user.id, "idea", `Idea: ${row.title}`, { type: "idea", id: row.id });
       bump();
       return { ok: true, kind: "idea", id: row.id, href: `/hq/ideas/${row.id}`, title: row.title, reading: c.reading, resolved };
     }
     if (c.kind === "note") {
       const row = await db.hqNote.create({ data: { ...base, title: c.title.slice(0, 120), body: c.body ? `${c.title}\n\n${c.body}` : c.title, tags, relationshipId: person?.id ?? null, pipelineId: card?.id ?? null } });
+      await reindexMentions(user.id, { type: "note", id: row.id }, `${row.title}\n${row.body}`);
+      await journal(user.id, "note", `Note: ${row.title}`, { type: "note", id: row.id });
       bump();
       return { ok: true, kind: "note", id: row.id, href: `/hq/brain/${row.id}`, title: row.title, reading: c.reading, resolved };
     }
     if (c.kind === "event") {
       const startsAt = c.startsAt ?? new Date();
       const row = await db.hqEvent.create({ data: { ...base, title: c.title, startsAt, endsAt: c.hasTime ? new Date(startsAt.getTime() + 3600_000) : null, allDay: !c.hasTime, notes: c.body ?? null, relationshipId: person?.id ?? null, pipelineId: card?.id ?? null } });
+      await journal(user.id, "captured", `Event: ${row.title} on ${startsAt.toDateString()}`, { type: "event", id: row.id });
       bump();
       return { ok: true, kind: "event", id: row.id, href: "/hq/calendar", title: row.title, reading: c.reading, resolved };
     }
-    const row = await db.hqTask.create({ data: { ...base, kind: c.kind, title: c.title, notes: c.body ?? null, dueAt: c.dueAt ?? null, relationshipId: person?.id ?? null, pipelineId: card?.id ?? null } });
+    const row = await db.hqTask.create({ data: {
+      ...base, kind: c.kind, title: c.title, notes: c.body ?? null, dueAt: c.dueAt ?? null, relationshipId: person?.id ?? null, pipelineId: card?.id ?? null,
+      status: c.status, waitingSince: c.status === "waiting" ? new Date() : null, nudgeAfterDays: c.status === "waiting" ? 5 : null,
+    } });
     if (person && c.kind === "follow_up" && c.dueAt) await db.hqRelationship.update({ where: { id: person.id }, data: { nextTouchAt: c.dueAt } });
+    await reindexMentions(user.id, { type: "task", id: row.id }, `${row.title}\n${row.notes ?? ""}`);
+    await journal(user.id, "captured", `${c.status === "waiting" ? "Waiting" : c.kind === "follow_up" ? "Follow-up" : "Task"}: ${row.title}`, { type: "task", id: row.id });
     bump();
     return { ok: true, kind: c.kind, id: row.id, href: "/hq#tasks", title: row.title, reading: c.reading, resolved };
   } catch (e) { return fail(e); }
@@ -187,15 +204,22 @@ export async function saveTask(input: z.input<typeof taskSchema>): Promise<Resul
     const row = tid
       ? await db.hqTask.update({ where: { id: tid, ownerId: user.id }, data: clean })
       : await db.hqTask.create({ data: { ownerId: user.id, title: data.title, ...clean } });
+    await reindexMentions(user.id, { type: "task", id: row.id }, `${row.title}\n${row.notes ?? ""}`);
+    if (!tid) await journal(user.id, "captured", `${row.kind === "follow_up" ? "Follow-up" : "Task"}: ${row.title}`, { type: "task", id: row.id });
     bump();
     return { ok: true, id: row.id };
   } catch (e) { return fail(e); }
 }
 
-export async function setTaskStatus(tid: string, status: "open" | "done" | "dropped"): Promise<Result> {
+export async function setTaskStatus(tid: string, status: "open" | "waiting" | "done" | "dropped"): Promise<Result> {
   try {
     const user = await requireOwner();
-    const task = await db.hqTask.update({ where: { id: tid, ownerId: user.id }, data: { status, completedAt: status === "done" ? new Date() : null } });
+    const task = await db.hqTask.update({
+      where: { id: tid, ownerId: user.id },
+      data: { status, completedAt: status === "done" ? new Date() : null, waitingSince: status === "waiting" ? new Date() : null, nudgeAfterDays: status === "waiting" ? 5 : null },
+    });
+    if (status === "done") await journal(user.id, "task_done", `Done: ${task.title}`, { type: "task", id: task.id });
+    if (status === "waiting") await journal(user.id, "task_waiting", `Waiting: ${task.title}`, { type: "task", id: task.id });
     // Finishing a follow-up is contact.
     if (status === "done" && task.kind === "follow_up" && task.relationshipId) {
       await db.hqRelationship.update({ where: { id: task.relationshipId }, data: { lastContactAt: new Date(), nextTouchAt: null } });
@@ -278,9 +302,12 @@ export async function saveNote(input: z.input<typeof noteSchema>): Promise<Resul
     const user = await requireOwner();
     const { id: nid, ...data } = noteSchema.parse(input);
     const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+    const template = !nid && !data.body ? NOTE_TEMPLATES[data.kind ?? "note"] : undefined;
     const row = nid
       ? await db.hqNote.update({ where: { id: nid, ownerId: user.id }, data: clean })
-      : await db.hqNote.create({ data: { ownerId: user.id, title: data.title, ...clean } });
+      : await db.hqNote.create({ data: { ownerId: user.id, title: data.title, ...clean, ...(template ? { body: template } : {}) } });
+    await reindexMentions(user.id, { type: "note", id: row.id }, `${row.title}\n${row.body}`);
+    if (!nid) await journal(user.id, "note", `Note: ${row.title}`, { type: "note", id: row.id });
     bump();
     return { ok: true, id: row.id };
   } catch (e) { return fail(e); }
@@ -307,6 +334,8 @@ export async function saveIdea(input: z.input<typeof ideaSchema>): Promise<Resul
     const row = iid
       ? await db.hqIdea.update({ where: { id: iid, ownerId: user.id }, data: { ...clean, lastTouchedAt: new Date() } })
       : await db.hqIdea.create({ data: { ownerId: user.id, title: data.title, ...clean } });
+    await reindexMentions(user.id, { type: "idea", id: row.id }, `${row.title}\n${row.body ?? ""}`);
+    if (!iid) await journal(user.id, "idea", `Idea: ${row.title}`, { type: "idea", id: row.id });
     bump();
     return { ok: true, id: row.id };
   } catch (e) { return fail(e); }
@@ -352,6 +381,9 @@ export async function savePipeline(input: z.input<typeof pipelineSchema>): Promi
     const row = pid
       ? await db.hqPipeline.update({ where: { id: pid, ownerId: user.id }, data: { ...clean, source: "manual" } })
       : await db.hqPipeline.create({ data: { ownerId: user.id, title: data.title, ...clean } });
+    if (!pid || clean.title) forgetDictionary(user.id);
+    await reindexMentions(user.id, { type: "pipeline", id: row.id }, [row.whyItMatters, row.nextStep, row.notes].filter(Boolean).join("\n"), { targetType: "pipeline", targetId: row.id });
+    await journal(user.id, pid ? "card_edited" : "card_created", `${pid ? "Edited" : "New card"}: ${row.title}${clean.nextStep ? ` — next: ${String(clean.nextStep).slice(0, 80)}` : ""}`, { type: "pipeline", id: row.id });
     bump();
     return { ok: true, id: row.id };
   } catch (e) { return fail(e); }
@@ -361,10 +393,11 @@ export async function movePipeline(pid: string, stage: string): Promise<Result> 
   try {
     const user = await requireOwner();
     const top = await db.hqPipeline.aggregate({ where: { ownerId: user.id, stage }, _min: { order: true } });
-    await db.hqPipeline.update({
+    const row = await db.hqPipeline.update({
       where: { id: pid, ownerId: user.id },
       data: { stage, order: (top._min.order ?? 0) - 1, closedAt: stage === "passed" ? new Date() : null, source: "manual" },
     });
+    await journal(user.id, "card_moved", `${row.title} → ${stage.replace(/_/g, " ")}`, { type: "pipeline", id: pid });
     bump();
     return { ok: true };
   } catch (e) { return fail(e); }
@@ -455,6 +488,8 @@ export async function seedHq(): Promise<Result<{ pipelines: number; relationship
   try {
     const user = await requireOwner();
     const out = await seedFromRepo(user.id);
+    await reindexAll(user.id);
+    await journal(user.id, "seed", `Seeded from the Repo: ${out.pipelines} cards, ${out.relationships} people`);
     bump();
     return { ok: true, ...out };
   } catch (e) { return fail(e); }
@@ -466,6 +501,8 @@ export async function importBrain(raw: string): Promise<Result<{ summary: string
     const bundle = parseBrainBundle(String(raw ?? ""));
     if (!bundle) throw new Error("That is not a brain bundle (expected kind \"44forty-brain\").");
     const out = await importBrainBundle(user.id, bundle);
+    await reindexAll(user.id);
+    await journal(user.id, "seed", `Imported a brain bundle: ${out.ideas} ideas, ${out.notes} notes, ${out.relationships} people, ${out.interactions} conversations`);
     bump();
     const summary = Object.entries(out).filter(([k, v]) => k !== "unresolved" && v).map(([k, v]) => `${v} ${k}`).join(", ") || "nothing new";
     return { ok: true, summary, unresolved: out.unresolved };
@@ -487,5 +524,111 @@ export async function googleDisconnect(): Promise<Result> {
     await disconnectGoogle(user.id);
     bump();
     return { ok: true };
+  } catch (e) { return fail(e); }
+}
+
+// ---------------------------------------------------------------------------
+// The loops: refile, debrief, review.
+// ---------------------------------------------------------------------------
+
+/** A capture that landed in the wrong place moves, keeping its words. */
+export async function refileCapture(from: "task" | "idea" | "note", id_: string, to: "task" | "follow_up" | "idea" | "note"): Promise<Result<{ href: string }>> {
+  try {
+    const user = await requireOwner();
+    let title = "", body: string | null = null;
+    if (from === "task") { const r = await db.hqTask.findFirst({ where: { id: id_, ownerId: user.id } }); if (!r) throw new Error("Gone."); title = r.title; body = r.notes; if (to === "task" || to === "follow_up") { await db.hqTask.update({ where: { id: id_ }, data: { kind: to } }); bump(); return { ok: true, href: "/hq#tasks" }; } await db.hqTask.delete({ where: { id: id_ } }); }
+    if (from === "idea") { const r = await db.hqIdea.findFirst({ where: { id: id_, ownerId: user.id } }); if (!r) throw new Error("Gone."); title = r.title; body = r.body; await db.hqIdea.delete({ where: { id: id_ } }); }
+    if (from === "note") { const r = await db.hqNote.findFirst({ where: { id: id_, ownerId: user.id } }); if (!r) throw new Error("Gone."); title = r.title; body = r.body === r.title ? null : r.body; await db.hqNote.delete({ where: { id: id_ } }); }
+    await db.hqMention.deleteMany({ where: { ownerId: user.id, sourceType: from, sourceId: id_ } });
+    let href = "/hq#tasks";
+    if (to === "idea") { const r = await db.hqIdea.create({ data: { ownerId: user.id, title, body, source: "capture" } }); href = `/hq/ideas/${r.id}`; await reindexMentions(user.id, { type: "idea", id: r.id }, `${title}\n${body ?? ""}`); }
+    else if (to === "note") { const r = await db.hqNote.create({ data: { ownerId: user.id, title: title.slice(0, 120), body: body ?? title, source: "capture" } }); href = `/hq/brain/${r.id}`; await reindexMentions(user.id, { type: "note", id: r.id }, `${title}\n${body ?? ""}`); }
+    else { const r = await db.hqTask.create({ data: { ownerId: user.id, title, notes: body, kind: to, source: "capture" } }); await reindexMentions(user.id, { type: "task", id: r.id }, `${title}\n${body ?? ""}`); }
+    bump();
+    return { ok: true, href };
+  } catch (e) { return fail(e); }
+}
+
+const debriefSchema = z.object({
+  eventId: id, summary: z.string().trim().min(1).max(5000), nextStep: opt(1000), nextStepDue: dateIn,
+  followUpInDays: z.number().int().min(0).max(365).nullable().optional(), relationshipIds: z.array(id).max(20).optional(),
+});
+/** After a meeting: one form that logs the conversation, sets the card's next step, and books the follow-up. */
+export async function debriefEvent(input: z.input<typeof debriefSchema>): Promise<Result> {
+  try {
+    const user = await requireOwner();
+    const data = debriefSchema.parse(input);
+    const ev = await db.hqEvent.findFirst({ where: { id: data.eventId, ownerId: user.id }, include: { pipeline: true, relationship: true } });
+    if (!ev) throw new Error("Event not found.");
+    const people = new Set<string>([...(data.relationshipIds ?? []), ...(ev.relationshipId ? [ev.relationshipId] : [])]);
+    for (const rid of people) {
+      const rel = await db.hqRelationship.findFirst({ where: { id: rid, ownerId: user.id } });
+      if (!rel) continue;
+      const made = await db.hqInteraction.create({ data: { ownerId: user.id, relationshipId: rid, kind: "meeting", summary: `${ev.title}: ${data.summary}`, at: ev.startsAt } });
+      await reindexMentions(user.id, { type: "interaction", id: made.id }, data.summary, { targetType: "relationship", targetId: rid });
+      const updates: Record<string, unknown> = { source: "manual" };
+      if (!rel.lastContactAt || rel.lastContactAt < ev.startsAt) updates.lastContactAt = ev.startsAt;
+      if (data.followUpInDays != null) {
+        const due = new Date(Date.now() + data.followUpInDays * 86_400_000);
+        await db.hqTask.create({ data: { ownerId: user.id, kind: "follow_up", title: `Follow up with ${rel.name} after ${ev.title}`, dueAt: due, relationshipId: rid, pipelineId: ev.pipelineId, source: "capture" } });
+        updates.nextTouchAt = due;
+      }
+      await db.hqRelationship.update({ where: { id: rid }, data: updates });
+    }
+    if (ev.pipelineId) {
+      await db.hqPipeline.update({
+        where: { id: ev.pipelineId },
+        data: { lastContactAt: ev.startsAt, source: "manual", ...(data.nextStep ? { nextStep: data.nextStep, nextStepDue: data.nextStepDue } : {}), notes: [ev.pipeline?.notes, `[${ev.startsAt.toISOString().slice(0, 10)} — ${ev.title}] ${data.summary}`].filter(Boolean).join("\n\n") },
+      });
+      await reindexMentions(user.id, { type: "pipeline", id: ev.pipelineId }, [ev.pipeline?.whyItMatters, data.nextStep, ev.pipeline?.notes, data.summary].filter(Boolean).join("\n"), { targetType: "pipeline", targetId: ev.pipelineId });
+    }
+    await db.hqEvent.update({ where: { id: ev.id }, data: { debriefedAt: new Date() } });
+    await journal(user.id, "debrief", `Debrief — ${ev.title}: ${data.summary.slice(0, 120)}`, { type: "event", id: ev.id });
+    bump();
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+
+export async function skipDebrief(eventId: string): Promise<Result> {
+  try {
+    const user = await requireOwner();
+    await db.hqEvent.update({ where: { id: eventId, ownerId: user.id }, data: { debriefedAt: new Date() } });
+    bump();
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+
+export async function rescheduleTask(tid: string, days: number): Promise<Result> {
+  try {
+    const user = await requireOwner();
+    const base = new Date(); base.setHours(9, 0, 0, 0);
+    await db.hqTask.update({ where: { id: tid, ownerId: user.id }, data: { dueAt: new Date(base.getTime() + Math.max(0, Math.min(365, days)) * 86_400_000), status: "open", waitingSince: null } });
+    bump();
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+
+/** Close the week: the journal becomes a note, and the review clock resets. */
+export async function closeReview(reflection: string): Promise<Result<{ noteId: string }>> {
+  try {
+    const user = await requireOwner();
+    const since = new Date(Date.now() - 7 * 86_400_000);
+    const entries = await db.hqActivity.findMany({ where: { ownerId: user.id, at: { gte: since } }, orderBy: { at: "asc" } });
+    const lines = entries.map((e) => `- ${e.at.toISOString().slice(0, 10)} ${e.summary}`);
+    const body = [reflection.trim() ? `Reflection:\n${reflection.trim()}` : "", `What happened (${entries.length}):`, ...lines].filter(Boolean).join("\n");
+    const note = await db.hqNote.create({ data: { ownerId: user.id, title: `Weekly review — ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })}`, body, kind: "review", pinned: false } });
+    await db.hqSettings.upsert({ where: { ownerId: user.id }, update: { lastReviewAt: new Date() }, create: { ownerId: user.id, lastReviewAt: new Date() } });
+    await journal(user.id, "review", "Weekly review closed", { type: "note", id: note.id });
+    bump();
+    return { ok: true, noteId: note.id };
+  } catch (e) { return fail(e); }
+}
+
+export async function rebuildConnections(): Promise<Result<{ links: number }>> {
+  try {
+    const user = await requireOwner();
+    const links = await reindexAll(user.id);
+    bump();
+    return { ok: true, links };
   } catch (e) { return fail(e); }
 }

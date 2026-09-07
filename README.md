@@ -322,7 +322,12 @@ and decision makers on top of the Repo's records, relationship intelligence with
 conversation logs and touch cadences, a Brain that searches notes and the whole Repo
 together and reads the question for the kind of answer wanted, an ideas archive, a Studio
 that turns a style guide and examples into a brief for Claude, and a calendar with Google
-sync built and waiting for credentials. Details in [`docs/hq.md`](docs/hq.md).
+sync built and waiting for credentials. Underneath, a mentions graph links every name in
+anything written to the person, card or record it names, so every page shows what mentions
+it; relationship strength and card momentum are computed from those links plus recency;
+"waiting on" tasks nudge after five days; meetings get a prep sheet before and a one-box
+debrief after; and a weekly review reads the journal back with push / park / drop.
+Details in [`docs/hq.md`](docs/hq.md).
 
 **Changes files.** The panel's reader costs an API call per page. The same proposals can be
 written outside the site — by Claude in a chat, working from a downloaded backup and the

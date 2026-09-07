@@ -7,6 +7,8 @@ import { InteractionLog, RelationshipEditor } from "@/components/hq/relationship
 import { TaskList, type TaskRow } from "@/components/hq/task-list";
 import { NoteList } from "@/components/hq/note-list";
 import { STAGES, hqLabel, repoPath } from "@/lib/hq/vocab";
+import { Connections } from "@/components/hq/connections";
+import { relationshipStrength } from "@/lib/hq/strength";
 import { labelFor } from "@/lib/taxonomy";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +20,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     where: { id, ownerId: user.id },
     include: {
       interactions: { orderBy: { at: "desc" }, take: 60 },
-      tasks: { where: { status: "open" }, orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }], include: { relationship: { select: { id: true, name: true } }, pipeline: { select: { id: true, title: true } } } },
+      tasks: { where: { status: { in: ["open", "waiting"] } }, orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }], include: { relationship: { select: { id: true, name: true } }, pipeline: { select: { id: true, title: true } } } },
       notes_: { orderBy: { updatedAt: "desc" }, take: 20 },
       pipelines: { include: { pipeline: { select: { id: true, title: true, stage: true, heat: true } } } },
       events: { where: { startsAt: { gte: new Date(new Date().getTime() - 86_400_000) } }, orderBy: { startsAt: "asc" }, take: 5 },
@@ -34,7 +36,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     ? await db.creator.findUnique({ where: { id: rel.personId }, include: { people: { include: { person: { select: { name: true, slug: true } } } }, socialProfiles: true } })
     : null;
   const href = repoPath(rel.personType, repo?.slug ?? talent?.slug ?? null);
-  const tasks: TaskRow[] = rel.tasks.map((t) => ({ ...t, dueAt: t.dueAt?.toISOString() ?? null }));
+  const tasks: TaskRow[] = rel.tasks.map((t) => ({ ...t, dueAt: t.dueAt?.toISOString() ?? null, waitingSince: t.waitingSince?.toISOString() ?? null }));
+  const mentionCount = await db.hqMention.count({ where: { ownerId: user.id, targetType: "relationship", targetId: rel.id } });
+  const strength = relationshipStrength({ tier: rel.tier, lastContactAt: rel.lastContactAt, interactionDates: rel.interactions.map((i) => i.at), cardsTogether: rel.pipelines.length, mentions: mentionCount });
 
   return (
     <HqFrame active="/hq/people">
@@ -48,7 +52,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             {href && <> · <Link href={href} className="underline hover:text-accent">Repo page →</Link></>}
           </p>
         </div>
-        <div className="text-xs text-faint">{rel.lastContactAt ? `Last contact ${rel.lastContactAt.toLocaleDateString()}` : "No contact logged"}</div>
+        <div className="text-right text-xs text-faint">
+          <div><span className={`font-semibold ${strength.label === "strong" ? "text-ok" : strength.label === "fading" || strength.label === "dormant" ? "text-[#8a3a30]" : "text-charcoal"}`}>{strength.label}</span> · {strength.score}/100</div>
+          <div>{strength.why}</div>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -67,6 +74,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
               <NoteList notes={rel.notes_.map((n) => ({ id: n.id, title: n.title, kind: n.kind, updatedAt: n.updatedAt.toISOString() }))} newDefaults={{ relationshipId: rel.id, title: `${rel.name} — notes`, kind: "meeting" }} />
             </section>
           </div>
+          <Connections ownerId={user.id} target={{ targetType: "relationship", targetId: rel.id }} source={{ type: "relationship", id: rel.id }} />
           {(rel.pipelines.length > 0 || rel.events.length > 0) && (
             <section className="card p-4">
               <div className="overline mb-2">In play together</div>

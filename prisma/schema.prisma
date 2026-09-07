@@ -1013,6 +1013,7 @@ model HqSettings {
   styleGuide      String?
   briefPrefs      Json?
   seededAt        DateTime?
+  lastReviewAt    DateTime?
   updatedAt       DateTime  @updatedAt
 }
 
@@ -1128,10 +1129,12 @@ model HqTask {
   title          String
   notes          String?
   kind           String    @default("task") // task | follow_up
-  status         String    @default("open") // open | done | dropped
+  status         String    @default("open") // open | waiting | done | dropped
   priority       Int       @default(2) // 1 high · 2 normal · 3 low
   dueAt          DateTime?
   completedAt    DateTime?
+  waitingSince   DateTime?
+  nudgeAfterDays Int?
   relationshipId String?
   pipelineId     String?
   linkTargetType String?
@@ -1164,6 +1167,7 @@ model HqEvent {
   pipelineId     String?
   linkTargetType String?
   linkTargetId   String?
+  debriefedAt    DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -1236,4 +1240,34 @@ model HqAiUsage {
   createdAt    DateTime @default(now())
 
   @@index([ownerId, createdAt])
+}
+
+// The network: every name found in any HQ text, linked to what it names.
+model HqMention {
+  id         String   @id @default(cuid())
+  ownerId    String
+  sourceType String // note | idea | interaction | task | pipeline | relationship
+  sourceId   String
+  targetType String // relationship | pipeline | repo
+  targetId   String
+  targetKind String? // for repo targets: format | project | creator | person | organization | channel | opportunity
+  name       String
+  createdAt  DateTime @default(now())
+
+  @@unique([ownerId, sourceType, sourceId, targetType, targetId])
+  @@index([ownerId, targetType, targetId])
+  @@index([ownerId, sourceType, sourceId])
+}
+
+// The journal: what happened, in order, for the weekly review and for memory.
+model HqActivity {
+  id         String   @id @default(cuid())
+  ownerId    String
+  at         DateTime @default(now())
+  kind       String // captured | task_done | task_waiting | interaction | card_moved | card_edited | note | idea | review | debrief | seed | sync
+  summary    String
+  targetType String?
+  targetId   String?
+
+  @@index([ownerId, at])
 }

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { HqFrame } from "@/components/hq/nav";
 import { TaskList, type TaskRow } from "@/components/hq/task-list";
 import { hqLabel, plural, STAGES, IDEA_KINDS } from "@/lib/hq/vocab";
+import { RefileStrip } from "@/components/hq/refile";
 
 export const metadata = { title: "HQ" };
 export const dynamic = "force-dynamic";
@@ -13,24 +14,33 @@ export const dynamic = "force-dynamic";
 // top is computed, and every line says why it is there.
 
 const fmtTime = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-const KIND_WORD: Record<string, string> = { task: "Task", follow_up: "Follow-up", event: "Event", pipeline: "Card", relationship: "Person" };
+const KIND_WORD: Record<string, string> = { task: "Task", follow_up: "Follow-up", event: "Event", pipeline: "Card", relationship: "Person", waiting: "Waiting", review: "Review", debrief: "Debrief" };
 
 export default async function HqTodayPage() {
   const user = await requireOwner();
   const now = new Date();
-  const [brief, openTasks, recentNotes, settings] = await Promise.all([
+  const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+  const [brief, openTasks, recentNotes, settings, capTasks, capIdeas, capNotes] = await Promise.all([
     loadBrief(user.id, now),
     db.hqTask.findMany({
-      where: { ownerId: user.id, status: "open" },
+      where: { ownerId: user.id, status: { in: ["open", "waiting"] } },
       orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }, { priority: "asc" }, { createdAt: "desc" }],
       take: 40,
       include: { relationship: { select: { id: true, name: true } }, pipeline: { select: { id: true, title: true } } },
     }),
     db.hqNote.findMany({ where: { ownerId: user.id }, orderBy: { updatedAt: "desc" }, take: 5, select: { id: true, title: true, kind: true, updatedAt: true } }),
     db.hqSettings.findUnique({ where: { ownerId: user.id } }),
+    db.hqTask.findMany({ where: { ownerId: user.id, source: "capture", createdAt: { gte: dayStart } }, orderBy: { createdAt: "desc" }, take: 6, select: { id: true, title: true, kind: true, status: true } }),
+    db.hqIdea.findMany({ where: { ownerId: user.id, source: "capture", createdAt: { gte: dayStart } }, orderBy: { createdAt: "desc" }, take: 6, select: { id: true, title: true } }),
+    db.hqNote.findMany({ where: { ownerId: user.id, source: "capture", createdAt: { gte: dayStart } }, orderBy: { createdAt: "desc" }, take: 6, select: { id: true, title: true } }),
   ]);
+  const captured = [
+    ...capTasks.map((t) => ({ from: "task" as const, id: t.id, title: t.title, as: t.status === "waiting" ? "waiting" : t.kind === "follow_up" ? "follow-up" : "task" })),
+    ...capIdeas.map((i) => ({ from: "idea" as const, id: i.id, title: i.title, as: "idea" })),
+    ...capNotes.map((n) => ({ from: "note" as const, id: n.id, title: n.title, as: "note" })),
+  ].slice(0, 6);
   const empty = brief.counts.openTasks + brief.counts.activeCards + brief.counts.relationships + brief.counts.ideas === 0;
-  const rows: TaskRow[] = openTasks.map((t) => ({ ...t, dueAt: t.dueAt?.toISOString() ?? null }));
+  const rows: TaskRow[] = openTasks.map((t) => ({ ...t, dueAt: t.dueAt?.toISOString() ?? null, waitingSince: t.waitingSince?.toISOString() ?? null }));
   const greeting = now.getHours() < 12 ? "Morning" : now.getHours() < 18 ? "Afternoon" : "Evening";
 
   return (
@@ -41,7 +51,7 @@ export default async function HqTodayPage() {
         </h1>
         <div className="text-sm text-muted">
           {now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-          {" · "}{brief.counts.openTasks} open · {plural(brief.counts.activeCards, "card")} in play · {brief.counts.relationships} people · {plural(brief.counts.ideas, "idea")}
+          {" · "}{brief.counts.openTasks} open{brief.counts.waiting ? ` · ${brief.counts.waiting} waiting` : ""} · {plural(brief.counts.activeCards, "card")} in play · {brief.counts.relationships} people · {plural(brief.counts.ideas, "idea")}
         </div>
       </div>
 
@@ -71,12 +81,27 @@ export default async function HqTodayPage() {
         </section>
       )}
 
+      {captured.length > 0 && <RefileStrip items={captured} />}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {brief.debriefs.length > 0 && (
+            <section className="card border-accent/40 p-4">
+              <div className="overline mb-1">Write it up</div>
+              <ul className="text-sm">
+                {brief.debriefs.map((e) => (
+                  <li key={e.id} className="flex flex-wrap items-baseline gap-x-2 py-1">
+                    <Link href={`/hq/prep/${e.id}`} className="font-medium hover:text-accent">{e.title}</Link>
+                    <span className="text-muted">{e.startsAt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}{e.relationshipName ? ` · ${e.relationshipName}` : ""}{e.pipelineTitle ? ` · ${e.pipelineTitle}` : ""} — a two-minute debrief keeps the thread alive</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <section id="tasks" className="card p-4">
             <div className="mb-2 flex items-baseline justify-between">
               <div className="overline">Tasks &amp; follow-ups</div>
-              <span className="text-xs text-faint">{brief.overdue.length ? `${brief.overdue.length} overdue · ` : ""}{brief.followUps.length} follow-ups due</span>
+              <span className="text-xs text-faint">{brief.overdue.length ? `${brief.overdue.length} overdue · ` : ""}{brief.followUps.length} follow-ups due{brief.waiting.length ? ` · ${brief.waiting.length} waiting on others` : ""}</span>
             </div>
             <TaskList tasks={rows} allowAdd emptyText="Nothing open. Type into the capture bar, or pull some in from the pipeline." />
           </section>
@@ -172,6 +197,13 @@ export default async function HqTodayPage() {
             )}
           </section>
 
+          {brief.reread && (
+            <section className="card p-4">
+              <div className="overline mb-1">Worth a re-read</div>
+              <Link href={`/hq/brain/${brief.reread.id}`} className="text-sm font-medium hover:text-accent">{brief.reread.title}</Link>
+              <div className="text-xs text-faint">{brief.reread.kind.replace(/_/g, " ")} · untouched {Math.floor((now.getTime() - brief.reread.updatedAt.getTime()) / 86_400_000)}d — memory decays; this one was worth writing down</div>
+            </section>
+          )}
           <section className="card p-4">
             <div className="mb-2 flex items-baseline justify-between">
               <div className="overline">Recent notes</div>

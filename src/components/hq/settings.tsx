@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { googleDisconnect, googleSyncNow, importBrain, saveHqSettings, seedHq } from "@/lib/actions/hq";
+import { googleDisconnect, googleSyncNow, importBrain, rebuildConnections, saveHqSettings, seedHq } from "@/lib/actions/hq";
 
 export function AiSettings({ aiEnabled, capCents, keyPresent, spentToday, spentMonth }: { aiEnabled: boolean; capCents: number; keyPresent: boolean; spentToday: number; spentMonth: number }) {
   const router = useRouter();
@@ -65,7 +65,7 @@ export function GoogleSettings({ configured, status, email, lastSyncAt, lastErro
   );
 }
 
-export function SeedAndData({ seededAt, counts }: { seededAt: string | null; counts: { pipelines: number; relationships: number; ideas: number; notes: number } }) {
+export function SeedAndData({ seededAt, counts }: { seededAt: string | null; counts: { pipelines: number; relationships: number; ideas: number; notes: number; links: number } }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -89,6 +89,10 @@ export function SeedAndData({ seededAt, counts }: { seededAt: string | null; cou
           }} />
         </label>
         <p className="mt-1 text-xs text-muted">A .json of ideas, notes, people, conversations, cards and tasks prepared outside the site (kind “44forty-brain”). Names resolve against your People and the Repo.</p>
+      </div>
+      <div>
+        <button className="btn btn-secondary btn-sm" disabled={pending} onClick={() => start(async () => { const r = await rebuildConnections(); setMsg(r.ok ? `Connections rebuilt: ${r.links} links between your notes, people, cards and the Repo.` : r.error); router.refresh(); })}>Rebuild connections</button>
+        <p className="mt-1 text-xs text-muted">Every name in every note, idea, conversation, card and task links to the person, card or Repo record it names, in both directions. This rebuilds the whole graph; it also happens after a seed or an import. Currently {counts.links.toLocaleString()} links.</p>
       </div>
       <div>
         <a href="/api/hq/export" className="btn btn-secondary btn-sm">Export my HQ</a>

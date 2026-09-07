@@ -34,11 +34,11 @@ export type SearchResult = {
   total: number;
 };
 
-const STOP = new Set(("what which who whom whose where when why how have has had we us our i me my you your the a an of for to in on at by with about from and or is are was were be been being do does did any all some this that these those there their them they it its as if so than then into over under discussed discuss talked talk mention mentioned looked liked like want wanted think thought ever did we've we'd i've i'd let's list show find give me").split(" "));
+const STOP = new Set(("what which who whom whose where when why how have has had we us our i me my you your the a an of for to in on at by with about from and or is are was were be been being do does did any all some this that these those there their them they it its as if so than then into over under discussed discuss talked talk mention mentioned looked liked like want wanted think thought ever did we've we'd i've i'd let's list show find give me know anyone someone could can should would get").split(" "));
 
 const HINTS: { re: RegExp; hint: string }[] = [
   { re: /\b(athletes?|talent|creators?|players?|stars?|influencers?)\b/i, hint: "creator" },
-  { re: /\b(filmmakers?|directors?|producers?|showrunners?|writers?|dps?|editors?|execs?|executives?|buyers?|agents?|managers?|people|contacts?|reps?)\b/i, hint: "person" },
+  { re: /\b(filmmakers?|directors?|producers?|showrunners?|writers?|dps?|editors?|execs?|executives?|buyers?|agents?|managers?|people|contacts?|reps?|know|anyone|someone)\b/i, hint: "person" },
   { re: /\b(formats?|shows?|series|concepts?|ideas?|mechanics?)\b/i, hint: "format" },
   { re: /\b(projects?|films?|docs?|documentar(?:y|ies)|productions?)\b/i, hint: "project" },
   { re: /\b(companies|company|networks?|streamers?|brands?|studios?|agencies|agency)\b/i, hint: "organization" },
@@ -146,7 +146,7 @@ export function hrefFor(source: string, id: string): string {
  * people credited on it; asking for companies gives the organizations
  * connected to whatever matched.
  */
-async function answerBlocks(hints: string[], hits: Hit[]): Promise<AnswerBlock[]> {
+async function answerBlocks(ownerId: string, hints: string[], hits: Hit[]): Promise<AnswerBlock[]> {
   const blocks: AnswerBlock[] = [];
   const repoHits = hits.filter((h) => h.source === "repo");
   const formatIds = repoHits.filter((h) => h.targetType === "format").map((h) => h.targetId!);
@@ -191,6 +191,39 @@ async function answerBlocks(hints: string[], hits: Hit[]): Promise<AnswerBlock[]
     for (const x of fo) seen.set(x.organization.slug, { name: x.organization.name, href: `/organizations/${x.organization.slug}`, detail: `${x.relationship.replace(/_/g, " ")} on ${x.format.title}` });
     if (seen.size) blocks.push({ heading: "Companies connected to what matched", items: [...seen.values()].slice(0, 24) });
   }
+  // "Who do I know at Netflix": people and talent connected to matched companies, marked when they are in HQ.
+  const orgIds = repoHits.filter((h) => h.targetType === "organization").map((h) => h.targetId!);
+  if ((hints.includes("person") || hints.includes("creator") || hints.includes("organization")) && orgIds.length) {
+    const [po, co, rels] = await Promise.all([
+      db.personOrganization.findMany({ where: { organizationId: { in: orgIds } }, include: { person: { select: { id: true, name: true, slug: true, title: true } }, organization: { select: { name: true } } } }),
+      db.creatorOrganization.findMany({ where: { organizationId: { in: orgIds } }, include: { creator: { select: { id: true, name: true, slug: true } }, organization: { select: { name: true } } } }),
+      db.hqRelationship.findMany({ where: { ownerId }, select: { id: true, personType: true, personId: true, tier: true } }),
+    ]);
+    const inHq = new Map(rels.map((r) => [`${r.personType}:${r.personId}`, r]));
+    const items: AnswerBlock["items"] = [];
+    for (const x of po) { const r = inHq.get(`person:${x.person.id}`); items.push({ name: x.person.name, href: r ? `/hq/people/${r.id}` : `/people/${x.person.slug}`, detail: `${x.person.title ?? (x.role ?? "works").replace(/_/g, " ")} at ${x.organization.name}${r ? ` · in HQ (${r.tier})` : ""}` }); }
+    for (const x of co) { const r = inHq.get(`creator:${x.creator.id}`); items.push({ name: x.creator.name, href: r ? `/hq/people/${r.id}` : `/talent/${x.creator.slug}`, detail: `${x.relationship.replace(/_/g, " ")} with ${x.organization.name}${r ? ` · in HQ (${r.tier})` : ""}` }); }
+    if (items.length) blocks.push({ heading: "People you know at what matched", items: items.slice(0, 24) });
+  }
+  // The graph: what your own writing says about the people and cards that matched.
+  const graphTargets = [
+    ...hits.filter((h) => h.source === "relationship").map((h) => ({ targetType: "relationship", targetId: h.id, name: h.title })),
+    ...hits.filter((h) => h.source === "pipeline").map((h) => ({ targetType: "pipeline", targetId: h.id, name: h.title })),
+  ].slice(0, 3);
+  if (graphTargets.length) {
+    const mentions = await db.hqMention.findMany({ where: { ownerId, OR: graphTargets.map((t) => ({ targetType: t.targetType, targetId: t.targetId })) }, orderBy: { createdAt: "desc" }, take: 12 });
+    const noteIds = mentions.filter((m) => m.sourceType === "note").map((m) => m.sourceId);
+    const interIds = mentions.filter((m) => m.sourceType === "interaction").map((m) => m.sourceId);
+    const [notes, inter] = await Promise.all([
+      noteIds.length ? db.hqNote.findMany({ where: { id: { in: noteIds } }, select: { id: true, title: true, body: true } }) : [],
+      interIds.length ? db.hqInteraction.findMany({ where: { id: { in: interIds } }, include: { relationship: { select: { id: true, name: true } } } }) : [],
+    ]);
+    const items: AnswerBlock["items"] = [
+      ...notes.map((n) => ({ name: n.title, href: `/hq/brain/${n.id}`, detail: n.body.slice(0, 120) })),
+      ...inter.map((i) => ({ name: `${i.kind} with ${i.relationship.name}`, href: `/hq/people/${i.relationship.id}`, detail: i.summary.slice(0, 120) })),
+    ];
+    if (items.length) blocks.push({ heading: `Your notes that mention ${graphTargets.map((t) => t.name).join(", ")}`, items: items.slice(0, 8) });
+  }
   // Your own words first: notes and ideas that match are the memory itself.
   const own = hits.filter((h) => h.source === "note" || h.source === "idea" || h.source === "interaction").slice(0, 6);
   if (own.length && hints.length) {
@@ -218,6 +251,6 @@ export async function searchBrain(ownerId: string, query: string): Promise<Searc
   // A type hint pulls that kind of record to the front.
   const boost = (h: Hit) => (h.source === "repo" && hints.includes(h.targetType ?? "") ? 0.5 : 0) + (h.source !== "repo" ? 0.15 : 0);
   const hits = [...own, ...shared].sort((a, b) => b.rank + boost(b) - (a.rank + boost(a)));
-  const answer = await answerBlocks(hints, hits).catch(() => []);
+  const answer = await answerBlocks(ownerId, hints, hits).catch(() => []);
   return { query: q, terms, hints, answer, hits: hits.slice(0, 40), total: hits.length };
 }

@@ -6,6 +6,7 @@
 // runs it resolves names to people and #refs to pipeline cards.
 
 export type CaptureKind = "task" | "follow_up" | "event" | "idea" | "note";
+export type CaptureStatus = "open" | "waiting";
 
 export type Captured = {
   kind: CaptureKind;
@@ -17,6 +18,8 @@ export type Captured = {
   personName?: string;
   pipelineRef?: string;
   tags: string[];
+  /** "waiting on Dana for the deck": the ball is in their court. */
+  status: CaptureStatus;
   /** The rules that fired, in words — shown so the reader can see why it landed where it did. */
   reading: string[];
 };
@@ -26,6 +29,7 @@ const WEEKDAY_SHORT: Record<string, number> = { sun: 0, mon: 1, tue: 2, tues: 2,
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
 const FOLLOW_UP_VERBS = /^(call|phone|ring|email|text|dm|ping|message|follow[- ]?up (?:with|on)|check in (?:with|on)|chase|nudge|reply to|get back to|intro(?:duce)? .*? to)\b/i;
+const WAITING = /^(waiting (?:on|for)|sent (?:.+?) to|asked|pitched|submitted (?:.+?) to)\s+([A-Z][\w'.-]+(?:\s+[A-Z][\w'.-]+){0,3})?/;
 const EVENT_WORDS = /\b(meeting|meet|lunch|dinner|coffee|drinks|breakfast|zoom|call)\b\s+(?:with|w\/)\s+/i;
 const CONTACT_WITH = /\b(?:with|w\/)\s+([A-Z][\w'.-]+(?:\s+[A-Z][\w'.-]+){0,3})/;
 
@@ -134,6 +138,7 @@ export function capture(raw: string, now = new Date()): Captured {
   const reading: string[] = [];
   const tags: string[] = [];
   let kind: CaptureKind = "task";
+  let status: CaptureStatus = "open";
   let body: string | undefined;
 
   // A body after a blank line or " -- " stays with the item as its notes.
@@ -173,7 +178,13 @@ export function capture(raw: string, now = new Date()): Captured {
     text = text.replace(/\s+(on|by|at|for)$/i, "");
   }
 
-  if (!prefix) {
+  const waiting = text.match(WAITING);
+  if (waiting && !prefix) {
+    kind = "follow_up";
+    status = "waiting";
+    if (waiting[2] && !personName) personName = waiting[2];
+    reading.push("ball is in their court → waiting");
+  } else if (!prefix) {
     if (EVENT_WORDS.test(text) && date?.hasTime) {
       kind = "event";
       reading.push("a meal or meeting with someone at a time → event");
@@ -210,6 +221,7 @@ export function capture(raw: string, now = new Date()): Captured {
     personName,
     pipelineRef,
     tags,
+    status,
     reading,
   };
 }

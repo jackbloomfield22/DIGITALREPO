@@ -9,6 +9,7 @@ import { BOARD_STAGES, STAGES, hqLabel } from "@/lib/hq/vocab";
 export type CardVM = {
   id: string; title: string; stage: string; heat: number; nextStep: string | null; nextStepDue: string | null;
   lastContactAt: string | null; whyItMatters: string | null; targetType: string | null; contacts: { name: string; role: string }[];
+  momentum?: { score: number; label: string; why: string };
 };
 
 const daysSince = (iso: string | null) => (iso ? Math.floor((new Date().getTime() - new Date(iso).getTime()) / 86_400_000) : null);
@@ -39,6 +40,11 @@ function Card({ card, onDrag }: { card: CardVM; onDrag: (id: string) => void }) 
         {decision.length > 0 && <span className="text-muted">{decision.map((c) => c.name).join(", ")}</span>}
         <span className={since !== null && since > 14 ? "text-warn" : ""}>{since === null ? "no contact logged" : since === 0 ? "contact today" : `${since}d since contact`}</span>
       </div>
+      {card.momentum && (
+        <div className="mt-1.5 h-1 w-full overflow-hidden rounded bg-wash" title={`Momentum ${card.momentum.score}: ${card.momentum.why}`}>
+          <div className={`h-full ${card.momentum.label === "moving" ? "bg-ok" : card.momentum.label === "steady" ? "bg-warn" : card.momentum.label === "stalling" ? "bg-accent" : "bg-faint"}`} style={{ width: `${Math.max(4, card.momentum.score)}%` }} />
+        </div>
+      )}
     </div>
   );
 }

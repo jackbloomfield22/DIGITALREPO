@@ -55,6 +55,15 @@ export const NOTE_KINDS: Labeled[] = [
   { value: "email_template", label: "Email template" },
 ];
 
+/** What a new note of a kind starts with. Headings, not rules. */
+export const NOTE_TEMPLATES: Record<string, string> = {
+  meeting: "Who was there:\n\nWhat they want:\n\nWhat we said / promised:\n\nWhat surprised me:\n\nNext steps:\n- ",
+  research: "Question:\n\nWhat I found:\n\nSo what:\n\nRabbit holes worth going down:\n- ",
+  pitch: "Title:\n\nLogline:\n\nWhy now:\n\nThe mechanic:\n\nTalent:\n\nWho buys it and why:\n",
+  talent_list: "For:\n\nNames (why each):\n- ",
+  review: "",
+};
+
 export const IDEA_KINDS: Labeled[] = [
   { value: "idea", label: "Idea" },
   { value: "format_mechanic", label: "Format mechanic" },

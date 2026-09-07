@@ -4,6 +4,7 @@ import { requireOwner } from "@/lib/hq/owner";
 import { HqFrame } from "@/components/hq/nav";
 import { PipelineBoard, type CardVM } from "@/components/hq/pipeline-board";
 import { ACTIVE_STAGES } from "@/lib/hq/vocab";
+import { cardMomentum } from "@/lib/hq/strength";
 
 export const metadata = { title: "HQ · Pipeline" };
 export const dynamic = "force-dynamic";
@@ -16,7 +17,11 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
     orderBy: [{ order: "asc" }, { heat: "desc" }, { updatedAt: "desc" }],
     include: { contacts: { include: { relationship: { select: { name: true } } } } },
   });
+  const month = new Date(new Date().getTime() - 30 * 86_400_000);
+  const activity = await db.hqActivity.groupBy({ by: ["targetId"], where: { ownerId: user.id, targetType: "pipeline", at: { gte: month } }, _count: { _all: true } });
+  const activityBy = new Map(activity.map((a) => [a.targetId, a._count._all]));
   const vm: CardVM[] = cards.map((c) => ({
+    momentum: cardMomentum({ heat: c.heat, stage: c.stage, nextStep: c.nextStep, nextStepDue: c.nextStepDue, lastContactAt: c.lastContactAt, updatedAt: c.updatedAt, activity30: activityBy.get(c.id) ?? 0 }),
     id: c.id, title: c.title, stage: c.stage, heat: c.heat, nextStep: c.nextStep, nextStepDue: c.nextStepDue?.toISOString() ?? null,
     lastContactAt: c.lastContactAt?.toISOString() ?? null, whyItMatters: c.whyItMatters, targetType: c.targetType,
     contacts: c.contacts.map((x) => ({ name: x.relationship.name, role: x.role })),
@@ -38,7 +43,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
         </div>
         <div className="flex items-center gap-3 text-xs">
           <Link href={show === "all" ? "/hq/pipeline" : "/hq/pipeline?show=all"} className="text-muted hover:text-accent">{show === "all" ? "Hide passed" : "Show passed"}</Link>
-          <span className="text-faint">Drag cards between stages. Click a title for the full card.</span>
+          <span className="text-faint">Drag cards between stages. Click a title for the full card. The bar is momentum.</span>
         </div>
       </div>
       {cards.length === 0 ? (

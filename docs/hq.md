@@ -54,6 +54,44 @@ One section with eight views of the same thing, not eight tools.
 - **Settings** — seed from the Repo, import a brain bundle, export HQ, the AI
   switch and daily cap with a spend meter, and the Google connection.
 
+## The network, and the loops
+
+What makes HQ a brain rather than a set of lists:
+
+- **Mentions graph.** Every note, idea, conversation, card and task is scanned for
+  the names it contains — your people, your cards, the Repo's records — and each
+  hit is stored as a link (`HqMention`). Nothing is tagged by hand. Every page
+  shows *Mentions* (what this text names) and *Comes up in* (everything that
+  names this thing). The matcher is conservative: whole words, longest name
+  wins, no short or common single words. `src/lib/hq/mentions.ts` (pure) and
+  `network.ts`; *Rebuild connections* on Settings redoes the whole graph.
+- **Strength and momentum.** A relationship's strength is recency × frequency ×
+  depth (cards together, mentions in your writing), labelled strong / steady /
+  fading / dormant with the reason in words. A card's momentum is recency, a
+  written next step, recent activity and heat, labelled moving / steady /
+  stalling / stalled. Shown on the People list, the person page, the board and
+  the card. `src/lib/hq/strength.ts`.
+- **Waiting-for.** A task can be *waiting* — the ball is in their court. "waiting
+  on Dana for the deck", "sent the sizzle to Netflix" file that way from the
+  capture bar; ⏳ on any task toggles it. After five days Today says nudge.
+- **Prep and debrief.** Any event linked to a person or a card gets a prep sheet
+  (`/hq/prep/<event>`): interests, how you met, last conversations, open items,
+  the card's why and next step, and what else mentions it. After the event the
+  same page takes a one-box debrief that logs the conversation on each person,
+  moves last-contact, sets the card's next step and books the follow-up. Today
+  lists meetings not yet written up.
+- **The journal and the weekly review.** Every action writes one line to
+  `HqActivity`. `/hq/review` shows the week by day, stalled cards with
+  push / park / drop, overdue tasks with done / +7d / drop, what you are still
+  waiting on and who is slipping out of touch, and closes as a review note in
+  the Brain. Today asks for a review after seven days.
+- **Clarify.** What the capture bar filed today sits at the top of Today with
+  one-click re-filing between task, follow-up, idea and note.
+- **Resurfacing.** Three ideas a day, and one substantial note untouched for 45
+  days, rotated by date.
+- **Templates.** New meeting, research, pitch and talent-list notes start with
+  headings, not a blank page.
+
 ## Seeding
 
 **Seed from the Repo** creates a pipeline card for every live format, channel,
@@ -109,7 +147,8 @@ Everything else in HQ works without a model.
 ## Files
 
 - `src/lib/hq/owner.ts` — the guard. `src/lib/hq/vocab.ts` — stages, tiers, kinds.
-- `src/lib/hq/capture.ts`, `brief.ts`, `search.ts`, `ics.ts` — pure logic, tested in `tests/hq.test.ts`.
+- `src/lib/hq/capture.ts`, `brief.ts`, `search.ts`, `ics.ts`, `mentions.ts`, `strength.ts` — pure logic, tested in `tests/hq.test.ts`.
+- `src/lib/hq/network.ts` — the graph. `src/lib/hq/journal.ts` — the activity log.
 - `src/lib/hq/google.ts` — OAuth and sync. `src/lib/hq/seed.ts` — seed, export, bundle import. `src/lib/hq/ask.ts` — the gated model calls. `src/lib/hq/studio.ts` — the brief builder.
 - `src/lib/actions/hq.ts` — every write. `src/app/api/hq/*` — lookup, export, ask, draft, brief, style-upload, Google start/callback.
 - `src/app/(app)/hq/*` — the pages. `src/components/hq/*` — the views.

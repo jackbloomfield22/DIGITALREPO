@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireOwner } from "@/lib/hq/owner";
 import { HqFrame } from "@/components/hq/nav";
 import { NoteEditor } from "@/components/hq/note-editor";
+import { Connections } from "@/components/hq/connections";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
     <HqFrame active="/hq/brain">
       <div className="mb-3 text-xs text-muted"><Link href="/hq/brain" className="hover:text-accent">← Brain</Link> · {note.kind.replace(/_/g, " ")} · updated {note.updatedAt.toLocaleString()}</div>
       <NoteEditor note={{ id: note.id, title: note.title, body: note.body, kind: note.kind, tags: note.tags, pinned: note.pinned, relationship: note.relationship, pipeline: note.pipeline }} />
+      <div className="mt-6"><Connections ownerId={user.id} target={{ targetType: "note", targetId: note.id }} source={{ type: "note", id: note.id }} /></div>
     </HqFrame>
   );
 }

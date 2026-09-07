@@ -7,6 +7,8 @@ import { PipelineCardEditor, type CardDetail } from "@/components/hq/pipeline-ca
 import { TaskList, type TaskRow } from "@/components/hq/task-list";
 import { NoteList } from "@/components/hq/note-list";
 import { repoPath } from "@/lib/hq/vocab";
+import { Connections } from "@/components/hq/connections";
+import { cardMomentum } from "@/lib/hq/strength";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +28,7 @@ export default async function PipelineCardPage({ params }: { params: Promise<{ i
     where: { id, ownerId: user.id },
     include: {
       contacts: { include: { relationship: { select: { id: true, name: true, tier: true, lastContactAt: true } } } },
-      tasks: { where: { status: "open" }, orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }], include: { relationship: { select: { id: true, name: true } }, pipeline: { select: { id: true, title: true } } } },
+      tasks: { where: { status: { in: ["open", "waiting"] } }, orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }], include: { relationship: { select: { id: true, name: true } }, pipeline: { select: { id: true, title: true } } } },
       notes_: { orderBy: { updatedAt: "desc" }, take: 20 },
       events: { where: { startsAt: { gte: new Date(new Date().getTime() - 86_400_000) } }, orderBy: { startsAt: "asc" }, take: 5 },
     },
@@ -39,16 +41,22 @@ export default async function PipelineCardPage({ params }: { params: Promise<{ i
     targetType: card.targetType, repoHref: repoPath(card.targetType, slug),
     contacts: card.contacts.map((c) => ({ relationshipId: c.relationshipId, name: c.relationship.name, role: c.role, note: c.note, tier: c.relationship.tier, lastContactAt: c.relationship.lastContactAt?.toISOString() ?? null })),
   };
-  const tasks: TaskRow[] = card.tasks.map((t) => ({ ...t, dueAt: t.dueAt?.toISOString() ?? null }));
+  const tasks: TaskRow[] = card.tasks.map((t) => ({ ...t, dueAt: t.dueAt?.toISOString() ?? null, waitingSince: t.waitingSince?.toISOString() ?? null }));
   // The card's people, and everything said to them lately: the conversation around this project.
   const recent = card.contacts.length
     ? await db.hqInteraction.findMany({ where: { ownerId: user.id, relationshipId: { in: card.contacts.map((c) => c.relationshipId) } }, orderBy: { at: "desc" }, take: 8, include: { relationship: { select: { id: true, name: true } } } })
     : [];
 
+  const activity30 = recent.filter((i) => i.at > new Date(new Date().getTime() - 30 * 86_400_000)).length + (await db.hqActivity.count({ where: { ownerId: user.id, targetType: "pipeline", targetId: card.id, at: { gte: new Date(new Date().getTime() - 30 * 86_400_000) } } }));
+  const momentum = cardMomentum({ heat: card.heat, stage: card.stage, nextStep: card.nextStep, nextStepDue: card.nextStepDue, lastContactAt: card.lastContactAt, updatedAt: card.updatedAt, activity30 });
   return (
     <HqFrame active="/hq/pipeline">
-      <div className="mb-3 text-xs text-muted"><Link href="/hq/pipeline" className="hover:text-accent">← Pipeline</Link></div>
+      <div className="mb-3 flex items-baseline justify-between text-xs text-muted">
+        <Link href="/hq/pipeline" className="hover:text-accent">← Pipeline</Link>
+        <span>Momentum <span className={`font-semibold ${momentum.label === "moving" ? "text-ok" : momentum.label === "stalled" ? "text-[#8a3a30]" : "text-charcoal"}`}>{momentum.label}</span> · {momentum.score}/100 · {momentum.why}</span>
+      </div>
       <PipelineCardEditor card={vm} />
+      <div className="mt-6"><Connections ownerId={user.id} target={{ targetType: "pipeline", targetId: card.id }} source={{ type: "pipeline", id: card.id }} /></div>
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <section className="card p-4">
           <div className="overline mb-2">Tasks on this</div>
