@@ -321,3 +321,40 @@ describe("page updates spend one model call", () => {
     expect(formatCents(250)).toBe("$2.50");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Industry people on formats, and moving them with the page.
+// ---------------------------------------------------------------------------
+
+import { deleteLink, upsertLink } from "@/lib/link-core";
+import { LINK_SPECS } from "@/lib/ingest/registry";
+
+describe("people on formats", () => {
+  it("links and unlinks a person to a format with a role, and ingest knows the kind", async () => {
+    const person = await db.industryPerson.create({ data: { name: `${P} Brennan`, slug: slugify(`${P} brennan`), roleType: "producer" } });
+    const format = await db.format.create({ data: { title: `${P} Vinyl Series`, slug: slugify(`${P} vinyl`), status: "concept", formatType: "docuseries", ownerId: "u-pageops-test" } });
+    await upsertLink({ kind: "format_person", formatId: format.id, personId: person.id, role: "producer" });
+    await upsertLink({ kind: "format_person", formatId: format.id, personId: person.id, role: "producer" }); // idempotent
+    expect(await db.formatPerson.count({ where: { formatId: format.id } })).toBe(1);
+    expect(LINK_SPECS.format_person).toMatchObject({ ingest: true, a: { targetType: "format" }, b: { targetType: "person" }, roleField: "role" });
+    expect(parse({ op: "link", kind: "format_person", aName: format.title, bName: person.name, role: "Executive Producer" })).toMatchObject({ ok: true, op: { role: "executive_producer" } });
+    await deleteLink({ kind: "format_person", formatId: format.id, personId: person.id, role: "producer" });
+    expect(await db.formatPerson.count({ where: { formatId: format.id } })).toBe(0);
+  });
+
+  it("carries people across a format → project move and back", async () => {
+    const person = await db.industryPerson.create({ data: { name: `${P} Exec`, slug: slugify(`${P} exec`), roleType: "executive" } });
+    const format = await db.format.create({
+      data: { title: `${P} Carried Show`, slug: slugify(`${P} carried`), status: "pitching", formatType: "docuseries", ownerId: "u-pageops-test", people: { create: { personId: person.id, role: "executive_producer", note: "champion" } } },
+    });
+    const { convertRecord } = await import("@/lib/convert");
+    const moved = await convertRecord({ id: "u-pageops-test", name: "Page Ops", role: "EDITOR" } as never, { type: "format", id: format.id }, "project");
+    const credits = await db.personProject.findMany({ where: { projectId: moved.toId } });
+    expect(credits).toEqual([expect.objectContaining({ personId: person.id, role: "executive_producer", note: "champion" })]);
+    // And a project's people come along when it becomes a format again.
+    const back = await convertRecord({ id: "u-pageops-test", name: "Page Ops", role: "EDITOR" } as never, { type: "project", id: moved.toId }, "format");
+    const onFormat = await db.formatPerson.findMany({ where: { formatId: back.toId } });
+    expect(onFormat).toEqual([expect.objectContaining({ personId: person.id, role: "executive_producer" })]);
+    expect((await db.format.findUnique({ where: { id: back.toId } }))?.notes ?? "").not.toContain("People on the project");
+  });
+});

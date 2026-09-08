@@ -54,6 +54,7 @@ export async function auditInfo(p: LinkPayload): Promise<{ targetType: string; t
     case "project_org": return { targetType: "project", targetId: p.projectId, targetLabel: await label("project", p.projectId), other: `${await label("organization", p.organizationId)} (${p.relationship})` };
     case "project_entity": return { targetType: "project", targetId: p.projectId, targetLabel: await label("project", p.projectId), other: await label("entity", p.entityId) };
     case "project_person": return { targetType: "project", targetId: p.projectId, targetLabel: await label("project", p.projectId), other: `${await label("person", p.personId)} (${p.role})` };
+    case "format_person": return { targetType: "format", targetId: p.formatId, targetLabel: await label("format", p.formatId), other: `${await label("person", p.personId)} (${p.role})` };
     case "format_entity": return { targetType: "format", targetId: p.formatId, targetLabel: await label("format", p.formatId), other: await label("entity", p.entityId) };
     case "format_org": return { targetType: "format", targetId: p.formatId, targetLabel: await label("format", p.formatId), other: await label("organization", p.organizationId) };
     case "channel_org": return { targetType: "channel", targetId: p.channelId, targetLabel: await label("channel", p.channelId), other: await label("organization", p.organizationId) };
@@ -145,6 +146,13 @@ export async function upsertLink(p: LinkPayload): Promise<void> {
         where: { personId_projectId_role: { personId: p.personId, projectId: p.projectId, role: p.role } },
         update: {},
         create: { personId: p.personId, projectId: p.projectId, role: p.role },
+      });
+      return;
+    case "format_person":
+      await db.formatPerson.upsert({
+        where: { personId_formatId_role: { personId: p.personId, formatId: p.formatId, role: p.role } },
+        update: {},
+        create: { personId: p.personId, formatId: p.formatId, role: p.role },
       });
       return;
     case "format_entity":
@@ -269,6 +277,9 @@ export async function deleteLink(p: LinkPayload): Promise<void> {
       return;
     case "project_person":
       await db.personProject.deleteMany({ where: { personId: p.personId, projectId: p.projectId, role: p.role } });
+      return;
+    case "format_person":
+      await db.formatPerson.deleteMany({ where: { personId: p.personId, formatId: p.formatId, role: p.role } });
       return;
     case "format_entity":
       await db.formatEntityLink.deleteMany({ where: { formatId: p.formatId, entityId: p.entityId } });

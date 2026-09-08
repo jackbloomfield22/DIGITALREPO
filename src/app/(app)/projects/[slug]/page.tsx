@@ -9,6 +9,8 @@ import { recordRecentView } from "@/lib/actions/misc";
 import { findRelatedProjects } from "@/lib/related";
 import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
 import { LinkChips } from "@/components/link-editor";
+import { QuietTimer } from "@/components/quiet-timer";
+import { onQuietTimer, quietClock } from "@/lib/quiet-rules";
 import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
 import { SourceList } from "@/components/sources-attachments";
 import { AttachmentList } from "@/components/attachments";
@@ -38,7 +40,7 @@ export default async function ProjectPage({
       credits: { include: { creator: { select: { id: true, name: true, slug: true, imageUrl: true } } } },
       organizations: { include: { organization: true } },
       entityLinks: { include: { entity: true } },
-      people: { include: { person: { select: { id: true, name: true, slug: true, title: true } } } },
+      people: { include: { person: { select: { id: true, name: true, slug: true, title: true, organizations: { take: 1, include: { organization: { select: { name: true } } } } } } } },
       opportunities: { include: { opportunity: { select: { title: true, slug: true } } } },
     },
   });
@@ -146,6 +148,9 @@ export default async function ProjectPage({
             <AddToCollectionButton targetType="project" targetId={project.id} targetLabel={project.title} />
           </div>
         </div>
+        <div className="mt-3">
+          <QuietTimer targetType="project" id={project.id} name={project.title} canEdit={canEdit} onTimer={onQuietTimer("project", project.status)} {...quietClock(project)} />
+        </div>
       </div>
 
       <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
@@ -208,7 +213,7 @@ export default async function ProjectPage({
               items={project.people.map((pp) => ({
                 key: pp.id,
                 label: pp.person.name,
-                sub: labelFor(pp.role),
+                sub: [labelFor(pp.role), pp.person.organizations[0]?.organization.name ?? pp.person.title].filter(Boolean).join(" · "),
                 href: `/people/${pp.person.slug}`,
                 removePayload: { kind: "project_person", projectId: project.id, personId: pp.personId, role: pp.role },
               }))}

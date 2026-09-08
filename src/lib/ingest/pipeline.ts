@@ -374,7 +374,7 @@ async function linkAlreadyExists(op: { kind: string; role?: string }, aId: strin
     creator_entity: "creatorEntityLink", creator_format: "creatorFormat", creator_project: "creatorProjectCredit",
     creator_org: "creatorOrganization", creator_person: "creatorPerson", creator_creator: "creatorRelationship",
     project_org: "projectOrganization", project_entity: "projectEntityLink", project_person: "personProject",
-    format_entity: "formatEntityLink", format_org: "formatOrganization",
+    format_entity: "formatEntityLink", format_org: "formatOrganization", format_person: "formatPerson",
     channel_org: "channelOrganization", channel_person: "channelPerson",
     person_org: "personOrganization",
     opportunity_creator: "opportunityCreator", opportunity_format: "opportunityFormat",

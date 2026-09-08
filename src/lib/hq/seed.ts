@@ -26,11 +26,11 @@ export type SeedOutcome = { pipelines: number; relationships: number; contacts: 
 
 export async function seedFromRepo(ownerId: string): Promise<SeedOutcome> {
   const [formats, channels, projects, opportunities, people, creators] = await Promise.all([
-    db.format.findMany({ where: { archived: false }, include: { creators: { select: { creatorId: true, isPrimary: true } } } }),
+    db.format.findMany({ where: { archived: false }, include: { creators: { select: { creatorId: true, isPrimary: true } }, people: { select: { personId: true, role: true } } } }),
     db.channel.findMany({ where: { archived: false }, include: { people: { select: { personId: true, relationship: true } } } }),
     db.project.findMany({ where: { archived: false, status: { in: Object.keys(PROJECT_STAGE) } }, include: { credits: { select: { creatorId: true } }, people: { select: { personId: true, role: true } } } }),
     db.opportunity.findMany({ where: { archived: false }, include: { creators: { select: { creatorId: true } } } }),
-    db.industryPerson.findMany({ where: { archived: false }, include: { _count: { select: { projects: true, creators: true, channels: true } } } }),
+    db.industryPerson.findMany({ where: { archived: false }, include: { _count: { select: { projects: true, creators: true, channels: true, formats: true } } } }),
     db.creator.findMany({ where: { archived: false }, include: { entityLinks: { include: { entity: { select: { name: true } } } }, _count: { select: { formats: true, credits: true, channels: true } } } }),
   ]);
 
@@ -38,7 +38,7 @@ export async function seedFromRepo(ownerId: string): Promise<SeedOutcome> {
   const relRows = [
     ...people.map((p) => ({
       ownerId, personType: "person", personId: p.id, name: p.name, email: p.email ?? null,
-      tier: p._count.projects + p._count.creators + p._count.channels > 0 ? "active" : "warm",
+      tier: p._count.projects + p._count.creators + p._count.channels + p._count.formats > 0 ? "active" : "warm",
       notes: [p.title, p.roleType ? p.roleType.replace(/_/g, " ") : null].filter(Boolean).join(" · ") || null,
       source: "seed",
     })),
@@ -61,7 +61,7 @@ export async function seedFromRepo(ownerId: string): Promise<SeedOutcome> {
   for (const f of formats) {
     const stage = FORMAT_STAGE[f.status]; if (!stage) continue;
     cards.push({ targetType: "format", targetId: f.id, title: f.title, stage, whyItMatters: f.logline ?? null, lastContactAt: f.lastActivityAt ?? null,
-      contacts: f.creators.map((c) => ({ key: `creator:${c.creatorId}`, role: "talent" })) });
+      contacts: [...f.creators.map((c) => ({ key: `creator:${c.creatorId}`, role: "talent" })), ...f.people.map((x) => ({ key: `person:${x.personId}`, role: x.role === "executive_producer" || x.role === "executive" ? "decision_maker" : "partner" }))] });
   }
   for (const c of channels) {
     const stage = CHANNEL_STAGE[c.status]; if (!stage) continue;

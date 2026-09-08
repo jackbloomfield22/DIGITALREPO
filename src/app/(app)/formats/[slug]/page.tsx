@@ -8,11 +8,13 @@ import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
 import { LinkChips } from "@/components/link-editor";
+import { QuietTimer } from "@/components/quiet-timer";
+import { onQuietTimer, quietClock } from "@/lib/quiet-rules";
 import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
 import { SourceList } from "@/components/sources-attachments";
 import { AttachmentList } from "@/components/attachments";
 import { attachmentsFor, uploadLimit } from "@/lib/files";
-import { labelFor } from "@/lib/taxonomy";
+import { labelFor, PERSON_PROJECT_ROLES } from "@/lib/taxonomy";
 import { formatDate, relativeTime } from "@/lib/format";
 
 export default async function FormatPage({
@@ -28,6 +30,7 @@ export default async function FormatPage({
       creators: { include: { creator: { select: { id: true, name: true, slug: true, imageUrl: true, headline: true } } } },
       entityLinks: { include: { entity: true } },
       organizations: { include: { organization: { select: { id: true, name: true, slug: true } } } },
+      people: { include: { person: { select: { id: true, name: true, slug: true, title: true, organizations: { take: 1, include: { organization: { select: { name: true } } } } } } } },
       opportunities: { include: { opportunity: { select: { title: true, slug: true, status: true } } } },
       owner: { select: { name: true } },
     },
@@ -79,6 +82,9 @@ export default async function FormatPage({
             <FavoriteButton targetType="format" targetId={format.id} favorited={!!favorite} />
             <AddToCollectionButton targetType="format" targetId={format.id} targetLabel={format.title} />
           </div>
+        </div>
+        <div className="mt-3">
+          <QuietTimer targetType="format" id={format.id} name={format.title} canEdit={canEdit} onTimer={onQuietTimer("format", format.status)} {...quietClock(format)} />
         </div>
       </div>
 
@@ -138,6 +144,29 @@ export default async function FormatPage({
                 emptyMessage={format.creators.length ? "" : "No talent attached yet."}
               />
             </div>
+          </Section>
+
+          <Section title="People">
+            <LinkChips
+              canEdit={canEdit}
+              items={format.people.map((fp) => ({
+                key: fp.id,
+                label: fp.person.name,
+                sub: [labelFor(fp.role), fp.person.organizations[0]?.organization.name ?? fp.person.title].filter(Boolean).join(" · "),
+                href: `/people/${fp.person.slug}`,
+                removePayload: { kind: "format_person", formatId: format.id, personId: fp.personId, role: fp.role },
+              }))}
+              addConfig={{
+                template: { kind: "format_person", formatId: format.id },
+                idField: "personId",
+                lookupType: "person",
+                roleField: "role",
+                roleOptions: PERSON_PROJECT_ROLES,
+                createKind: "person",
+                buttonLabel: "+ Add Person",
+              }}
+              emptyMessage="No industry people on this yet — the execs, producers and reps involved. Their company shows next to their name; click through for contact details."
+            />
           </Section>
 
           <Section title="Interests, Sports & Topics">

@@ -24,6 +24,7 @@ export default async function PersonPage({
       organizations: { include: { organization: { select: { id: true, name: true, slug: true } } } },
       creators: { include: { creator: { select: { id: true, name: true, slug: true, imageUrl: true } } } },
       projects: { include: { project: { select: { id: true, title: true, slug: true } } } },
+      formats: { include: { format: { select: { id: true, title: true, slug: true, status: true } } } },
     },
   });
   if (!person) notFound();
@@ -137,6 +138,20 @@ export default async function PersonPage({
               removePayload: { kind: "project_person", projectId: pp.projectId, personId: person.id, role: pp.role },
             }))}
             emptyMessage="No project credits recorded."
+          />
+        </Section>
+
+        <Section title="Formats">
+          <LinkChips
+            canEdit={canEdit}
+            items={person.formats.map((fp) => ({
+              key: fp.id,
+              label: fp.format.title,
+              sub: [labelFor(fp.role), labelFor(fp.format.status)].filter(Boolean).join(" · "),
+              href: `/formats/${fp.format.slug}`,
+              removePayload: { kind: "format_person", formatId: fp.formatId, personId: person.id, role: fp.role },
+            }))}
+            emptyMessage="Not on any format in development."
           />
         </Section>
 

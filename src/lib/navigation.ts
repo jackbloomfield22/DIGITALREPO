@@ -6,6 +6,7 @@ export const NAV_GROUPS: { label: string; collapsed?: boolean; items: NavItem[] 
     { href: "/projects", label: "Projects", description: "Existing shows & credits" },
     { href: "/organizations", label: "Organizations", description: "Companies, brands & buyers" },
     { href: "/people", label: "Industry people", description: "Representatives & contacts" },
+    { href: "/archive", label: "Archive", description: "Everything that has gone quiet or been shelved — restorable any time" },
   ] },
   { label: "Workspaces", items: [
     { href: "/development", label: "Development overview" },
@@ -27,7 +28,6 @@ export const NAV_GROUPS: { label: string; collapsed?: boolean; items: NavItem[] 
     { href: "/ai", label: "Ask AI" },
     { href: "/uploads", label: "Add information" },
     { href: "/ingest", label: "Review incoming info" },
-    { href: "/archive", label: "Archive" },
     { href: "/attention", label: "Needs attention" },
     { href: "/activity", label: "Team activity" },
   ] },

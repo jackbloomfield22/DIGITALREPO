@@ -3,6 +3,7 @@ import { directoryPageUrl } from "@/lib/directory-params";
 import { pageNumber } from "@/lib/directory-params";
 import { formatSearch } from "@/lib/search-where";
 import Link from "next/link";
+import { sweepQuietRecordsThrottled } from "@/lib/quiet";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireUser, hasRole } from "@/lib/auth";
@@ -24,6 +25,7 @@ export default async function FormatsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await sweepQuietRecordsThrottled();
   const user = await requireUser();
   const params = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);

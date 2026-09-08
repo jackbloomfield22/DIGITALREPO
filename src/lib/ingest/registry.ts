@@ -351,6 +351,14 @@ export const LINK_SPECS: Record<LinkPayload["kind"], LinkSpec> = {
     roleField: "role",
     roleVocab: () => PERSON_PROJECT_ROLES,
   },
+  format_person: {
+    kind: "format_person", ingest: true,
+    a: { targetType: "format", idField: "formatId" },
+    b: { targetType: "person", idField: "personId" },
+    roleField: "role",
+    roleVocab: () => PERSON_PROJECT_ROLES,
+    note: "An industry person involved in a format in development — an exec, a producer, a rep.",
+  },
   format_entity: {
     kind: "format_entity", ingest: true,
     a: { targetType: "format", idField: "formatId" },

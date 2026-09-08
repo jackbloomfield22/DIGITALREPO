@@ -96,7 +96,7 @@ export async function convertRecord(
     where: { id: from.id },
     include:
       fromType === "format"
-        ? { creators: { include: { creator: true } }, organizations: { include: { organization: true } }, entityLinks: { include: { entity: true } }, opportunities: true }
+        ? { creators: { include: { creator: true } }, organizations: { include: { organization: true } }, entityLinks: { include: { entity: true } }, opportunities: true, people: { include: { person: true } } }
         : fromType === "project"
           ? { credits: { include: { creator: true } }, organizations: { include: { organization: true } }, entityLinks: { include: { entity: true } }, people: { include: { person: true } }, opportunities: true }
           : fromType === "creator"
@@ -152,13 +152,12 @@ export async function convertRecord(
     for (const op of src.opportunities ?? []) {
       await db.opportunityProject.create({ data: { opportunityId: op.opportunityId, projectId: toId } }).catch(() => {});
     }
+    for (const fp of src.people ?? []) {
+      await db.personProject.create({ data: { personId: fp.personId, projectId: toId, role: fp.role, note: fp.note ?? null } }).catch(() => {});
+    }
   } else if (to === "format") {
     toSlug = await freshSlug("format", toName);
     const formatType = has(FORMAT_TYPES, str("formatType")) ? str("formatType")! : has(FORMAT_TYPES, src.projectType) ? src.projectType : "other";
-    const peopleNote = (src.people ?? []).length
-      ? `People on the project this came from: ${src.people.map((p: { person: { name: string }; role: string }) => `${p.person.name} (${labelFor(p.role)})`).join(", ")}`
-      : null;
-    if (peopleNote) rehomed.push("the project's people");
     const created = await db.format.create({
       data: {
         slug: toSlug, title: toName,
@@ -166,7 +165,7 @@ export async function convertRecord(
         status: str("status") ?? "concept",
         logline: str("logline") ?? src.logline ?? null,
         description: str("description") ?? src.description ?? null,
-        notes: joinNotes(src.internalNotes, peopleNote),
+        notes: joinNotes(src.internalNotes),
         lastActivityAt: src.lastActivityAt ?? carried,
         ownerId: user.id,
       },
@@ -193,6 +192,9 @@ export async function convertRecord(
     }
     for (const op of src.opportunities ?? []) {
       await db.opportunityFormat.create({ data: { opportunityId: op.opportunityId, formatId: toId } }).catch(() => {});
+    }
+    for (const pp of src.people ?? []) {
+      await db.formatPerson.create({ data: { personId: pp.personId, formatId: toId, role: pp.role, note: pp.note ?? null } }).catch(() => {});
     }
   } else if (to === "person") {
     toSlug = await freshSlug("industryPerson", toName);

@@ -16,7 +16,7 @@ const TABLE_ORDER = [
   "organization", "industryPerson", "format", "opportunity",
   "creatorEntityLink", "formatEntityLink", "projectEntityLink",
   "opportunityEntityLink", "creatorProjectCredit", "projectOrganization",
-  "creatorOrganization", "creatorPerson", "personOrganization", "personProject",
+  "creatorOrganization", "creatorPerson", "personOrganization", "personProject", "formatPerson",
   "creatorFormat", "formatOrganization", "creatorRelationship",
   "opportunityCreator", "opportunityFormat", "opportunityProject",
   "opportunityOrganization", "collection", "collectionItem", "savedView",

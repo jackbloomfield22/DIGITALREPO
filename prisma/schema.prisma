@@ -199,6 +199,7 @@ model IndustryPerson {
   organizations PersonOrganization[]
   creators      CreatorPerson[]
   projects      PersonProject[]
+  formats       FormatPerson[]
 
   @@index([name])
   channels     ChannelPerson[]
@@ -232,6 +233,7 @@ model Format {
   creators      CreatorFormat[]
   entityLinks   FormatEntityLink[]
   organizations FormatOrganization[]
+  people           FormatPerson[]
   opportunities OpportunityFormat[]
 
   @@index([title])
@@ -440,6 +442,22 @@ model PersonProject {
 
   @@unique([personId, projectId, role])
   @@index([projectId])
+}
+
+// An industry person on a format in development — the exec, producer or rep
+// involved before there is a production to credit them on.
+model FormatPerson {
+  id       String  @id @default(cuid())
+  personId String
+  formatId String
+  role     String // executive_producer | producer | director | ...
+  note     String?
+
+  person IndustryPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  format Format         @relation(fields: [formatId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, formatId, role])
+  @@index([formatId])
 }
 
 model CreatorFormat {

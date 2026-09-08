@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/ingest",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/quiet",
+      "schedule": "30 8 * * *"
     }
   ]
 }

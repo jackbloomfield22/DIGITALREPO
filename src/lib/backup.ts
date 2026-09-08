@@ -63,6 +63,7 @@ export const TABLE_ORDER = [
   "creatorPerson",
   "personOrganization",
   "personProject",
+  "formatPerson",
   "creatorFormat",
   "formatOrganization",
   "creatorRelationship",
