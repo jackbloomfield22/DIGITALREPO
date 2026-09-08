@@ -14,7 +14,7 @@ export function PageTrail() {
   const query = params.toString();
   const href = `${pathname}${query ? `?${query}` : ""}`;
   if (DIRECTORY_PATHS.includes(pathname) && lastList?.href !== href) setLastList({ href, label: current?.label ?? "results" });
-  if (pathname === "/") return null;
+  if (pathname === "/" || pathname.startsWith("/hq")) return null;
   const detail = current && pathname !== current.href;
   return <nav aria-label="Breadcrumb" className="no-print mb-5 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-muted">
     <Link href="/" className="hover:text-accent">Home</Link><span aria-hidden>/</span>

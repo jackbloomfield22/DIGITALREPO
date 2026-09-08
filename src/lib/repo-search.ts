@@ -31,7 +31,7 @@ export function searchSnippet(text: string | null | undefined, q: string, length
 
 /** Search only shared, canonical Repo models. HQ notes and personal records
  * never enter this index. Counts are exact; All shows a short group preview. */
-export async function searchRepo(query: string, options: { type?: string; page?: number; archived?: boolean; previewSize?: number } = {}) {
+export async function searchRepo(query: string, options: { type?: string; page?: number; archived?: boolean; previewSize?: number; skipCounts?: boolean } = {}) {
   const q = query.trim().slice(0, 200);
   const selected = SEARCH_SECTIONS.some((s) => s.type === options.type) ? options.type : "";
   const archived = options.archived === true;
@@ -52,7 +52,9 @@ export async function searchRepo(query: string, options: { type?: string; page?:
     () => db.channel.count({ where: where.channel }), () => db.entity.count({ where: where.entity }),
     () => db.collection.count({ where: where.collection }), () => db.doc.count({ where: where.doc }),
   ];
-  const counts = q ? await Promise.all(countQueries.map((count) => count())) : SEARCH_SECTIONS.map(() => 0);
+  // The command bar only shows a preview per section: it loads the previews
+  // straight away and reads counts off them, halving the queries per keystroke.
+  const counts = q && !options.skipCounts ? await Promise.all(countQueries.map((count) => count())) : SEARCH_SECTIONS.map(() => (q ? -1 : 0));
   const selectedCount = counts[SEARCH_SECTIONS.findIndex((s) => s.type === selected)] ?? 0;
   const pages = Math.max(1, Math.ceil(selectedCount / SEARCH_PAGE_SIZE));
   const page = Math.min(Math.max(1, Math.floor(options.page ?? 1)), pages);
@@ -71,6 +73,9 @@ export async function searchRepo(query: string, options: { type?: string; page?:
     collection: async () => (await db.collection.findMany({ where: where.collection, ...paging, orderBy: nameOrder, select: { id: true, name: true, slug: true, description: true } })).map((r) => ({ id: r.id, label: r.name, href: `/collections/${r.slug}`, detail: searchSnippet(r.description, q) })),
     doc: async () => (await db.doc.findMany({ where: where.doc, ...paging, orderBy: titleOrder, select: { id: true, title: true, slug: true, content: true } })).map((r) => ({ id: r.id, label: r.title, href: docPaths[r.slug], detail: searchSnippet(r.content, q) })),
   };
-  const groups: SearchGroup[] = await Promise.all(SEARCH_SECTIONS.map(async (s, i) => ({ ...s, count: counts[i], items: q && counts[i] && (!selected || selected === s.type) ? await loaders[s.type]() : [] })));
-  return { groups, total: counts.reduce((a,b) => a+b, 0), selected, page, pages, q };
+  const groups: SearchGroup[] = await Promise.all(SEARCH_SECTIONS.map(async (s, i) => {
+    const items = q && counts[i] !== 0 && (!selected || selected === s.type) ? await loaders[s.type]() : [];
+    return { ...s, count: counts[i] < 0 ? items.length : counts[i], items };
+  }));
+  return { groups, total: groups.reduce((a, g) => a + g.count, 0), selected, page, pages, q };
 }

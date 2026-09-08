@@ -52,3 +52,19 @@ Based on commit `4086d7442d47896f26092672603e6e060a0bb992`.
 - No browser/visual testing was performed.
 - `happy-dom` was added as a development dependency for URL-state interaction tests.
 - No production database migration or data rewrite is introduced by this change.
+
+## Follow-up review (Claude, same day)
+
+- Re-ran the full suite against a real PostgreSQL 16 database: 162 of 162 pass, including
+  `tests/page-edit-ops.test.ts`. The one failure reported above reproduced only on the
+  isolated PGlite database ("Server has closed the connection" mid-transaction) and is an
+  artefact of that test harness, not a conversion-reversal defect.
+- Browser QA (Chromium, desktop and 390px): `/search` with section filters and pagination,
+  directory search with fast typing (one final URL, no overwrites), lookup filters and
+  active-filter chips, sort and view changes preserving filters, the breadcrumb back-link
+  carrying the exact list URL, browser Back restoring the search box, the command bar via
+  ⌘/Ctrl+K and the sidebar button with arrow keys, Enter and click, the mobile drawer, and
+  the HQ pages under the new shell. No hydration warnings or console errors.
+- Two changes: the breadcrumb no longer renders under `/hq` (HQ carries its own frame and
+  way back), and the command bar's preview no longer runs the ten per-section count queries
+  on every keystroke — it reads counts off the previews it loads, halving the database work.
