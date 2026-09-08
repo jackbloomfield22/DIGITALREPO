@@ -286,3 +286,13 @@ label {
   content: "Start typing, or press Upload to bring in a document.";
   color: var(--color-faint);
 }
+
+/* Consistent targets and focus cues for navigating dense information. */
+:where(a, button, summary):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+section[id], [id="saved-views"] { scroll-margin-top: 5rem; }
+.overline { font-size: 0.75rem; }
+label { font-size: 0.875rem; }
+.filter-option { display: flex; width: 100%; align-items: center; gap: 0.5rem; border-radius: 0.25rem; padding: 0.5rem; text-align: left; font-size: 0.875rem; cursor: pointer; }
+.filter-option:hover, .filter-option[aria-pressed="true"] { background: var(--color-wash); }
+@media (max-width: 639px) { input[type="search"], input[type="text"], select, textarea { font-size: 1rem; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }

@@ -1,3 +1,7 @@
+import { redirect } from "next/navigation";
+import { directoryPageUrl } from "@/lib/directory-params";
+import { pageNumber } from "@/lib/directory-params";
+import { organizationSearch } from "@/lib/search-where";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -26,10 +30,10 @@ export default async function OrganizationsPage({
   const type = one(params.type);
   const sort = parseSort(one(params.sort), "name");
   const view = one(params.view) === "cards" ? "cards" : "table";
-  const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
+  const page = pageNumber(one(params.page));
 
   const and: Prisma.OrganizationWhereInput[] = [{ archived: false }];
-  if (q) and.push({ OR: [{ name: { contains: q, mode: "insensitive" } }, { aliases: { hasSome: [q] } }] });
+  if (q) and.push(organizationSearch(q));
   if (type) and.push({ types: { has: type } });
   const where = { AND: and };
 
@@ -49,6 +53,7 @@ export default async function OrganizationsPage({
   const canEdit = hasRole(user, "EDITOR");
   const chips: DirChip[] = type ? [{ param: "type", value: type, label: labelFor(type) }] : [];
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) redirect(directoryPageUrl("/organizations", params, pages));
 
   return (
     <div>
@@ -65,7 +70,7 @@ export default async function OrganizationsPage({
         sorts={[
           { value: "name", label: "Alphabetical" },
           { value: "location", label: "Location" },
-          { value: "updated", label: "Recently Updated" },
+          { value: "updated-desc", label: "Recently Updated" },
           { value: "created-desc", label: "Recently Added" },
         ]}
         filters={[{ param: "type", label: "Organization Type", kind: "select", options: ORG_TYPES }]}

@@ -1,3 +1,5 @@
+import { DirectorySearch } from "@/components/directory-search";
+import { pageNumber } from "@/lib/directory-params";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser, hasRole } from "@/lib/auth";
@@ -78,7 +80,7 @@ export default async function ArchivePage({
   const q = one(params.q)?.trim();
   const typeParam = one(params.type);
   const sort = parseSort(one(params.sort), "date-desc");
-  const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
+  const requestedPage = pageNumber(one(params.page));
   const canEdit = hasRole(user, "EDITOR");
 
   const selected = KINDS.find((k) => k.type === typeParam) ?? null;
@@ -105,6 +107,7 @@ export default async function ArchivePage({
   // One type: the database paginates. Everything: take enough of each list to
   // cover the requested page, merge, then slice — each list is already sorted
   // the same way, so the merge is correct up to that depth.
+  const page = Math.min(requestedPage, Math.max(1, Math.ceil(total / PAGE_SIZE)));
   const perType = selected ? PAGE_SIZE : page * PAGE_SIZE;
   const skip = selected ? (page - 1) * PAGE_SIZE : 0;
 
@@ -181,10 +184,7 @@ export default async function ArchivePage({
         lists if a project comes around again.
       </p>
 
-      <form className="mb-3 max-w-xs">
-        <input type="search" name="q" placeholder="Search the archive…" defaultValue={q ?? ""} aria-label="Search the archive" />
-        {typeParam && <input type="hidden" name="type" value={typeParam} />}
-      </form>
+      <div className="mb-4 max-w-xl"><DirectorySearch placeholder="Search the archive…" /></div>
 
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
         <Link href={chipHref(null)} className={`chip ${!selected ? "bg-wash font-semibold" : "text-muted hover:text-accent-deep"}`}>

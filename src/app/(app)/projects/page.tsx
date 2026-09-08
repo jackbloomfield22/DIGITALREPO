@@ -1,3 +1,7 @@
+import { redirect } from "next/navigation";
+import { directoryPageUrl } from "@/lib/directory-params";
+import { pageNumber } from "@/lib/directory-params";
+import { projectSearch } from "@/lib/search-where";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -33,10 +37,10 @@ export default async function ProjectsPage({
   const year = one(params.year);
   const sort = parseSort(one(params.sort), "date-desc");
   const view = one(params.view) === "cards" ? "cards" : "table";
-  const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
+  const page = pageNumber(one(params.page));
 
   const and: Prisma.ProjectWhereInput[] = [{ archived: false }];
-  if (q) and.push({ OR: [{ title: { contains: q, mode: "insensitive" } }, { aliases: { hasSome: [q] } }] });
+  if (q) and.push(projectSearch(q));
   if (type) and.push({ projectType: type });
   if (status) and.push({ status });
   if (creatorId && role) and.push({ credits: { some: { creatorId, role } } });
@@ -69,6 +73,7 @@ export default async function ProjectsPage({
 
   const canEdit = hasRole(user, "EDITOR");
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) redirect(directoryPageUrl("/projects", params, pages));
 
   const chips: DirChip[] = [
     ...(type ? [{ param: "type", value: type, label: labelFor(type) }] : []),
@@ -97,7 +102,7 @@ export default async function ProjectsPage({
           { value: "date-desc", label: "Latest Activity" },
           { value: "status", label: "Status" },
           { value: "year-desc", label: "Premiere Year" },
-          { value: "updated", label: "Recently Updated" },
+          { value: "updated-desc", label: "Recently Updated" },
           { value: "title", label: "Alphabetical" },
         ]}
         filters={[

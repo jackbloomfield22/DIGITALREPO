@@ -1,6 +1,8 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { creatorSearch } from "@/lib/search-where";
+import { pageNumber, nonNegativeNumber } from "@/lib/directory-params";
 import { totalAudience } from "@/lib/format";
 
 export type CreatorFilters = {
@@ -35,29 +37,18 @@ export function parseCreatorFilters(
     rep: one(params.rep) || undefined,
     format: one(params.format) || undefined,
     platform: one(params.platform) || undefined,
-    minFollowers: one(params.min) ? Number(one(params.min)) : undefined,
+    minFollowers: nonNegativeNumber(params.min),
     status: one(params.status) || undefined,
     sort: one(params.sort) || "name",
     view: one(params.view) === "cards" ? "cards" : "table",
-    page: Math.max(1, Number(one(params.page) ?? 1) || 1),
+    page: pageNumber(params.page),
   };
 }
 
 export function buildCreatorWhere(f: CreatorFilters): Prisma.CreatorWhereInput {
   const and: Prisma.CreatorWhereInput[] = [{ archived: false }];
 
-  if (f.q) {
-    const tokens = f.q.split(/\s+/).filter(Boolean);
-    and.push({
-      OR: [
-        { name: { contains: f.q, mode: "insensitive" } },
-        { aliases: { hasSome: [f.q] } },
-        ...(tokens.length > 1
-          ? [{ AND: tokens.map((t) => ({ name: { contains: t, mode: "insensitive" as const } })) }]
-          : []),
-      ],
-    });
-  }
+  if (f.q) and.push(creatorSearch(f.q));
   for (const entityId of f.entities) {
     and.push({ entityLinks: { some: { entityId } } });
   }
@@ -163,14 +154,20 @@ export async function queryCreators(f: CreatorFilters): Promise<{
     select: {
       id: true,
       name: true,
+      createdAt: true,
+      updatedAt: true,
       socialProfiles: { select: { platform: true, followerCount: true } },
-      _count: { select: { relationshipsA: true, relationshipsB: true } },
+      _count: { select: { formats: true, credits: true, relationshipsA: true, relationshipsB: true } },
     },
   });
 
   let ranked = rows.map((r) => ({
     id: r.id,
     name: r.name,
+    added: r.createdAt.getTime(),
+    updated: r.updatedAt.getTime(),
+    formats: r._count.formats,
+    projects: r._count.credits,
     audience: totalAudience(r.socialProfiles),
     platformCount: (platform: string) =>
       r.socialProfiles
@@ -188,6 +185,9 @@ export async function queryCreators(f: CreatorFilters): Promise<{
   else if (f.sort in PLATFORM_SORTS) {
     const platform = PLATFORM_SORTS[f.sort];
     ranked.sort((a, b) => b.platformCount(platform) - a.platformCount(platform) || a.name.localeCompare(b.name));
+  } else if (["added", "updated", "formats", "projects"].includes(f.sort)) {
+    const key = f.sort as "added" | "updated" | "formats" | "projects";
+    ranked.sort((a, b) => b[key] - a[key] || a.name.localeCompare(b.name));
   } else ranked.sort((a, b) => a.name.localeCompare(b.name));
 
   const total = ranked.length;

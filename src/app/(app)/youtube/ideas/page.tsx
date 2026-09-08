@@ -1,3 +1,4 @@
+import { DirectorySearch } from "@/components/directory-search";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -86,10 +87,7 @@ export default async function YouTubeIdeasPage({
         ))}
       </div>
 
-      <form className="mb-5 max-w-xs">
-        <input type="search" name="q" placeholder="Search ideas…" defaultValue={q ?? ""} aria-label="Search ideas" />
-        {status && <input type="hidden" name="status" value={status} />}
-      </form>
+      <div className="mb-5 max-w-xl"><DirectorySearch placeholder="Search ideas…" /></div>
 
       {byChannel.size === 0 ? (
         <p className="text-sm text-faint">

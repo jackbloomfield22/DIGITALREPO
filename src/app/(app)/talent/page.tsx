@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { directoryPageUrl } from "@/lib/directory-params";
 import Link from "next/link";
 import { requireUser, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -35,6 +37,8 @@ export default async function CreatorsPage({
       select: { targetId: true },
     }),
   ]);
+
+  if (filters.page > pages) redirect(directoryPageUrl("/talent", params, pages));
 
   const favoriteIds = new Set(favorites.map((f) => f.targetId));
   const vms = creators.map((c) => toCreatorCardVM(c, favoriteIds));

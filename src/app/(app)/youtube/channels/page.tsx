@@ -1,3 +1,8 @@
+import { redirect } from "next/navigation";
+import { directoryPageUrl } from "@/lib/directory-params";
+import { DirectoryControls } from "@/components/directory-controls";
+import { channelSearch } from "@/lib/search-where";
+import { pageNumber } from "@/lib/directory-params";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -37,11 +42,11 @@ export default async function ChannelsPage({
   const status = one(params.status);
   const view = one(params.view) === "board" ? "board" : "table";
   const sort = parseSort(one(params.sort), "subscribers-desc");
-  const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
+  const page = pageNumber(one(params.page));
   const canEdit = hasRole(user, "EDITOR");
 
   const and: Prisma.ChannelWhereInput[] = [{ archived: false }];
-  if (q) and.push({ OR: [{ name: { contains: q, mode: "insensitive" } }, { handle: { contains: q, mode: "insensitive" } }] });
+  if (q) and.push(channelSearch(q));
   if (status) and.push({ status });
   const where = { AND: and };
 
@@ -68,8 +73,8 @@ export default async function ChannelsPage({
     }),
     db.channel.count({ where }),
     db.channel.findMany({
-      where: { archived: false, status: { in: PIPELINE } },
-      orderBy: [{ subscribers: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
+      where: { AND: [where, { status: { in: PIPELINE } }] },
+      orderBy,
       include: { creator: { select: { name: true } }, _count: { select: { ideas: true } } },
     }),
     db.channel.aggregate({ _sum: { subscribers: true, totalViews: true }, where: { archived: false } }),
@@ -77,24 +82,11 @@ export default async function ChannelsPage({
   ]);
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (view !== "board" && page > pages) redirect(directoryPageUrl("/youtube/channels", params, pages));
   const byStatus = new Map<string, typeof board>();
   for (const c of board) (byStatus.get(c.status) ?? byStatus.set(c.status, []).get(c.status)!).push(c);
   const columns = PIPELINE.filter((s) => (byStatus.get(s)?.length ?? 0) > 0);
   const ideasInFlight = board.reduce((n, c) => n + c._count.ideas, 0);
-
-  const keep = (extra: Record<string, string | null>) => {
-    const p = new URLSearchParams();
-    if (q) p.set("q", q);
-    if (status) p.set("status", status);
-    if (one(params.sort)) p.set("sort", one(params.sort)!);
-    p.set("view", view);
-    for (const [k, v] of Object.entries(extra)) {
-      if (v === null) p.delete(k);
-      else p.set(k, v);
-    }
-    p.delete("page");
-    return `/youtube?${p.toString()}`;
-  };
 
   return (
     <div>
@@ -103,38 +95,10 @@ export default async function ChannelsPage({
         action={canEdit ? <Link href="/youtube/new" className="btn btn-primary btn-sm">+ Add Channel</Link> : null}
       />
 
-      <div className="mb-4 flex items-baseline gap-3">
-        <h2 className="font-display text-xl font-bold">Channels</h2>
-        <span className="text-sm text-muted">{total}</span>
-        <span className="ml-auto text-xs text-faint">
-          {live} live · {compactNumber(reach._sum.subscribers ?? 0)} subscribers · {ideasInFlight} ideas queued
-        </span>
-      </div>
-
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <Link href={keep({ status: null })} className={`chip ${!status ? "bg-wash font-semibold" : "text-muted hover:text-accent-deep"}`}>
-          All
-        </Link>
-        {CHANNEL_STATUSES.filter((s) => s.value !== "archived").map((s) => (
-          <Link
-            key={s.value}
-            href={keep({ status: s.value })}
-            className={`chip ${status === s.value ? "bg-wash font-semibold" : "text-muted hover:text-accent-deep"}`}
-          >
-            {s.label}
-          </Link>
-        ))}
-        <span className="ml-auto flex gap-1">
-          <Link href={keep({ view: "table" })} className={`chip ${view === "table" ? "bg-wash font-semibold" : "text-muted"}`}>List</Link>
-          <Link href={keep({ view: "board" })} className={`chip ${view === "board" ? "bg-wash font-semibold" : "text-muted"}`}>Pipeline</Link>
-        </span>
-      </div>
-
-      <form className="mb-4 max-w-xs">
-        <input type="search" name="q" placeholder="Search channels…" defaultValue={q ?? ""} aria-label="Search channels" />
-        {status && <input type="hidden" name="status" value={status} />}
-        <input type="hidden" name="view" value={view} />
-      </form>
+      <DirectoryControls headingLevel={2} title="Channels" total={view === "board" ? board.length : total} canEdit={canEdit} searchPlaceholder="Search channels, athletes, ideas…" savedViewType="youtube/channels" views={[{ value: "table", label: "List" }, { value: "board", label: "Pipeline" }]} chips={status ? [{ param: "status", value: status, label: labelFor(status) }] : []} sorts={[
+        { value: "subscribers-desc", label: "Most subscribers" }, { value: "name", label: "Alphabetical" }, { value: "date-desc", label: "Latest activity" }, { value: "status", label: "Status" },
+      ]} filters={[{ param: "status", label: "Channel status", kind: "select", options: CHANNEL_STATUSES.filter((s) => s.value !== "archived") }]} />
+      <p className="mb-4 text-sm text-muted">{live} live channels · {compactNumber(reach._sum.subscribers ?? 0)} subscribers overall · {ideasInFlight} ideas in this pipeline</p>
 
       {view === "board" ? (
         columns.length === 0 ? (

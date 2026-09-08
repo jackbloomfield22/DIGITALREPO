@@ -1,3 +1,4 @@
+import { pageNumber } from "@/lib/directory-params";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -16,7 +17,7 @@ export default async function ActivityPage({
 }) {
   await requireUser();
   const params = await searchParams;
-  const page = Math.max(1, Number(params.page ?? 1) || 1);
+  const page = pageNumber(params.page);
   const PAGE_SIZE = 50;
 
   const where: Prisma.AuditLogWhereInput = {

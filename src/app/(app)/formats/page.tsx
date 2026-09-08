@@ -1,3 +1,7 @@
+import { redirect } from "next/navigation";
+import { directoryPageUrl } from "@/lib/directory-params";
+import { pageNumber } from "@/lib/directory-params";
+import { formatSearch } from "@/lib/search-where";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -31,12 +35,12 @@ export default async function FormatsPage({
   const orgId = one(params.org);
   const sort = parseSort(one(params.sort), "date-desc");
   const view = one(params.view) === "cards" ? "cards" : "table";
-  const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
+  const page = pageNumber(one(params.page));
 
   // Shelved formats live in the Archive now — one place for everything that is
   // no longer live, rather than a status the directory has to remember to hide.
   const and: Prisma.FormatWhereInput[] = [{ archived: false }];
-  if (q) and.push({ title: { contains: q, mode: "insensitive" } });
+  if (q) and.push(formatSearch(q));
   if (status) and.push({ status });
   if (type) and.push({ formatType: type });
   if (creatorId) and.push({ creators: { some: { creatorId } } });
@@ -71,6 +75,7 @@ export default async function FormatsPage({
     ...(orgRecord ? [{ param: "org", value: orgId!, label: orgRecord.name }] : []),
   ];
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) redirect(directoryPageUrl("/formats", params, pages));
   const canEdit = hasRole(user, "EDITOR");
 
   return (
@@ -89,7 +94,7 @@ export default async function FormatsPage({
           { value: "date-desc", label: "Latest Activity" },
           { value: "date", label: "Oldest Activity" },
           { value: "status", label: "Status" },
-          { value: "updated", label: "Recently Updated" },
+          { value: "updated-desc", label: "Recently Updated" },
           { value: "title", label: "Alphabetical" },
         ]}
         filters={[

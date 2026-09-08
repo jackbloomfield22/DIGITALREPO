@@ -57,7 +57,7 @@ export function RecordTable({
 
   return (
     <div className="overflow-x-auto rounded-md border border-line">
-      <table className="w-full min-w-[38rem] border-collapse text-sm">
+      <table className="w-full min-w-0 border-collapse text-sm">
         <thead>
           <tr className="border-b border-line bg-wash text-left">
             {columns.map((c) => {
@@ -76,7 +76,7 @@ export function RecordTable({
                     <Link
                       href={hrefFor(c.sortKey)}
                       scroll={false}
-                      className={`inline-flex items-center gap-1 hover:text-accent ${
+                      className={`group inline-flex items-center gap-1 hover:text-accent ${
                         active ? "text-accent" : "text-muted"
                       }`}
                     >
@@ -101,7 +101,7 @@ export function RecordTable({
                 return (
                   <td
                     key={i}
-                    className={`px-3 py-2 align-top ${c?.align === "right" ? "text-right" : ""} ${c?.showAt ?? ""}`}
+                    className={`px-3 py-3 align-top ${c?.align === "right" ? "text-right" : ""} ${c?.showAt ?? ""}`}
                   >
                     {i === 0 ? (
                       <Link href={row.href} className="font-medium hover:text-accent">

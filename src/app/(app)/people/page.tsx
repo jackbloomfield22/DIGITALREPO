@@ -1,3 +1,9 @@
+import { redirect } from "next/navigation";
+import { directoryPageUrl } from "@/lib/directory-params";
+import { DirectoryControls, type DirChip } from "@/components/directory-controls";
+import { personSearch } from "@/lib/search-where";
+import { firstParam, type SearchParams } from "@/lib/directory-params";
+import { pageNumber } from "@/lib/directory-params";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -15,26 +21,24 @@ const PAGE_SIZE = 50;
 export default async function PeoplePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; role?: string; sort?: string; view?: string; page?: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const user = await requireUser();
-  const { q, role, sort: sortParam, view: viewParam, page: pageParam } = await searchParams;
+  const params = await searchParams;
+  const q = firstParam(params.q)?.trim();
+  const role = firstParam(params.role);
+  const org = firstParam(params.org);
+  const sortParam = firstParam(params.sort);
+  const viewParam = firstParam(params.view);
+  const pageParam = firstParam(params.page);
   const sort = parseSort(sortParam, "name");
   const view = viewParam === "cards" ? "cards" : "table";
-  const page = Math.max(1, Number(pageParam ?? 1) || 1);
+  const page = pageNumber(pageParam);
   const canEdit = hasRole(user, "EDITOR");
-  const keep = (extra: Record<string, string>) => {
-    const p = new URLSearchParams();
-    if (q) p.set("q", q);
-    if (role) p.set("role", role);
-    if (sortParam) p.set("sort", sortParam);
-    for (const [k, v] of Object.entries(extra)) p.set(k, v);
-    return `/people?${p.toString()}`;
-  };
-
   const where: Prisma.IndustryPersonWhereInput = {
     archived: false,
-    ...(q?.trim() ? { name: { contains: q.trim(), mode: "insensitive" } } : {}),
+    ...(q ? personSearch(q) : {}),
+    ...(org ? { organizations: { some: { organizationId: org } } } : {}),
     ...(role ? { roleType: role } : {}),
   };
 
@@ -52,36 +56,21 @@ export default async function PeoplePage({
     db.industryPerson.count({ where }),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) redirect(directoryPageUrl("/people", params, pages));
 
+  const organization = org ? await db.organization.findUnique({ where: { id: org }, select: { name: true } }) : null;
+  const chips: DirChip[] = [
+    ...(role ? [{ param: "role", value: role, label: labelFor(role) }] : []),
+    ...(org ? [{ param: "org", value: org, label: organization?.name ?? "Organization" }] : []),
+  ];
   return (
     <div>
-      <div className="mb-5 flex items-baseline gap-3">
-        <h1 className="font-display text-3xl font-bold tracking-tight">INDUSTRY PEOPLE</h1>
-        <span className="text-sm text-muted">{total}</span>
-      </div>
-      <form className="mb-3 max-w-xs">
-        <input type="search" name="q" placeholder="Search people…" defaultValue={q ?? ""} aria-label="Search people" />
-        {role && <input type="hidden" name="role" value={role} />}
-      </form>
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        {PERSON_ROLE_TYPES.map((r) => (
-          <Link
-            key={r.value}
-            href={r.value === role ? "/people" : `/people?role=${r.value}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-            className={`chip ${r.value === role ? "bg-wash font-semibold" : "text-muted hover:text-accent-deep"}`}
-          >
-            {r.label}
-          </Link>
-        ))}
-        <span className="ml-auto flex gap-1">
-          <Link href={keep({ view: "table" })} className={`chip ${view === "table" ? "bg-wash font-semibold" : "text-muted"}`}>
-            List
-          </Link>
-          <Link href={keep({ view: "cards" })} className={`chip ${view === "cards" ? "bg-wash font-semibold" : "text-muted"}`}>
-            Cards
-          </Link>
-        </span>
-      </div>
+      <DirectoryControls title="Industry people" total={total} createHref="/people/new" createLabel="+ Add person" searchPlaceholder="Search names, roles, companies, email…" canEdit={canEdit} viewToggle savedViewType="people" chips={chips} sorts={[
+        { value: "name", label: "Alphabetical" }, { value: "title", label: "Job title" }, { value: "role", label: "Role" }, { value: "updated-desc", label: "Recently updated" },
+      ]} filters={[
+        { param: "role", label: "Role", kind: "select", options: PERSON_ROLE_TYPES },
+        { param: "org", label: "Organization", kind: "lookup", lookupType: "organization" },
+      ]} />
       {view === "table" ? (
         <RecordTable
           sort={sort}

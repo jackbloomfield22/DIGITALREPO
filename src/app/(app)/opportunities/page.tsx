@@ -1,3 +1,7 @@
+import { redirect } from "next/navigation";
+import { directoryPageUrl } from "@/lib/directory-params";
+import { pageNumber } from "@/lib/directory-params";
+import { opportunitySearch } from "@/lib/search-where";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -28,10 +32,10 @@ export default async function OpportunitiesPage({
   const status = one(params.status);
   const sort = parseSort(one(params.sort), "date-desc");
   const view = one(params.view) === "cards" ? "cards" : "table";
-  const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
+  const page = pageNumber(one(params.page));
 
   const and: Prisma.OpportunityWhereInput[] = [{ archived: false }];
-  if (q) and.push({ title: { contains: q, mode: "insensitive" } });
+  if (q) and.push(opportunitySearch(q));
   if (type) and.push({ type });
   if (status) and.push({ status });
   const where = { AND: and };
@@ -53,6 +57,7 @@ export default async function OpportunitiesPage({
 
   const canEdit = hasRole(user, "EDITOR");
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) redirect(directoryPageUrl("/opportunities", params, pages));
 
   const chips: DirChip[] = [
     ...(type ? [{ param: "type", value: type, label: labelFor(type) }] : []),

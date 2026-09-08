@@ -1,3 +1,5 @@
+import { DirectorySearch } from "@/components/directory-search";
+import { pageNumber } from "@/lib/directory-params";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -49,7 +51,7 @@ export default async function DigitalPage({
   const q = one(params.q)?.trim();
   const platform = PLATFORMS.find((p) => p === one(params.platform)) ?? null;
   const tab: TabKey = (TABS.find((t) => t.key === one(params.tab))?.key ?? "talent") as TabKey;
-  const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
+  const page = pageNumber(one(params.page));
   const sort = parseSort(one(params.sort), tab === "talent" ? "audience-desc" : "date-desc");
   const canEdit = hasRole(user, "EDITOR");
 
@@ -83,6 +85,7 @@ export default async function DigitalPage({
     if (q) p.set("q", q);
     if (platform) p.set("platform", platform);
     p.set("tab", tab);
+    if (one(params.sort)) p.set("sort", one(params.sort)!);
     for (const [k, v] of Object.entries(extra)) {
       if (v === null) p.delete(k);
       else p.set(k, v);
@@ -97,7 +100,7 @@ export default async function DigitalPage({
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="font-display text-3xl font-bold tracking-tight">DIGITAL</h1>
         <div className="flex gap-2">
-          <Link href="/talent?sort=audience-desc" className="btn btn-secondary btn-sm">All Talent</Link>
+          <Link href="/talent?sort=audience" className="btn btn-secondary btn-sm">All Talent</Link>
           <Link href="/formats" className="btn btn-secondary btn-sm">All Formats</Link>
         </div>
       </div>
@@ -145,11 +148,7 @@ export default async function DigitalPage({
             {t.label}
           </Link>
         ))}
-        <form className="ml-auto max-w-[14rem]">
-          <input type="hidden" name="tab" value={tab} />
-          {platform && <input type="hidden" name="platform" value={platform} />}
-          <input type="search" name="q" placeholder="Search this list…" defaultValue={q ?? ""} aria-label="Search digital" />
-        </form>
+        <div className="ml-auto w-full sm:w-auto"><DirectorySearch placeholder="Search this list…" /></div>
       </div>
 
       {tab === "talent" && <TalentTab q={q} platform={platform} page={page} sort={sort} />}

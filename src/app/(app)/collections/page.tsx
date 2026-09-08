@@ -52,12 +52,12 @@ export default async function CollectionsPage() {
       </div>
 
       <div className="mt-10">
-        <Section title="My Saved Views">
+        <Section title="My Saved Views" id="saved-views">
           <SavedViewList
             views={savedViews.map((v) => ({
               id: v.id,
               name: v.name,
-              href: `/${v.targetType}?${v.query}`,
+              href: `/${v.targetType === "creators" ? "talent" : v.targetType}?${v.query}`,
               targetType: v.targetType,
             }))}
           />

@@ -30,6 +30,8 @@ export async function recordRecentView(
   targetId: string,
 ) {
   try {
+    const user = await requireUser();
+    if (user.id !== userId) return;
     await db.recentView.upsert({
       where: { userId_targetType_targetId: { userId, targetType, targetId } },
       update: { viewedAt: new Date() },
@@ -58,7 +60,9 @@ export async function saveView(input: {
   try {
     const user = await requireUser();
     const name = input.name.trim();
-    if (!name) return { ok: false, error: "Name is required." };
+    if (!name || name.length > 100) return { ok: false, error: "Use a view name of 1–100 characters." };
+    const allowedTypes = ["creators", "talent", "projects", "formats", "organizations", "people", "opportunities", "youtube/channels", "digital", "search", "archive"];
+    if (!allowedTypes.includes(input.targetType) || input.query.length > 4000) return { ok: false, error: "Invalid saved view." };
     await db.savedView.create({
       data: {
         name,
