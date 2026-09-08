@@ -1,7 +1,7 @@
 # HQ
 
 HQ is one person's private operating system inside the Repo: `/hq`, visible and
-usable only by the owner (`HQ_OWNER_EMAIL`, default `jackbloomfield22@gmail.com`).
+usable only by the owner (`HQ_OWNER_EMAIL`, default `jack.bloomfield@44fortymedia.com`).
 For anyone else the section does not exist — the sidebar has no entry and every
 HQ page, action and API answers 404. HQ data lives in its own tables
 (`Hq*`), every row carries `ownerId`, and those tables are left out of the shared

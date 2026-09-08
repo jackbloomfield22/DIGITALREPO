@@ -10,7 +10,7 @@ import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import type { SessionUser } from "@/lib/roles";
 
-export const OWNER_EMAIL = (process.env.HQ_OWNER_EMAIL ?? "jackbloomfield22@gmail.com").toLowerCase();
+export const OWNER_EMAIL = (process.env.HQ_OWNER_EMAIL ?? "jack.bloomfield@44fortymedia.com").toLowerCase();
 
 export function isOwner(user: SessionUser | null | undefined): boolean {
   return !!user && user.email.toLowerCase() === OWNER_EMAIL;
