@@ -276,3 +276,48 @@ describe("applying the new ops", () => {
     expect(rows[0].error).toContain("Archive");
   });
 });
+
+// ---------------------------------------------------------------------------
+// The panel's model spend: one call per page, and a readout of what it cost.
+// ---------------------------------------------------------------------------
+
+import { proposeItemCore } from "@/lib/ingest/pipeline";
+import { PAGE_UPDATE_LABEL, isPageUpdate } from "@/lib/page-update";
+import { estimateCents, formatCents, usageCents } from "@/lib/ai-cost";
+
+describe("page updates spend one model call", () => {
+  it("goes straight to proposals without a triage call", async () => {
+    const project = await db.project.create({ data: { title: `${P} Straight To Proposals`, slug: slugify(`${P} straight`), status: "announced" } });
+    const item = await db.ingestItem.create({
+      data: { kind: "text", filename: `${PAGE_UPDATE_LABEL}${project.title}`, extractedText: `About: ${project.title}\n\nIt's cancelled.`, status: "parsed" },
+    });
+    expect(isPageUpdate(item)).toBe(true);
+    const models: string[] = [];
+    const out = await proposeItemCore(item.id, async (req) => {
+      models.push(req.model);
+      return { output: { changes: [{ ...base, op: "update", targetType: "project", targetName: project.title, field: "status", value: "cancelled", evidence: ["cancelled"] }] }, usage: { model: req.model, inputTokens: 1200, outputTokens: 300, cacheReadTokens: 1000 } };
+    });
+    expect(out).toEqual({ ok: true, status: "proposed" });
+    // One propose call; the triage model never ran.
+    expect(models).toHaveLength(1);
+    const after = await db.ingestItem.findUnique({ where: { id: item.id } });
+    expect(after?.status).toBe("proposed");
+    expect((after?.relevance as { reasons?: string[] })?.reasons?.[0]).toContain("Typed on the page");
+    expect(await db.ingestChange.count({ where: { itemId: item.id } })).toBe(1);
+    expect(usageCents(after?.tokenUsage).calls).toBe(1);
+    await db.ingestItem.delete({ where: { id: item.id } });
+    await db.project.delete({ where: { id: project.id } });
+  });
+
+  it("prices tokens from the sheet, cache reads at a tenth, unknown models like Opus", () => {
+    // 1M fresh input on Opus 5 is $5 = 500¢; 1M output is $25.
+    expect(estimateCents("claude-opus-5", { inputTokens: 1_000_000, outputTokens: 0 })).toBeCloseTo(500, 5);
+    expect(estimateCents("claude-opus-5", { inputTokens: 0, outputTokens: 1_000_000 })).toBeCloseTo(2500, 5);
+    expect(estimateCents("claude-opus-5", { inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 1_000_000 })).toBeCloseTo(50, 5);
+    expect(estimateCents("claude-sonnet-5", { inputTokens: 1_000_000, outputTokens: 1_000_000 })).toBeCloseTo(1200, 5);
+    expect(estimateCents("claude-mystery-9", { inputTokens: 1_000_000, outputTokens: 0 })).toBeCloseTo(500, 5);
+    expect(formatCents(0.3)).toBe("<1¢");
+    expect(formatCents(7.4)).toBe("7¢");
+    expect(formatCents(250)).toBe("$2.50");
+  });
+});

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatCents, usageCents } from "@/lib/ai-cost";
 import { db } from "@/lib/db";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { describeOp } from "@/lib/ingest/describe";
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
 
   const item = await db.ingestItem.findUnique({
     where: { id },
-    select: { id: true, status: true, relevance: true },
+    select: { id: true, status: true, relevance: true, tokenUsage: true },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -61,6 +62,7 @@ export async function GET(request: Request) {
     itemId: item.id,
     status: item.status,
     reasons: ((item.relevance as { reasons?: string[] } | null)?.reasons ?? []).slice(0, 2),
+    cost: (() => { const u = usageCents(item.tokenUsage); return u.calls ? { label: formatCents(u.cents), calls: u.calls } : null; })(),
     changes: changes.map((c) => {
       const dest = (c.destination ?? {}) as { targetType?: string; targetId?: string; field?: string; name?: string; path?: string };
       const spec = dest.targetType ? RECORD_REGISTRY[dest.targetType as IngestTargetType] : null;

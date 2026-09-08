@@ -39,7 +39,7 @@ type Proposal = {
 type Stage =
   | { at: "writing" }
   | { at: "reading"; what: string }
-  | { at: "review"; itemId: string; proposals: Proposal[]; picked: Set<string> }
+  | { at: "review"; itemId: string; proposals: Proposal[]; picked: Set<string>; cost?: string | null }
   | { at: "nothing"; itemId: string; reasons: string[] }
   | { at: "failed"; itemId: string; error: string }
   | { at: "done"; applied: number };
@@ -224,8 +224,9 @@ export function UpdatePanelClient({
     async (id: string) => {
       setStage({ at: "reading", what: "Reading what you wrote…" });
       try {
-        for (const s of ["triage", "propose"] as const) {
-          if (s === "propose") setStage({ at: "reading", what: "Working out what changes on this page…" });
+        // Typed on the page, so the reader knows what it is about: straight to proposals.
+        for (const s of ["propose"] as const) {
+          setStage({ at: "reading", what: "Working out what changes on this page…" });
           const r = await fetch("/api/ingest/run", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -236,11 +237,11 @@ export function UpdatePanelClient({
           if (out.status === "irrelevant") break;
         }
         const list = await fetch(`/api/ingest/changes?id=${id}`);
-        const parsed = (await list.json()) as { changes?: Proposal[]; reasons?: string[]; error?: string };
+        const parsed = (await list.json()) as { changes?: Proposal[]; reasons?: string[]; error?: string; cost?: { label: string; calls: number } | null };
         if (!list.ok) return setStage({ at: "failed", itemId: id, error: parsed.error ?? "Couldn't read that back." });
         const proposals = parsed.changes ?? [];
         if (!proposals.length) return setStage({ at: "nothing", itemId: id, reasons: parsed.reasons ?? [] });
-        setStage({ at: "review", itemId: id, proposals, picked: new Set(proposals.map((p) => p.id)) });
+        setStage({ at: "review", itemId: id, proposals, picked: new Set(proposals.map((p) => p.id)), cost: parsed.cost?.label ?? null });
       } catch {
         setStage({ at: "failed", itemId: id, error: "Could not reach the server." });
       }
@@ -368,7 +369,7 @@ export function UpdatePanelClient({
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-sm">
               <span className="font-semibold">
-                {stage.proposals.length} change{stage.proposals.length === 1 ? "" : "s"}
+                {stage.proposals.length} change{stage.proposals.length === 1 ? "" : "s"}{stage.cost ? <span className="ml-2 font-normal text-faint" title="Estimated API cost for reading this page">≈ {stage.cost}</span> : null}
               </span>{" "}
               <span className="text-muted">— untick anything that&apos;s wrong. Everything ticked is made together.</span>
             </p>

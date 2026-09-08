@@ -12,9 +12,7 @@ import { searchBrain } from "@/lib/hq/search";
 import { hqLabel, STAGES, TIERS } from "@/lib/hq/vocab";
 
 const MODEL = process.env.AI_MODEL_ASK ?? "claude-sonnet-5";
-// Cents per million tokens; set from the price sheet for the model in use.
-const IN_CENTS_PER_M = Number(process.env.AI_ASK_INPUT_CENTS_PER_M ?? 300);
-const OUT_CENTS_PER_M = Number(process.env.AI_ASK_OUTPUT_CENTS_PER_M ?? 1500);
+import { estimateCents } from "@/lib/ai-cost";
 
 export function askAvailable(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;
@@ -45,7 +43,7 @@ export async function aiGate(ownerId: string): Promise<{ ok: true; capCents: num
 }
 
 function costCents(inputTokens: number, outputTokens: number): number {
-  return Math.round((inputTokens * IN_CENTS_PER_M + outputTokens * OUT_CENTS_PER_M) / 1_000_000);
+  return Math.round(estimateCents(MODEL, { inputTokens, outputTokens }));
 }
 
 async function record(ownerId: string, feature: string, usage: { input_tokens: number; output_tokens: number }): Promise<number> {

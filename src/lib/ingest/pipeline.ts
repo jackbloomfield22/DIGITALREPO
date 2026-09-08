@@ -11,6 +11,7 @@ import {
   type ModelUsage,
 } from "@/lib/ingest/ai";
 import { matchCandidates, type DigestCandidate } from "@/lib/ingest/matching";
+import { isPageUpdate } from "@/lib/page-update";
 import {
   describeOpVocabulary,
   proposalToolSchema,
@@ -544,6 +545,15 @@ export async function proposeItemCore(
   if (!item) return { ok: false, error: "Item not found." };
   // A changes file arrives already proposed; there is nothing for the model to read.
   if (item.kind === "changes") return { ok: true, status: item.status };
+  // Text typed on a page is about that page: relevance is known, so the triage
+  // call is skipped and the item goes straight to proposals.
+  if (item.status === "parsed" && isPageUpdate(item)) {
+    await db.ingestItem.update({
+      where: { id: itemId },
+      data: { status: "triaged", relevance: { relevant: true, reasons: ["Typed on the page itself"], workspace: item.workspace ?? "general" } },
+    });
+    item.status = "triaged";
+  }
   if (!["triaged", "proposed", "failed"].includes(item.status)) {
     return { ok: false, error: `Cannot propose for an item in status "${item.status}" — triage it first.` };
   }
@@ -554,7 +564,8 @@ export async function proposeItemCore(
   if (!text) return { ok: false, error: "No text to propose from." };
 
   try {
-    const candidates = await matchCandidates(text);
+    // A page update names its record up front; a shorter candidate list is enough.
+    const candidates = await matchCandidates(text, isPageUpdate(item) ? { maxCandidates: 12 } : {});
     const thread = await threadContext(item);
     const chunks = chunkText(text);
 

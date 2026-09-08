@@ -11,6 +11,11 @@
 
 export const PAGE_UPDATE_LABEL = "Update — ";
 
+/** An ingest item that came from the panel on a page, by its label. */
+export function isPageUpdate(item: { filename: string | null }): boolean {
+  return !!item.filename?.startsWith(PAGE_UPDATE_LABEL);
+}
+
 /** The audit-log field that marks a page as having been gone over. */
 export const BROUGHT_UP_TO_DATE = "brought up to date";
 
@@ -53,5 +58,8 @@ export function pageUpdateContext(input: {
     "",
     "Do not invent anything the text does not say. Do not change other records except to",
     "connect them to this one. Loosely worded is expected — read the intent.",
+    "",
+    "Keep each rationale to one short clause and each evidence quote to the few words that",
+    "support the change; the owner wrote the text and does not need it explained back.",
   ].join("\n");
 }
