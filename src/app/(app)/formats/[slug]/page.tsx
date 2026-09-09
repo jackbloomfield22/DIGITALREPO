@@ -9,6 +9,9 @@ import { recordRecentView } from "@/lib/actions/misc";
 import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
 import { LinkChips } from "@/components/link-editor";
 import { QuietTimer } from "@/components/quiet-timer";
+import { RecordStepper } from "@/components/record-stepper";
+import { recordNeighbors } from "@/lib/neighbors";
+
 import { onQuietTimer, quietClock } from "@/lib/quiet-rules";
 import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
 import { SourceList } from "@/components/sources-attachments";
@@ -76,7 +79,8 @@ export default async function FormatPage({
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{format.title}</h1>
             {format.logline && <p className="mt-2 max-w-2xl text-[15px] italic text-charcoal">{format.logline}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <RecordStepper type="format" fallback={await recordNeighbors("format", { id: format.id, name: format.title })} />
             {canEdit && <Link href={`/formats/${format.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>}
             {canEdit && <DeleteRecordButton targetType="format" id={format.id} label={format.title} />}
             <FavoriteButton targetType="format" targetId={format.id} favorited={!!favorite} />

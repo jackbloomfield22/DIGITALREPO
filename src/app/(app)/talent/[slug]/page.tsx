@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
+import { RecordStepper } from "@/components/record-stepper";
+import { recordNeighbors } from "@/lib/neighbors";
+
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { findRelatedCreators } from "@/lib/related";
@@ -255,6 +258,7 @@ export default async function CreatorProfilePage({
             <span className="font-semibold text-ink">{compactNumber(audience)} listed audience</span>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
+            <RecordStepper type="creator" fallback={await recordNeighbors("creator", { id: creator.id, name: creator.name })} />
             {canEdit && (
               <Link href={`/talent/${creator.slug}/edit`} className="btn btn-primary btn-sm">
                 Edit

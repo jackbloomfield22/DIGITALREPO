@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
+import { RecordStepper } from "@/components/record-stepper";
+import { recordNeighbors } from "@/lib/neighbors";
+
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { Portrait, Section } from "@/components/ui";
@@ -55,12 +58,15 @@ export default async function PersonPage({
             )}
           </div>
         </div>
-        {canEdit && (
-          <span className="flex gap-2">
-            <Link href={`/people/${person.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
-            <DeleteRecordButton targetType="person" id={person.id} label={person.name} />
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <RecordStepper type="person" fallback={await recordNeighbors("person", { id: person.id, name: person.name })} />
+          {canEdit && (
+            <span className="flex gap-2">
+              <Link href={`/people/${person.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
+              <DeleteRecordButton targetType="person" id={person.id} label={person.name} />
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="max-w-3xl">

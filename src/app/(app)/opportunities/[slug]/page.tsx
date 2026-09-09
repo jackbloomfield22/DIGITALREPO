@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
+import { RecordStepper } from "@/components/record-stepper";
+import { recordNeighbors } from "@/lib/neighbors";
+
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { Portrait, Section, StatusPill } from "@/components/ui";
@@ -115,12 +118,15 @@ export default async function OpportunityPage({
                 .join(" · ")}
             </div>
           </div>
-          {canEdit && (
-            <span className="flex gap-2">
-              <Link href={`/opportunities/${opp.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
-              <DeleteRecordButton targetType="opportunity" id={opp.id} label={opp.title} />
-            </span>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <RecordStepper type="opportunity" fallback={await recordNeighbors("opportunity", { id: opp.id, name: opp.title })} />
+            {canEdit && (
+              <span className="flex gap-2">
+                <Link href={`/opportunities/${opp.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
+                <DeleteRecordButton targetType="opportunity" id={opp.id} label={opp.title} />
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

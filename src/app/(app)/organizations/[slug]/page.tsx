@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
+import { RecordStepper } from "@/components/record-stepper";
+import { recordNeighbors } from "@/lib/neighbors";
+
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
@@ -96,7 +99,8 @@ export default async function OrganizationPage({
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <RecordStepper type="organization" fallback={await recordNeighbors("organization", { id: org.id, name: org.name })} />
           {canEdit && (
             <span className="flex gap-2">
               <Link href={`/organizations/${org.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>

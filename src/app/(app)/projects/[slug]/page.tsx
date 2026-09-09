@@ -10,6 +10,9 @@ import { findRelatedProjects } from "@/lib/related";
 import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
 import { LinkChips } from "@/components/link-editor";
 import { QuietTimer } from "@/components/quiet-timer";
+import { RecordStepper } from "@/components/record-stepper";
+import { recordNeighbors } from "@/lib/neighbors";
+
 import { onQuietTimer, quietClock } from "@/lib/quiet-rules";
 import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
 import { SourceList } from "@/components/sources-attachments";
@@ -139,7 +142,8 @@ export default async function ProjectPage({
             </div>
             {project.logline && <p className="mt-2 max-w-2xl text-[15px] italic text-charcoal">{project.logline}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <RecordStepper type="project" fallback={await recordNeighbors("project", { id: project.id, name: project.title })} />
             {canEdit && (
               <Link href={`/projects/${project.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
             )}
