@@ -11,6 +11,8 @@ import { LINK_SPECS, RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest
 import { splitList, type ProposedOp } from "@/lib/ingest/ops";
 import { convertRecord, type ConvertOutcome } from "@/lib/convert";
 import { labelFor } from "@/lib/taxonomy";
+import { queueAirtableSync } from "@/lib/airtable/sync";
+import { attachSourceFile, attachTargets } from "@/lib/ingest/attach-source";
 import type { SessionUser } from "@/lib/roles";
 import type { LinkPayload } from "@/lib/link-schema";
 
@@ -388,6 +390,7 @@ export async function applyIngestChangesCore(itemId: string, user: SessionUser):
   const touched: Touched = new Map();
   const versions: Versions = new Map();
   let applied = 0, failed = 0, superseded = 0;
+  const createdHere: { targetType: string; targetId: string }[] = [];
 
   for (const change of ordered) {
     const op = change.payload as unknown as ProposedOp & { expectedVersion?: number };
@@ -407,6 +410,7 @@ export async function applyIngestChangesCore(itemId: string, user: SessionUser):
         await applyCreate(effective, user, touched);
         const created = [...touched.values()].find((t) => !before.has(`${t.targetType}:${t.targetId}`));
         if (created) {
+          createdHere.push({ targetType: created.targetType, targetId: created.targetId });
           await db.ingestChange.update({
             where: { id: change.id },
             data: {
@@ -525,6 +529,13 @@ export async function applyIngestChangesCore(itemId: string, user: SessionUser):
   for (const t of touched.values()) {
     await refreshDigest(t.targetType, t.targetId);
   }
+
+  // The uploaded file itself lands on the pages it was for: the record the
+  // uploader named, and any format or project this item created.
+  if (applied > 0) await attachSourceFile(item, user, [...createdHere, ...attachTargets(item)]);
+
+  // Formats and projects go to Airtable once everything above has settled.
+  for (const t of touched.values()) await queueAirtableSync(t.targetType, t.targetId);
 
   // Item status: done unless something needs another look
   const open = await db.ingestChange.count({

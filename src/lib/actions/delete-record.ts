@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { queueAirtableSync } from "@/lib/airtable/sync";
+
 import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
 
 // Hard delete for the main record types. Archive remains the safe default for
@@ -58,6 +60,7 @@ export async function deleteRecord(input: {
     await db.collectionItem.deleteMany({ where: { targetType, targetId: id } });
 
     await logAudit(user, { targetType, targetId: id, targetLabel: label, action: "deleted" });
+    await queueAirtableSync(targetType, id, { reason: "deleted" });
     revalidatePath("/", "layout");
     return { ok: true, redirect };
   } catch (e) {

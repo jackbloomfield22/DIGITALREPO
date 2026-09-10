@@ -101,6 +101,8 @@ DATABASE_URL="…" IMPORT_BATCH_DIR=/path/to/batches \
 | `AI_MODEL_TRIAGE`   | no       | Cheap model for ingest triage (default `claude-haiku-4-5`)      |
 | `INGEST_RAW_CAP_MB` | no       | Raw-file retention cap in Postgres (default 4)                  |
 | `CRON_SECRET`       | no       | When set, required on the backup and ingest cron endpoints      |
+| `AIRTABLE_TOKEN`    | no       | Personal access token for the company Airtable base. Turns on the Airtable mirror: every format and project gets a row, with its files. See [`docs/airtable.md`](docs/airtable.md) |
+| `AIRTABLE_BASE_ID`  | no       | The base to mirror into (`app…`). Can also be set on Admin → Airtable |
 
 On hosted deploys the bootstrap seed generates random passwords for the demo
 accounts (the admin one is printed once in the build log), and every build

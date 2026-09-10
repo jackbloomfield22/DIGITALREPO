@@ -8,6 +8,8 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { queueAirtableSync } from "@/lib/airtable/sync";
+
 import { QUIET_DAYS, QUIET_FORMAT_STATUSES, QUIET_PROJECT_STATUSES, QUIET_REASON } from "@/lib/quiet-rules";
 
 export type QuietSweep = { formats: number; projects: number; titles: string[] };
@@ -28,6 +30,8 @@ export async function sweepQuietRecords(): Promise<QuietSweep> {
   if (projects.length) await db.project.updateMany({ where: { id: { in: projects.map((p) => p.id) } }, data: { archived: true, archivedReason: QUIET_REASON, archivedAt: now } });
   for (const f of formats) await logAudit(null, { targetType: "format", targetId: f.id, targetLabel: f.title, action: "archived", field: "quiet timer", newValue: QUIET_REASON });
   for (const p of projects) await logAudit(null, { targetType: "project", targetId: p.id, targetLabel: p.title, action: "archived", field: "quiet timer", newValue: QUIET_REASON });
+  for (const f of formats) await queueAirtableSync("format", f.id);
+  for (const p of projects) await queueAirtableSync("project", p.id);
   return { formats: formats.length, projects: projects.length, titles: [...formats, ...projects].map((r) => r.title) };
 }
 

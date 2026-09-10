@@ -20,6 +20,8 @@ export type AttachmentVM = {
   kind: "video" | "audio" | "image" | "pdf" | "file";
   durationSeconds: number | null;
   storage: string;
+  /** Copied onto the record's Airtable row. */
+  inAirtable?: boolean;
 };
 
 function readableSize(bytes: number | null): string | null {
@@ -212,7 +214,7 @@ export function AttachmentList({
                 {a.filename}
               </a>
               <span className="shrink-0 text-xs text-faint">
-                {[readableDuration(a.durationSeconds), readableSize(a.sizeBytes)].filter(Boolean).join(" · ")}
+                {[readableDuration(a.durationSeconds), readableSize(a.sizeBytes), a.inAirtable ? "in Airtable" : null].filter(Boolean).join(" · ")}
               </span>
               {canEdit && (
                 <button

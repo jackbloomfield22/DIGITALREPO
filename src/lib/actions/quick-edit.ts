@@ -10,6 +10,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { queueAirtableSync } from "@/lib/airtable/sync";
+
 import { refreshDigest } from "@/lib/ingest/digest";
 import {
   CHANNEL_STATUSES,
@@ -76,6 +78,7 @@ export async function setRecordStatus(type: StatusType, id: string, status: stri
       newValue: labelFor(status),
     });
     await refreshDigest(type, id);
+    await queueAirtableSync(type, id);
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
@@ -108,6 +111,7 @@ export async function archiveRecord(type: ArchiveType, id: string, reason?: stri
       action: "archived",
       newValue: reason?.trim()?.slice(0, 300) ?? null,
     });
+    await queueAirtableSync(type, id);
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
@@ -152,6 +156,7 @@ export async function restoreRecord(type: ArchiveType, id: string, status?: stri
       newValue: nextStatus ? labelFor(nextStatus) : null,
     });
     await refreshDigest(type, id);
+    await queueAirtableSync(type, id);
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {

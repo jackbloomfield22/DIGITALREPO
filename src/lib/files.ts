@@ -193,5 +193,6 @@ export async function attachmentsFor(targetType: string, targetId: string) {
     kind: mediaKind(a.mimeType, a.filename),
     durationSeconds: a.durationSeconds,
     storage: a.storage,
+    inAirtable: !!a.airtableAttachmentId,
   }));
 }

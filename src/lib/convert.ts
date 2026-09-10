@@ -30,6 +30,8 @@ import {
 } from "@/lib/taxonomy";
 import type { SessionUser } from "@/lib/roles";
 import { CONVERSIONS as ALLOWED, MOVED_PREFIX } from "@/lib/conversions";
+import { queueAirtableSync } from "@/lib/airtable/sync";
+
 
 export type ConvertibleType = "format" | "project" | "creator" | "person" | "channel";
 
@@ -332,6 +334,8 @@ export async function convertRecord(
     action: "created", field: "moved from", newValue: `${labelFor(fromType)}: ${srcName}`,
   });
   await refreshDigest(fromType, from.id);
+  await queueAirtableSync(fromType, from.id);
+  await queueAirtableSync(to, toId);
   await refreshDigest(to, toId);
 
   return { toType: to, toId, toSlug, toName, toPath, rehomed };

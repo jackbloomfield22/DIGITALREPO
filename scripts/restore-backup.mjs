@@ -20,7 +20,7 @@ const TABLE_ORDER = [
   "creatorFormat", "formatOrganization", "creatorRelationship",
   "opportunityCreator", "opportunityFormat", "opportunityProject",
   "opportunityOrganization", "collection", "collectionItem", "savedView",
-  "favorite", "recentView", "source", "recordSource", "storedFile", "attachment", "auditLog",
+  "favorite", "recentView", "source", "recordSource", "storedFile", "attachment", "appSetting", "airtableSync", "airtableJob", "auditLog",
   "aiThread", "aiMessage", "ingestItem", "ingestChange", "doc", "docRevision", "channel", "channelIdea", "channelOrganization", "channelPerson", "knowledgeDigest",
 ];
 

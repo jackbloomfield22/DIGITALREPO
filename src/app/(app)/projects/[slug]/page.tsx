@@ -10,6 +10,8 @@ import { findRelatedProjects } from "@/lib/related";
 import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
 import { LinkChips } from "@/components/link-editor";
 import { QuietTimer } from "@/components/quiet-timer";
+import { AirtableCard } from "@/components/airtable-card";
+import { airtableStateFor } from "@/lib/airtable/sync";
 import { RecordStepper } from "@/components/record-stepper";
 import { recordNeighbors } from "@/lib/neighbors";
 
@@ -59,13 +61,14 @@ export default async function ProjectPage({
   const limits = uploadLimit();
   await recordRecentView(user.id, "project", project.id);
 
-  const [favorite, recordSources, attachments, related] = await Promise.all([
+  const [favorite, recordSources, attachments, related, airtableState] = await Promise.all([
     db.favorite.findUnique({
       where: { userId_targetType_targetId: { userId: user.id, targetType: "project", targetId: project.id } },
     }),
     db.recordSource.findMany({ where: { targetType: "project", targetId: project.id }, include: { source: true } }),
     attachmentsFor("project", project.id),
     findRelatedProjects(project.id),
+    airtableStateFor("project", project.id),
   ]);
 
   // Group credits by creator
@@ -152,8 +155,9 @@ export default async function ProjectPage({
             <AddToCollectionButton targetType="project" targetId={project.id} targetLabel={project.title} />
           </div>
         </div>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap gap-2">
           <QuietTimer targetType="project" id={project.id} name={project.title} canEdit={canEdit} onTimer={onQuietTimer("project", project.status)} {...quietClock(project)} />
+          <AirtableCard targetType="project" targetId={project.id} canEdit={canEdit} state={{ ...airtableState, syncedAt: airtableState.syncedAt?.toISOString() ?? null }} />
         </div>
       </div>
 

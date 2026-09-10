@@ -9,6 +9,8 @@ import { recordRecentView } from "@/lib/actions/misc";
 import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
 import { LinkChips } from "@/components/link-editor";
 import { QuietTimer } from "@/components/quiet-timer";
+import { AirtableCard } from "@/components/airtable-card";
+import { airtableStateFor } from "@/lib/airtable/sync";
 import { RecordStepper } from "@/components/record-stepper";
 import { recordNeighbors } from "@/lib/neighbors";
 
@@ -50,12 +52,13 @@ export default async function FormatPage({
   const limits = uploadLimit();
   await recordRecentView(user.id, "format", format.id);
 
-  const [favorite, recordSources, attachments] = await Promise.all([
+  const [favorite, recordSources, attachments, airtableState] = await Promise.all([
     db.favorite.findUnique({
       where: { userId_targetType_targetId: { userId: user.id, targetType: "format", targetId: format.id } },
     }),
     db.recordSource.findMany({ where: { targetType: "format", targetId: format.id }, include: { source: true } }),
     attachmentsFor("format", format.id),
+    airtableStateFor("format", format.id),
   ]);
 
   const facts = [
@@ -87,8 +90,9 @@ export default async function FormatPage({
             <AddToCollectionButton targetType="format" targetId={format.id} targetLabel={format.title} />
           </div>
         </div>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap gap-2">
           <QuietTimer targetType="format" id={format.id} name={format.title} canEdit={canEdit} onTimer={onQuietTimer("format", format.status)} {...quietClock(format)} />
+          <AirtableCard targetType="format" targetId={format.id} canEdit={canEdit} state={{ ...airtableState, syncedAt: airtableState.syncedAt?.toISOString() ?? null }} />
         </div>
       </div>
 

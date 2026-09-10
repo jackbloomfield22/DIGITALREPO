@@ -17,6 +17,8 @@ import crypto from "crypto";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { queueAirtableSync } from "@/lib/airtable/sync";
+
 import {
   MAX_DB_UPLOAD_BYTES,
   MAX_UPLOAD_BYTES,
@@ -78,6 +80,7 @@ export async function recordBlobUpload(input: {
       field: "attachment",
       newValue: filename,
     });
+    await queueAirtableSync(input.targetType, input.targetId);
     revalidatePath("/", "layout");
     return { ok: true, id: attachment.id };
   } catch (e) {
@@ -137,6 +140,7 @@ export async function recordDatabaseUpload(input: {
       field: "attachment",
       newValue: filename,
     });
+    await queueAirtableSync(input.targetType, input.targetId);
     revalidatePath("/", "layout");
     return { ok: true, id: attachment.id };
   } catch (e) {
@@ -163,6 +167,9 @@ export async function removeAttachment(attachmentId: string): Promise<AttachResu
       action: "unlinked",
       field: "attachment",
       oldValue: attachment.filename,
+    });
+    await queueAirtableSync(attachment.targetType, attachment.targetId, {
+      removeIds: attachment.airtableAttachmentId ? [attachment.airtableAttachmentId] : [],
     });
     revalidatePath("/", "layout");
     return { ok: true };

@@ -4,6 +4,7 @@ import { getSessionUser, hasRole } from "@/lib/auth";
 import { storeRawBytes } from "@/lib/ingest/storage";
 import { classifyKind } from "@/lib/ingest/parse";
 import { loadChangesFile, parseChangesFile } from "@/lib/ingest/changes-file";
+import { verifyUpload } from "@/lib/files";
 
 export const maxDuration = 60;
 
@@ -33,8 +34,29 @@ export async function POST(request: Request) {
   // Optional human label for pasted text, so a note is recognisable in the
   // queue and in Add Info rather than showing up as one more "Pasted text".
   const label = String(form.get("label") ?? "").trim().slice(0, 120) || null;
+  // Files that went straight to Blob storage from the browser: verified
+  // against the store, never trusted from the form.
+  let blobs: { url: string; pathname: string; filename: string; size: number; type: string }[] = [];
+  try {
+    const raw = String(form.get("blobs") ?? "");
+    if (raw) blobs = (JSON.parse(raw) as typeof blobs).filter((b) => b && typeof b.url === "string" && typeof b.filename === "string").slice(0, MAX_FILES);
+  } catch {
+    return NextResponse.json({ error: "The upload list could not be read." }, { status: 400 });
+  }
+  // "This file is for": a format or project the file should land on after review.
+  const attachToRaw = String(form.get("attachTo") ?? "").trim();
+  let attachTo: { type: "format" | "project"; id: string } | null = null;
+  if (attachToRaw) {
+    const [type, id] = attachToRaw.split(":");
+    if ((type === "format" || type === "project") && id) {
+      const exists = type === "format" ? await db.format.findUnique({ where: { id }, select: { id: true } }) : await db.project.findUnique({ where: { id }, select: { id: true } });
+      if (!exists) return NextResponse.json({ error: "The record this file is for could not be found." }, { status: 400 });
+      attachTo = { type, id };
+    }
+  }
+  const metadata = attachTo ? { attachTo } : undefined;
 
-  if (!files.length && !pasted) {
+  if (!files.length && !pasted && !blobs.length) {
     return NextResponse.json({ error: "Nothing to ingest — add files or paste text." }, { status: 400 });
   }
   if (files.length > MAX_FILES) {
@@ -79,12 +101,43 @@ export async function POST(request: Request) {
         context,
         webResearch,
         workspace,
+        metadata,
         createdById: user.id,
         status: "uploaded",
       },
     });
     await storeRawBytes(item.id, new Uint8Array(await file.arrayBuffer()));
     created.push({ id: item.id, filename: file.name });
+  }
+
+  for (const b of blobs) {
+    const extension = b.filename.toLowerCase().split(".").pop() ?? "";
+    if (!ACCEPTED.has(extension)) {
+      created.push({ id: "", filename: b.filename, skipped: `Unsupported type .${extension}` });
+      continue;
+    }
+    const info = await verifyUpload(b.url);
+    if (!info) {
+      created.push({ id: "", filename: b.filename, skipped: "That upload didn't arrive — try it again" });
+      continue;
+    }
+    const item = await db.ingestItem.create({
+      data: {
+        kind: classifyKind(b.filename, b.type || null),
+        filename: b.filename,
+        mimeType: b.type || info.contentType,
+        sizeBytes: info.size,
+        blobPath: info.pathname,
+        blobUrl: b.url,
+        context,
+        webResearch,
+        workspace,
+        metadata,
+        createdById: user.id,
+        status: "uploaded",
+      },
+    });
+    created.push({ id: item.id, filename: b.filename });
   }
 
   if (pasted) {

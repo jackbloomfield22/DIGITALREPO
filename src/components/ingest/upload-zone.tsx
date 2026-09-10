@@ -4,7 +4,8 @@
 // runner advances items one short stage at a time (parse → triage → propose)
 // so no single request approaches the serverless duration limit.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { upload as uploadToBlob } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast";
 
@@ -19,7 +20,63 @@ async function runStage(id: string, stage: "parse" | "triage" | "propose"): Prom
   return res.json();
 }
 
-export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; pendingIds: string[] }) {
+type Pick = { type: "format" | "project"; id: string; name: string };
+
+/** "This file is for…" — a typeahead over formats and projects, so a deck lands on its page. */
+function ForPicker({ value, onChange }: { value: Pick | null; onChange: (p: Pick | null) => void }) {
+  const [type, setType] = useState<"format" | "project">("format");
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState<{ q: string; type: string; items: { id: string; name: string; sub?: string }[] }>({ q: "", type: "format", items: [] });
+  // Results only count while they match what is typed; nothing to clear when the box empties.
+  const items = q.trim() && found.q === q && found.type === type ? found.items : [];
+  useEffect(() => {
+    if (!q.trim()) return;
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/lookup?${new URLSearchParams({ type, q })}`, { signal: controller.signal });
+        if (res.ok) setFound({ q, type, items: (await res.json()) as { id: string; name: string; sub?: string }[] });
+      } catch { /* typed on */ }
+    }, 200);
+    return () => { clearTimeout(t); controller.abort(); };
+  }, [q, type]);
+  if (value) {
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted">This file is for</span>
+        <span className="chip">{value.type === "format" ? "Format" : "Project"}: {value.name}</span>
+        <button type="button" className="text-xs underline underline-offset-2 hover:text-accent" onClick={() => onChange(null)}>change</button>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-muted">This file is for (optional)</span>
+        <select className="!w-auto" value={type} onChange={(e) => setType(e.target.value as "format" | "project")} aria-label="Record type">
+          <option value="format">a format</option>
+          <option value="project">a project</option>
+        </select>
+        <input type="text" className="!w-56" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Start typing its name…" aria-label="Record name" />
+        <span className="text-xs text-faint">The file goes on that page after review. A new page made from this upload gets it too.</span>
+      </div>
+      {items.length > 0 && (
+        <ul className="mt-1 max-w-md divide-y divide-line rounded-md border border-line bg-surface">
+          {items.map((i) => (
+            <li key={i.id}>
+              <button type="button" className="flex w-full items-baseline justify-between gap-2 px-3 py-1.5 text-left hover:bg-wash" onClick={() => { onChange({ type, id: i.id, name: i.name }); setQ(""); }}>
+                <span>{i.name}</span>{i.sub && <span className="truncate text-xs text-faint">{i.sub}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export function UploadZone({ aiAvailable, pendingIds, blobReady = false }: { aiAvailable: boolean; pendingIds: string[]; blobReady?: boolean }) {
+  const [attachTo, setAttachTo] = useState<Pick | null>(null);
   const [text, setText] = useState("");
   const [context, setContext] = useState("");
   const [webResearch, setWebResearch] = useState(false);
@@ -63,7 +120,28 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
 
   const upload = async (files: File[]) => {
     const form = new FormData();
-    for (const f of files) form.append("files", f);
+    // With Blob storage connected, files go straight there from the browser —
+    // a request through the app stops at a few megabytes, and decks are bigger.
+    // A changes file is tiny and is read by the app, so it still travels inline.
+    const direct: { url: string; pathname: string; filename: string; size: number; type: string }[] = [];
+    if (blobReady) {
+      for (const f of files) {
+        if (f.name.toLowerCase().endsWith(".json")) { form.append("files", f); continue; }
+        setProgress({ done: 0, total: files.length, label: `Uploading ${f.name}…` });
+        try {
+          const blob = await uploadToBlob(`ingest/${f.name}`, f, { access: "private", handleUploadUrl: "/api/blob/upload", multipart: f.size > 8 * 1024 * 1024 });
+          direct.push({ url: blob.url, pathname: blob.pathname, filename: f.name, size: f.size, type: f.type });
+        } catch (e) {
+          toast(`${f.name}: ${e instanceof Error ? e.message : "upload failed"}`, { tone: "error" });
+          setProgress(null);
+          return;
+        }
+      }
+      if (direct.length) form.append("blobs", JSON.stringify(direct));
+    } else {
+      for (const f of files) form.append("files", f);
+    }
+    if (attachTo) form.append("attachTo", `${attachTo.type}:${attachTo.id}`);
     if (text.trim()) form.append("text", text.trim());
     if (context.trim()) form.append("context", context.trim());
     if (webResearch) form.append("webResearch", "1");
@@ -79,6 +157,7 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
       }
       setText("");
       setContext("");
+      setAttachTo(null);
       const skipped =(body.items as { skipped?: string; filename: string | null }[]).filter((i) => i.skipped);
       if (skipped.length) toast(`Skipped: ${skipped.map((s) => s.filename).join(", ")}`, { tone: "error" });
       type Created = { id: string; filename: string | null; skipped?: string; ready?: boolean; stored?: number; invalid?: number; malformed?: number };
@@ -160,6 +239,7 @@ export function UploadZone({ aiAvailable, pendingIds }: { aiAvailable: boolean; 
           onChange={(e) => setContext(e.target.value)}
           aria-label="Context for this upload"
         />
+        <ForPicker value={attachTo} onChange={setAttachTo} />
         <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-muted">
           <input
             type="checkbox"

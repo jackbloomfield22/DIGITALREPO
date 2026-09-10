@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/quiet",
       "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/cron/airtable",
+      "schedule": "45 8 * * *"
     }
   ]
 }

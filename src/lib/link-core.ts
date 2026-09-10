@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/db";
 import { refreshDigest } from "@/lib/ingest/digest";
+import { queueAirtableForLink } from "@/lib/airtable/sync";
 import { LINK_SPECS } from "@/lib/ingest/registry";
 import type { LinkPayload } from "@/lib/link-schema";
 
@@ -70,7 +71,7 @@ export async function auditInfo(p: LinkPayload): Promise<{ targetType: string; t
   }
 }
 
-export async function upsertLink(p: LinkPayload): Promise<void> {
+async function upsertLinkInner(p: LinkPayload): Promise<void> {
   switch (p.kind) {
     case "creator_entity": {
       const relationship = p.relationship ?? "";
@@ -245,7 +246,7 @@ export async function upsertLink(p: LinkPayload): Promise<void> {
   }
 }
 
-export async function deleteLink(p: LinkPayload): Promise<void> {
+async function deleteLinkInner(p: LinkPayload): Promise<void> {
   switch (p.kind) {
     case "creator_entity":
       await db.creatorEntityLink.deleteMany({
@@ -320,3 +321,15 @@ export async function deleteLink(p: LinkPayload): Promise<void> {
   }
 }
 
+
+// Every add or remove goes through here, from the page and from the ingest
+// apply engine alike, so the Airtable mirror hears about each one once.
+export async function upsertLink(p: LinkPayload): Promise<void> {
+  await upsertLinkInner(p);
+  await queueAirtableForLink(p);
+}
+
+export async function deleteLink(p: LinkPayload): Promise<void> {
+  await deleteLinkInner(p);
+  await queueAirtableForLink(p);
+}

@@ -27,10 +27,21 @@ export async function storeRawBytes(itemId: string, bytes: Uint8Array): Promise<
 export async function readRawBytes(itemId: string): Promise<Uint8Array | null> {
   const item = await db.ingestItem.findUnique({
     where: { id: itemId },
-    select: { raw: true, rawRetained: true },
+    select: { raw: true, rawRetained: true, blobPath: true },
   });
+  if (!item) return null;
+  // A file that went straight to Blob storage (anything over the request
+  // limit) is read from there each time it is needed.
+  if (item.blobPath) {
+    const { signedUrlFor } = await import("@/lib/files");
+    const url = await signedUrlFor(item.blobPath);
+    if (!url) return null;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  }
   // A backup restores the item but not its bytes, leaving an empty column
   // behind a `rawRetained` flag that still says true. Treat that as gone.
-  if (!item?.rawRetained || !item.raw || item.raw.byteLength === 0) return null;
+  if (!item.rawRetained || !item.raw || item.raw.byteLength === 0) return null;
   return new Uint8Array(item.raw);
 }

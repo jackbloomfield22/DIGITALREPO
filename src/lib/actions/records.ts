@@ -9,6 +9,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { logAudit, logFieldChanges } from "@/lib/audit";
+import { queueAirtableSync } from "@/lib/airtable/sync";
 import { slugify, uniqueSlug } from "@/lib/slug";
 
 export type RecordResult =
@@ -76,6 +77,7 @@ export async function createProject(input: ProjectInput): Promise<RecordResult> 
     );
     const project = await db.project.create({ data: { ...data, slug, status: data.status || "released" } });
     await logAudit(user, { targetType: "project", targetId: project.id, targetLabel: project.title, action: "created" });
+    await queueAirtableSync("project", project.id);
     revalidatePath("/", "layout");
     return { ok: true, slug: project.slug, id: project.id };
   } catch (e) {
@@ -97,6 +99,7 @@ export async function updateProject(input: { id: string; expectedVersion: number
       data: { ...data, version: { increment: 1 } },
     });
     await logFieldChanges(user, "project", project.id, project.title, existing as unknown as Record<string, unknown>, data as Record<string, unknown>);
+    await queueAirtableSync("project", project.id);
     revalidatePath("/", "layout");
     return { ok: true, slug: project.slug, id: project.id };
   } catch (e) {
@@ -188,6 +191,7 @@ export async function createFormat(input: FormatInput): Promise<RecordResult> {
       data: { ...data, slug, status: data.status || "idea", ownerId: user.id },
     });
     await logAudit(user, { targetType: "format", targetId: format.id, targetLabel: format.title, action: "created" });
+    await queueAirtableSync("format", format.id);
     revalidatePath("/", "layout");
     return { ok: true, slug: format.slug, id: format.id };
   } catch (e) {
@@ -209,6 +213,7 @@ export async function updateFormat(input: { id: string; expectedVersion: number;
       data: { ...data, version: { increment: 1 } },
     });
     await logFieldChanges(user, "format", format.id, format.title, existing as unknown as Record<string, unknown>, data as Record<string, unknown>);
+    await queueAirtableSync("format", format.id);
     revalidatePath("/", "layout");
     return { ok: true, slug: format.slug, id: format.id };
   } catch (e) {

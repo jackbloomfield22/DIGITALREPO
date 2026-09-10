@@ -676,6 +676,9 @@ model Attachment {
   sizeBytes    Int?
   /// Video and audio only, when the browser could read it before uploading.
   durationSeconds Int?
+  /// Set once the file has been copied onto the record's Airtable row.
+  airtableAttachmentId String?
+  airtableSyncedAt     DateTime?
   uploadedById String?
   createdAt    DateTime @default(now())
 
@@ -815,6 +818,10 @@ model IngestItem {
   sizeBytes     Int?
   raw           Bytes?
   rawRetained   Boolean  @default(false)
+  /// When the file was uploaded straight to Blob storage (anything over the
+  /// request-body limit), where it lives; the bytes are read from there.
+  blobPath      String?
+  blobUrl       String?
   extractedText String?
   context       String? // optional uploader note: what this is and why it matters
   webResearch   Boolean  @default(false) // allow web search to fill gaps during propose
@@ -1288,4 +1295,53 @@ model HqActivity {
   targetId   String?
 
   @@index([ownerId, at])
+}
+
+// ---------------------------------------------------------------------------
+// Airtable mirror. Formats and projects are copied into the company's Airtable
+// base, with their files, so the team can see the slate there; the Repo stays
+// the source of truth and pushes one way. One row per mirrored record, one
+// queue row per record waiting to be pushed, and a small settings table.
+// ---------------------------------------------------------------------------
+
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model AirtableSync {
+  id         String    @id @default(cuid())
+  targetType String
+  targetId   String
+  tableName  String
+  tableId    String
+  recordId   String
+  /// Hash of the last field payload pushed, so an unchanged record costs no API call.
+  fieldsHash String?
+  syncedAt   DateTime?
+  error      String?
+  errorAt    DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([targetType, targetId])
+}
+
+model AirtableJob {
+  id         String   @id @default(cuid())
+  targetType String
+  targetId   String
+  /// "changed" | "deleted" | "forced"
+  reason     String   @default("changed")
+  /// Airtable attachment ids to take off the row, for files deleted here.
+  removeIds  String[] @default([])
+  attempts   Int      @default(0)
+  lastError  String?
+  /// Set while a runner holds the job, so two runners never push the same record at once.
+  claimedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([targetType, targetId])
 }

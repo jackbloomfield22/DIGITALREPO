@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireUser, hasRole } from "@/lib/auth";
 import { ingestAiAvailable } from "@/lib/ingest/ai";
 import { UploadZone } from "@/components/ingest/upload-zone";
+import { blobConfigured } from "@/lib/files";
 import { StatusPill } from "@/components/ui";
 import { labelFor } from "@/lib/taxonomy";
 import { relativeTime } from "@/lib/format";
@@ -70,7 +71,7 @@ export default async function IngestQueuePage({
         nothing touches the knowledge base until you approve it.
       </p>
 
-      {canEdit && <UploadZone aiAvailable={ingestAiAvailable()} pendingIds={pendingIds} />}
+      {canEdit && <UploadZone aiAvailable={ingestAiAvailable()} pendingIds={pendingIds} blobReady={blobConfigured()} />}
 
       <div className="mb-4 flex flex-wrap gap-1.5">
         {STATUS_FILTERS.map((s) => (
