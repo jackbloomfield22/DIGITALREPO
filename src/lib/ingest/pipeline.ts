@@ -4,6 +4,7 @@
 import { db } from "@/lib/db";
 import {
   PROPOSE_MODEL,
+  PAGE_MODEL,
   TRIAGE_MODEL,
   anthropicRunner,
   ingestAiAvailable,
@@ -564,16 +565,20 @@ export async function proposeItemCore(
   if (!text) return { ok: false, error: "No text to propose from." };
 
   try {
-    // A page update names its record up front; a shorter candidate list is enough.
-    const candidates = await matchCandidates(text, isPageUpdate(item) ? { maxCandidates: 12 } : {});
+    // A page update names its record up front; a shorter candidate list is
+    // enough. Someone is waiting on it, so it runs on the faster model and is
+    // sent straight to the tool call: no prose first, no second call to ask.
+    const page = isPageUpdate(item);
+    const candidates = await matchCandidates(text, page ? { maxCandidates: 12 } : {});
     const thread = await threadContext(item);
     const chunks = chunkText(text);
 
     const collected: ProposedOp[] = [];
     for (const chunk of chunks) {
       const { output, usage } = await runner({
-        model: PROPOSE_MODEL,
-        maxTokens: 16_000,
+        model: page ? PAGE_MODEL : PROPOSE_MODEL,
+        maxTokens: page ? 8_000 : 16_000,
+        forceTool: !item.webResearch,
         systemStable: proposeSystem(),
         webSearch: item.webResearch,
         userContent: [

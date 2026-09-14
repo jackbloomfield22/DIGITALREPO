@@ -79,7 +79,11 @@ describe("the op vocabulary", () => {
     expect(vocab).toContain("format→project/channel");
     expect(vocab).toContain("- unlink:");
     expect(vocab).toContain("types (comma-separated, each one of:");
-    const ctx = pageUpdateContext({ recordType: "format", name: "X", path: "/formats/x", today: "2026-09-04" });
+    const ctx = pageUpdateContext({ targetType: "format", recordType: "format", name: "X", path: "/formats/x", today: "2026-09-04" });
+    // Tags are asked for on every run, with the link kind that fills this page's section.
+    expect(ctx).toContain("TAGS, EVERY TIME");
+    expect(ctx).toContain('kind "format_entity"');
+    expect(pageUpdateContext({ targetType: "organization", recordType: "organization", name: "Y", path: "/organizations/y", today: "2026-09-04" })).not.toContain("TAGS, EVERY TIME");
     for (const word of ['"rename"', '"convert"', '"unlink"', '"restore"', "start the page over"]) expect(ctx).toContain(word);
 
     expect(describeOp({ ...base, op: "rename", targetType: "project", targetName: "Old", newName: "New" } as ProposedOp)).toBe('Rename Old to "New"');
@@ -293,13 +297,18 @@ describe("page updates spend one model call", () => {
     });
     expect(isPageUpdate(item)).toBe(true);
     const models: string[] = [];
+    const seen: { forceTool?: boolean; maxTokens: number }[] = [];
     const out = await proposeItemCore(item.id, async (req) => {
       models.push(req.model);
+      seen.push({ forceTool: req.forceTool, maxTokens: req.maxTokens });
       return { output: { changes: [{ ...base, op: "update", targetType: "project", targetName: project.title, field: "status", value: "cancelled", evidence: ["cancelled"] }] }, usage: { model: req.model, inputTokens: 1200, outputTokens: 300, cacheReadTokens: 1000 } };
     });
     expect(out).toEqual({ ok: true, status: "proposed" });
-    // One propose call; the triage model never ran.
+    // One propose call; the triage model never ran. Straight to the tool, on
+    // the page model, with a ceiling that keeps the wait short.
     expect(models).toHaveLength(1);
+    expect(models[0]).toBe(process.env.AI_MODEL_PAGE ?? process.env.AI_MODEL ?? "claude-opus-5");
+    expect(seen[0]).toEqual({ forceTool: true, maxTokens: 8_000 });
     const after = await db.ingestItem.findUnique({ where: { id: item.id } });
     expect(after?.status).toBe("proposed");
     expect((after?.relevance as { reasons?: string[] })?.reasons?.[0]).toContain("Typed on the page");

@@ -19,12 +19,21 @@ export function isPageUpdate(item: { filename: string | null }): boolean {
 /** The audit-log field that marks a page as having been gone over. */
 export const BROUGHT_UP_TO_DATE = "brought up to date";
 
+/** Which pages carry an "Interests, Sports & Topics" section, and the link kind that fills it. */
+const TAG_LINK_KIND: Record<string, string> = {
+  creator: "creator_entity", format: "format_entity", project: "project_entity", opportunity: "opportunity_entity",
+};
+
 export function pageUpdateContext(input: {
+  /** The record's type as the database knows it (creator, format, project…). */
+  targetType?: string;
+  /** How the page describes itself to the reader ("format in development"). */
   recordType: string;
   name: string;
   path: string;
   today: string;
 }): string {
+  const tagKind = input.targetType ? TAG_LINK_KIND[input.targetType] : undefined;
   return [
     `THIS IS A STATUS OVERVIEW FROM THE OWNER OF THIS REPO, typed on the "${input.name}" page (a ${input.recordType}, ${input.path}) on ${input.today}, to bring that page up to date.`,
     "",
@@ -35,6 +44,10 @@ export function pageUpdateContext(input: {
     "Cover every field the text speaks to: status, logline or description, the people and",
     "companies involved, dates, numbers, notes. Write descriptions and notes as the complete",
     "new text, in the owner's substance but cleaned up — full sentences, no stream-of-thought.",
+    "Then fill the rest of the page: every field this kind of record has that the text, the",
+    "page as it stands, or plain knowledge of the subject supports — type, platform, episode",
+    "structure and length, production scale, location, sponsor fit, genres. A page is found",
+    "and sorted by these later, so an empty field the material could fill is a miss.",
     "",
     'If the text says something is dead, done, over, passed, or shelved, propose the status',
     "change — and propose archiving only if they say to shelve, archive, or drop it.",
@@ -56,10 +69,26 @@ export function pageUpdateContext(input: {
     "  complete new value for every field the text covers, and clear the ones it contradicts",
     "  by proposing an empty value.",
     "",
-    "Do not invent anything the text does not say. Do not change other records except to",
-    "connect them to this one. Loosely worded is expected — read the intent.",
+    ...(tagKind ? [
+      "",
+      "TAGS, EVERY TIME. The page's \"Interests, Sports & Topics\" section is how the Repo is",
+      "searched and sorted, so on every update propose the tags this page should carry — drawn",
+      "from what they wrote, from what the page already says, and from what you know about the",
+      `subject. Each tag is a "link" with kind "${tagKind}", aName "${input.name}", bName the tag,`,
+      "and entityKind one of: sport, interest, genre, location, vertical, audience_type, tag,",
+      "hobby, skill, creator_category. Be specific and generous — a women's football",
+      "competition set in Brazil carries sport \"Soccer\" and \"Women's soccer\", genre",
+      "\"Competition\", location \"Brazil\", tag \"International\". Reuse a tag's existing",
+      "name where one is listed among the records above; skip tags the page already has.",
+      "Tags are the one place to go beyond the text; everything else stays to what it says.",
+    ] : []),
+    "",
+    "Do not invent facts the text does not say (tags excepted, above). Do not change other",
+    "records except to connect them to this one. Loosely worded is expected — read the intent.",
     "",
     "Keep each rationale to one short clause and each evidence quote to the few words that",
     "support the change; the owner wrote the text and does not need it explained back.",
+    "One evidence quote per change, twelve words at most. Rationale eight words at most.",
+    "Reply with the tool call only: no summary before it, nothing after it.",
   ].join("\n");
 }

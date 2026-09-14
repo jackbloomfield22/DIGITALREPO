@@ -38,13 +38,38 @@ type Proposal = {
 
 type Stage =
   | { at: "writing" }
-  | { at: "reading"; what: string }
+  | { at: "reading"; what: string; since?: number }
   | { at: "review"; itemId: string; proposals: Proposal[]; picked: Set<string>; cost?: string | null }
   | { at: "nothing"; itemId: string; reasons: string[] }
   | { at: "failed"; itemId: string; error: string }
   | { at: "done"; applied: number };
 
 const DRAFT_PREFIX = "update-page-draft:";
+
+/** A running clock, so a long read looks alive rather than stuck. */
+function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(since);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const s = Math.max(0, Math.floor((now - since) / 1000));
+  return <span className="tabular-nums text-faint">{Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}</span>;
+}
+
+function ElapsedNote({ since }: { since: number }) {
+  const [now, setNow] = useState(since);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(t);
+  }, []);
+  if (now - since < 40_000) return null;
+  return (
+    <p className="mt-2 text-xs text-faint">
+      A long note takes longer to read. You can leave this page — the reading carries on, and the changes will be waiting here when you come back.
+    </p>
+  );
+}
 
 function relative(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -171,6 +196,7 @@ export function UpdatePanelClient({
   lastUpdatedBy,
   next,
   workspace,
+  resume = null,
 }: {
   targetType: string;
   targetId: string;
@@ -182,10 +208,14 @@ export function UpdatePanelClient({
   lastUpdatedBy: string | null;
   next: { name: string; path: string } | null;
   workspace?: "youtube";
+  /** The last note typed here, when it is still being read or has proposals waiting. */
+  resume?: { itemId: string; state: "working" | "ready" } | null;
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [stage, setStage] = useState<Stage>({ at: "writing" });
+  // Read once; a later refresh must not reopen a note that was already dealt with.
+  const [resumeSeen, setResumeSeen] = useState<string | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const restored = useRef(false);
   const router = useRouter();
@@ -220,26 +250,32 @@ export function UpdatePanelClient({
     if (open && stage.at === "writing") areaRef.current?.focus();
   }, [open, stage.at]);
 
+
   const read = useCallback(
-    async (id: string) => {
-      setStage({ at: "reading", what: "Working out what changes on this page…" });
+    async (id: string, kick = true) => {
+      setStage({ at: "reading", what: "Working out what changes on this page…", since: Date.now() });
       // Typed on the page, so the reader knows what it is about: straight to
       // proposals, in one model call. That call can run for a couple of
       // minutes, and a phone that sleeps or a gateway that gives up drops the
       // reply while the work carries on — so a lost reply is not a failure:
       // the item is watched until it lands, one way or the other.
       let replied = false;
-      try {
-        const r = await fetch("/api/ingest/run", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, stage: "propose" }),
-        });
-        const out = (await r.json()) as { ok?: boolean; error?: string; status?: string };
-        replied = true;
-        if (!out.ok) return setStage({ at: "failed", itemId: id, error: out.error ?? "Something went wrong reading that." });
-      } catch {
-        setStage({ at: "reading", what: "Still working — this can take a couple of minutes on a busy page…" });
+      const since = Date.now();
+      if (kick) {
+        try {
+          const r = await fetch("/api/ingest/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, stage: "propose" }),
+          });
+          const out = (await r.json()) as { ok?: boolean; error?: string; status?: string };
+          replied = true;
+          if (!out.ok) return setStage({ at: "failed", itemId: id, error: out.error ?? "Something went wrong reading that." });
+        } catch {
+          setStage({ at: "reading", what: "Still working — this can take a couple of minutes on a busy page…", since });
+        }
+      } else {
+        setStage({ at: "reading", what: "Still reading the note you left here…", since });
       }
       type Read = { status?: string; error?: string | null; changes?: Proposal[]; reasons?: string[]; cost?: { label: string; calls: number } | null };
       const started = Date.now();
@@ -267,6 +303,17 @@ export function UpdatePanelClient({
     [],
   );
 
+  // Back on the page after leaving mid-read: carry on watching, or show what is ready.
+  useEffect(() => {
+    if (!resume || resume.itemId === resumeSeen) return;
+    const t = setTimeout(() => {
+      setResumeSeen(resume.itemId);
+      setOpen(true);
+      void read(resume.itemId, false);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [resume, resumeSeen, read]);
+
   const submit = useCallback(async () => {
     const overview = text.trim();
     if (!overview || stage.at === "reading") return;
@@ -278,9 +325,10 @@ export function UpdatePanelClient({
       form.set("text", `About: ${name} (${path})\n\n${overview}`);
       form.set(
         "context",
-        pageUpdateContext({ recordType, name, path, today: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) }),
+        pageUpdateContext({ targetType, recordType, name, path, today: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) }),
       );
       form.set("label", `${PAGE_UPDATE_LABEL}${name}`);
+      form.set("page", `${targetType}:${targetId}`);
       if (workspace) form.set("workspace", workspace);
       const res = await fetch("/api/ingest/upload", { method: "POST", body: form });
       const data = (await res.json()) as { items?: { id: string }[]; error?: string };
@@ -293,7 +341,7 @@ export function UpdatePanelClient({
       toast("Could not reach the server — your text is still here.", { tone: "error" });
       setStage({ at: "writing" });
     }
-  }, [text, stage.at, name, path, recordType, workspace, read, toast]);
+  }, [text, stage.at, name, path, recordType, workspace, targetType, targetId, read, toast]);
 
   const apply = useCallback(async () => {
     if (stage.at !== "review") return;
@@ -376,9 +424,13 @@ export function UpdatePanelClient({
       )}
 
       {stage.at === "reading" && (
-        <div className="flex items-center gap-3 p-6 text-sm text-muted">
-          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />
-          {stage.what}
+        <div className="p-6 text-sm text-muted">
+          <div className="flex items-center gap-3">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />
+            <span>{stage.what}</span>
+            {stage.since && <Elapsed since={stage.since} />}
+          </div>
+          {stage.since && <ElapsedNote since={stage.since} />}
         </div>
       )}
 

@@ -54,7 +54,12 @@ export async function POST(request: Request) {
       attachTo = { type, id };
     }
   }
-  const metadata = attachTo ? { attachTo } : undefined;
+  // A note typed on a record page says which page, so the panel can find its
+  // proposals again after the person has moved on and come back.
+  const pageRaw = String(form.get("page") ?? "").trim();
+  const [pageType, pageId] = pageRaw.includes(":") ? pageRaw.split(":") : ["", ""];
+  const page = pageType && pageId && /^[a-z_]+$/.test(pageType) && /^[A-Za-z0-9_-]{1,64}$/.test(pageId) ? { type: pageType, id: pageId } : null;
+  const metadata = attachTo || page ? { ...(attachTo ? { attachTo } : {}), ...(page ? { page } : {}) } : undefined;
 
   if (!files.length && !pasted && !blobs.length) {
     return NextResponse.json({ error: "Nothing to ingest — add files or paste text." }, { status: 400 });
@@ -150,6 +155,7 @@ export async function POST(request: Request) {
         context,
         webResearch,
         workspace,
+        metadata,
         createdById: user.id,
         status: "parsed", // pasted text needs no parse stage
       },

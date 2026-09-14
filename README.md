@@ -99,6 +99,7 @@ DATABASE_URL="…" IMPORT_BATCH_DIR=/path/to/batches \
 | `BLOB_READ_WRITE_TOKEN` | no   | Auto-set when a Vercel Blob store is connected. Turns on real file storage (decks, PDFs, video up to 2GB; without it uploads fall back to Postgres at 15MB), and makes every backup also upload an encrypted copy *outside* the database (decrypt with `scripts/decrypt-backup.mjs`) |
 | `AI_MODEL`          | no       | Override the Claude model (default `claude-opus-5`)            |
 | `AI_MODEL_TRIAGE`   | no       | Cheap model for ingest triage (default `claude-haiku-4-5`)      |
+| `AI_MODEL_PAGE`     | no       | Model behind the on-page "Bring this page up to date" panel (default: same as `AI_MODEL`; set `claude-sonnet-5` to trade some judgement for speed) |
 | `INGEST_RAW_CAP_MB` | no       | Raw-file retention cap in Postgres (default 4)                  |
 | `CRON_SECRET`       | no       | When set, required on the backup and ingest cron endpoints      |
 | `AIRTABLE_TOKEN`    | no       | Personal access token for the company Airtable base. Turns on the Airtable mirror: every format and project gets a row, with its files. See [`docs/airtable.md`](docs/airtable.md) |
