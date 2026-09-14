@@ -9,11 +9,12 @@ import { recordNeighbors } from "@/lib/neighbors";
 
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
-import { KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
+import { Portrait, Section } from "@/components/ui";
 import { LinkChips } from "@/components/link-editor";
 import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
 import { SourceList } from "@/components/sources-attachments";
-import { labelFor } from "@/lib/taxonomy";
+import { labelFor, CREATOR_ORG_RELATIONSHIPS, PROJECT_ORG_RELATIONSHIPS, PERSON_ROLE_TYPES } from "@/lib/taxonomy";
+import { LINK_SPECS } from "@/lib/ingest/registry";
 import { formatDate, relativeTime } from "@/lib/format";
 
 export default async function OrganizationPage({
@@ -129,44 +130,53 @@ export default async function OrganizationPage({
           )}
 
           <Section title="Projects">
-            <div className="space-y-2">
-              {org.projects.map((po) => (
-                <div key={po.id} className="card flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Link href={`/projects/${po.project.slug}`} className="truncate font-semibold hover:text-accent-deep hover:underline">
-                      {po.project.title}
-                    </Link>
-                    <KindBadge kind="project" />
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted">
-                    <span>{labelFor(po.relationship)}</span>
-                    <span>{[labelFor(po.project.projectType), po.project.premiereYear].filter(Boolean).join(" · ")}</span>
-                  </div>
-                </div>
-              ))}
-              {org.projects.length === 0 && <p className="text-sm text-faint">No projects linked yet.</p>}
-            </div>
+            <LinkChips
+              canEdit={canEdit}
+              items={org.projects.map((po) => ({
+                key: po.id,
+                label: po.project.title,
+                sub: [labelFor(po.relationship), labelFor(po.project.projectType), po.project.premiereYear].filter(Boolean).join(" · "),
+                href: `/projects/${po.project.slug}`,
+                removePayload: { kind: "project_org", projectId: po.projectId, organizationId: org.id, relationship: po.relationship },
+              }))}
+              addConfig={{
+                template: { kind: "project_org", organizationId: org.id },
+                idField: "projectId",
+                lookupType: "project",
+                roleField: "relationship",
+                roleOptions: PROJECT_ORG_RELATIONSHIPS,
+                createKind: "project",
+                buttonLabel: "+ Add Project",
+              }}
+              emptyMessage="No projects linked yet."
+            />
           </Section>
 
           <Section title="Talent">
-            {directIds.size === 0 && viaProjects.size === 0 && viaRep.size === 0 && (
-              <p className="text-sm text-faint">No talent connected yet.</p>
-            )}
-            {org.creators.length > 0 && (
-              <div className="mb-4">
+            <div className="mb-4">
+              {(org.creators.length > 0 || viaProjects.size > 0 || viaRep.size > 0) && (
                 <div className="mb-1.5 text-xs font-semibold text-muted">Direct relationships</div>
-                <LinkChips
-                  canEdit={canEdit}
-                  items={org.creators.map((co) => ({
-                    key: co.id,
-                    label: co.creator.name,
-                    sub: [labelFor(co.relationship), co.status === "past" ? "past" : null].filter(Boolean).join(" · "),
-                    href: `/talent/${co.creator.slug}`,
-                    removePayload: { kind: "creator_org", creatorId: co.creatorId, organizationId: org.id, relationship: co.relationship },
-                  }))}
-                />
-              </div>
-            )}
+              )}
+              <LinkChips
+                canEdit={canEdit}
+                items={org.creators.map((co) => ({
+                  key: co.id,
+                  label: co.creator.name,
+                  sub: [labelFor(co.relationship), co.status === "past" ? "past" : null].filter(Boolean).join(" · "),
+                  href: `/talent/${co.creator.slug}`,
+                  removePayload: { kind: "creator_org", creatorId: co.creatorId, organizationId: org.id, relationship: co.relationship },
+                }))}
+                addConfig={{
+                  template: { kind: "creator_org", organizationId: org.id },
+                  idField: "creatorId",
+                  lookupType: "creator",
+                  roleField: "relationship",
+                  roleOptions: CREATOR_ORG_RELATIONSHIPS,
+                  buttonLabel: "+ Add Talent",
+                }}
+                emptyMessage="No talent connected yet."
+              />
+            </div>
             {viaProjects.size > 0 && (
               <div className="mb-4">
                 <div className="mb-1.5 text-xs font-semibold text-muted">Through projects</div>
@@ -200,32 +210,47 @@ export default async function OrganizationPage({
           </Section>
 
           <Section title="4.4.Forty Formats">
-            <div className="space-y-2">
-              {org.formats.map((fo) => (
-                <div key={fo.id} className="card flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Link href={`/formats/${fo.format.slug}`} className="truncate font-semibold hover:text-accent-deep hover:underline">
-                      {fo.format.title}
-                    </Link>
-                    <KindBadge kind="format" />
-                    <span className="text-xs text-muted">{labelFor(fo.relationship)}</span>
-                  </div>
-                  <StatusPill status={fo.format.status} label={labelFor(fo.format.status)} />
-                </div>
-              ))}
-              {org.formats.length === 0 && <p className="text-sm text-faint">No internal formats connected.</p>}
-            </div>
+            <LinkChips
+              canEdit={canEdit}
+              items={org.formats.map((fo) => ({
+                key: fo.id,
+                label: fo.format.title,
+                sub: [labelFor(fo.relationship), labelFor(fo.format.status)].filter(Boolean).join(" · "),
+                href: `/formats/${fo.format.slug}`,
+                removePayload: { kind: "format_org", formatId: fo.formatId, organizationId: org.id, relationship: fo.relationship },
+              }))}
+              addConfig={{
+                template: { kind: "format_org", organizationId: org.id },
+                idField: "formatId",
+                lookupType: "format",
+                roleField: "relationship",
+                roleOptions: LINK_SPECS.format_org.roleVocab?.() ?? [],
+                createKind: "format",
+                buttonLabel: "+ Add Format",
+              }}
+              emptyMessage="No internal formats connected."
+            />
           </Section>
 
           <Section title="Industry People">
             <LinkChips
-              canEdit={false}
+              canEdit={canEdit}
               items={org.people.map((po) => ({
                 key: po.id,
                 label: po.person.name,
-                sub: po.person.title ?? undefined,
+                sub: [po.role ? labelFor(po.role) : null, po.person.title].filter(Boolean).join(" · ") || undefined,
                 href: `/people/${po.person.slug}`,
+                removePayload: { kind: "person_org", personId: po.personId, organizationId: org.id },
               }))}
+              addConfig={{
+                template: { kind: "person_org", organizationId: org.id },
+                idField: "personId",
+                lookupType: "person",
+                roleField: "role",
+                roleOptions: PERSON_ROLE_TYPES,
+                createKind: "person",
+                buttonLabel: "+ Add Person",
+              }}
               emptyMessage="No people mapped to this organization."
             />
           </Section>
