@@ -41,7 +41,9 @@ function extractToolInput(response: Anthropic.Message, toolName: string): unknow
 }
 
 export const anthropicRunner: ModelRunner = async (req) => {
-  const client = new Anthropic();
+  // Give up before the platform does, so a hung call comes back as an error
+  // the page can show rather than a cut-off reply.
+  const client = new Anthropic({ timeout: 240_000, maxRetries: 1 });
   const system: Anthropic.TextBlockParam[] = [
     { type: "text", text: req.systemStable, cache_control: { type: "ephemeral" } },
   ];

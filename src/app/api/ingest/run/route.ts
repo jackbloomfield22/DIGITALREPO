@@ -7,7 +7,9 @@ import { proposeItemCore, triageItemCore } from "@/lib/ingest/pipeline";
 // One entry point for the pipeline stages so the duration limit reliably
 // applies and the cron + client-side runner share the same path. Apply has
 // its own server action (it needs the reviewing user's identity for audit).
-export const maxDuration = 60;
+// A page update is one large model call that can run past a minute; the
+// budget here has to outlast it, or the platform cuts the reply off mid-way.
+export const maxDuration = 300;
 
 const bodySchema = z.object({
   id: z.string().min(1),
@@ -26,12 +28,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const result =
-    body.stage === "parse"
-      ? await parseIngestItemCore(body.id)
-      : body.stage === "triage"
-        ? await triageItemCore(body.id)
-        : await proposeItemCore(body.id);
-
-  return NextResponse.json(result, { status: result.ok ? 200 : 422 });
+  try {
+    const result =
+      body.stage === "parse"
+        ? await parseIngestItemCore(body.id)
+        : body.stage === "triage"
+          ? await triageItemCore(body.id)
+          : await proposeItemCore(body.id);
+    return NextResponse.json(result, { status: result.ok ? 200 : 422 });
+  } catch (e) {
+    // Always JSON, so the page can show the reason rather than "could not reach the server".
+    console.error(`Ingest ${body.stage} failed for ${body.id}:`, e);
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "That stage failed." }, { status: 500 });
+  }
 }

@@ -222,28 +222,46 @@ export function UpdatePanelClient({
 
   const read = useCallback(
     async (id: string) => {
-      setStage({ at: "reading", what: "Reading what you wrote…" });
+      setStage({ at: "reading", what: "Working out what changes on this page…" });
+      // Typed on the page, so the reader knows what it is about: straight to
+      // proposals, in one model call. That call can run for a couple of
+      // minutes, and a phone that sleeps or a gateway that gives up drops the
+      // reply while the work carries on — so a lost reply is not a failure:
+      // the item is watched until it lands, one way or the other.
+      let replied = false;
       try {
-        // Typed on the page, so the reader knows what it is about: straight to proposals.
-        for (const s of ["propose"] as const) {
-          setStage({ at: "reading", what: "Working out what changes on this page…" });
-          const r = await fetch("/api/ingest/run", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id, stage: s }),
-          });
-          const out = (await r.json()) as { ok?: boolean; error?: string; status?: string };
-          if (!out.ok) return setStage({ at: "failed", itemId: id, error: out.error ?? "Something went wrong reading that." });
-          if (out.status === "irrelevant") break;
-        }
-        const list = await fetch(`/api/ingest/changes?id=${id}`);
-        const parsed = (await list.json()) as { changes?: Proposal[]; reasons?: string[]; error?: string; cost?: { label: string; calls: number } | null };
-        if (!list.ok) return setStage({ at: "failed", itemId: id, error: parsed.error ?? "Couldn't read that back." });
-        const proposals = parsed.changes ?? [];
-        if (!proposals.length) return setStage({ at: "nothing", itemId: id, reasons: parsed.reasons ?? [] });
-        setStage({ at: "review", itemId: id, proposals, picked: new Set(proposals.map((p) => p.id)), cost: parsed.cost?.label ?? null });
+        const r = await fetch("/api/ingest/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, stage: "propose" }),
+        });
+        const out = (await r.json()) as { ok?: boolean; error?: string; status?: string };
+        replied = true;
+        if (!out.ok) return setStage({ at: "failed", itemId: id, error: out.error ?? "Something went wrong reading that." });
       } catch {
-        setStage({ at: "failed", itemId: id, error: "Could not reach the server." });
+        setStage({ at: "reading", what: "Still working — this can take a couple of minutes on a busy page…" });
+      }
+      type Read = { status?: string; error?: string | null; changes?: Proposal[]; reasons?: string[]; cost?: { label: string; calls: number } | null };
+      const started = Date.now();
+      const LIMIT = 6 * 60_000;
+      for (;;) {
+        let parsed: Read | null = null;
+        try {
+          const list = await fetch(`/api/ingest/changes?id=${id}`, { cache: "no-store" });
+          if (list.ok) parsed = (await list.json()) as Read;
+          else if (replied) return setStage({ at: "failed", itemId: id, error: ((await list.json()) as Read).error ?? "Couldn't read that back." });
+        } catch { /* a blip; look again shortly */ }
+        if (parsed) {
+          const proposals = parsed.changes ?? [];
+          if (proposals.length) return setStage({ at: "review", itemId: id, proposals, picked: new Set(proposals.map((p) => p.id)), cost: parsed.cost?.label ?? null });
+          if (parsed.status === "proposed" || parsed.status === "irrelevant" || parsed.status === "applied") return setStage({ at: "nothing", itemId: id, reasons: parsed.reasons ?? [] });
+          if (parsed.status === "failed") return setStage({ at: "failed", itemId: id, error: parsed.error ?? "Something went wrong reading that." });
+          if (replied) return setStage({ at: "nothing", itemId: id, reasons: parsed.reasons ?? [] });
+        }
+        if (Date.now() - started > LIMIT) {
+          return setStage({ at: "failed", itemId: id, error: "This is taking longer than usual. Your text is saved — wait a minute and press Try again." });
+        }
+        await new Promise((r) => setTimeout(r, 4000));
       }
     },
     [],

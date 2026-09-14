@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 
   const item = await db.ingestItem.findUnique({
     where: { id },
-    select: { id: true, status: true, relevance: true, tokenUsage: true },
+    select: { id: true, status: true, relevance: true, tokenUsage: true, error: true },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -61,6 +61,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     itemId: item.id,
     status: item.status,
+    error: item.error,
     reasons: ((item.relevance as { reasons?: string[] } | null)?.reasons ?? []).slice(0, 2),
     cost: (() => { const u = usageCents(item.tokenUsage); return u.calls ? { label: formatCents(u.cents), calls: u.calls } : null; })(),
     changes: changes.map((c) => {
