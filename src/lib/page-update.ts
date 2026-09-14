@@ -92,3 +92,24 @@ export function pageUpdateContext(input: {
     "Reply with the tool call only: no summary before it, nothing after it.",
   ].join("\n");
 }
+
+/**
+ * Added to the system prompt for a page update. The base rules say never to
+ * go beyond the text, which is right for a stranger's document and wrong for
+ * the owner tidying their own page: here the page itself and knowledge of
+ * the subject are fair game for tags and for filling empty fields.
+ */
+export function pageUpdateSystem(): string {
+  return [
+    "THIS RUN IS A PAGE UPDATE BY THE REPO'S OWNER, and two of the rules above bend for it:",
+    "- Tags (link ops to entities) and empty fields may be filled from the CURRENT PAGE block",
+    "  and from what you know about the subject, not only from the typed text. For such a",
+    "  change, evidence is the words on the page or the fact you drew on (e.g. \"Keep Up is a",
+    "  women's football competition in Brazil\"), and the rationale says \"from the page\".",
+    "- The typed text may be nothing but an instruction — \"add tags\", \"fill this in\",",
+    "  \"tidy this up\". Then do exactly that from the page and your knowledge. Never file a",
+    "  note that merely repeats the instruction or says no facts were given; a run that",
+    "  produces only such a note has failed.",
+    "Facts about the world (who is attached, a status, a deal) still come only from the text.",
+  ].join("\n");
+}

@@ -291,16 +291,16 @@ import { estimateCents, formatCents, usageCents } from "@/lib/ai-cost";
 
 describe("page updates spend one model call", () => {
   it("goes straight to proposals without a triage call", async () => {
-    const project = await db.project.create({ data: { title: `${P} Straight To Proposals`, slug: slugify(`${P} straight`), status: "announced" } });
+    const project = await db.project.create({ data: { title: `${P} Straight To Proposals`, slug: slugify(`${P} straight`), status: "announced", logline: "A women's football competition in Brazil." } });
     const item = await db.ingestItem.create({
-      data: { kind: "text", filename: `${PAGE_UPDATE_LABEL}${project.title}`, extractedText: `About: ${project.title}\n\nIt's cancelled.`, status: "parsed" },
+      data: { kind: "text", filename: `${PAGE_UPDATE_LABEL}${project.title}`, extractedText: `About: ${project.title}\n\nIt's cancelled.`, status: "parsed", metadata: { page: { type: "project", id: project.id } } },
     });
     expect(isPageUpdate(item)).toBe(true);
     const models: string[] = [];
-    const seen: { forceTool?: boolean; maxTokens: number }[] = [];
+    const seen: { forceTool?: boolean; maxTokens: number; system?: string; user: string }[] = [];
     const out = await proposeItemCore(item.id, async (req) => {
       models.push(req.model);
-      seen.push({ forceTool: req.forceTool, maxTokens: req.maxTokens });
+      seen.push({ forceTool: req.forceTool, maxTokens: req.maxTokens, system: req.systemVolatile, user: req.userContent });
       return { output: { changes: [{ ...base, op: "update", targetType: "project", targetName: project.title, field: "status", value: "cancelled", evidence: ["cancelled"] }] }, usage: { model: req.model, inputTokens: 1200, outputTokens: 300, cacheReadTokens: 1000 } };
     });
     expect(out).toEqual({ ok: true, status: "proposed" });
@@ -308,7 +308,13 @@ describe("page updates spend one model call", () => {
     // the page model, with a ceiling that keeps the wait short.
     expect(models).toHaveLength(1);
     expect(models[0]).toBe(process.env.AI_MODEL_PAGE ?? process.env.AI_MODEL ?? "claude-opus-5");
-    expect(seen[0]).toEqual({ forceTool: true, maxTokens: 8_000 });
+    expect(seen[0]).toMatchObject({ forceTool: true, maxTokens: 8_000 });
+    // The reader sees the whole page as it stands, and is told tags may come from it.
+    expect(seen[0].user).toContain(`CURRENT PAGE — "${project.title}"`);
+    expect(seen[0].user).toContain("Logline: A women's football competition in Brazil.");
+    expect(seen[0].user).toContain("Interests, Sports & Topics: (none yet)");
+    expect(seen[0].system).toContain("PAGE UPDATE BY THE REPO'S OWNER");
+    expect(seen[0].system).toContain("Never file a");
     const after = await db.ingestItem.findUnique({ where: { id: item.id } });
     expect(after?.status).toBe("proposed");
     expect((after?.relevance as { reasons?: string[] })?.reasons?.[0]).toContain("Typed on the page");

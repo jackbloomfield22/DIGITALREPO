@@ -12,7 +12,7 @@ import {
   type ModelUsage,
 } from "@/lib/ingest/ai";
 import { matchCandidates, type DigestCandidate } from "@/lib/ingest/matching";
-import { isPageUpdate } from "@/lib/page-update";
+import { isPageUpdate, pageUpdateSystem } from "@/lib/page-update";
 import {
   describeOpVocabulary,
   proposalToolSchema,
@@ -101,6 +101,36 @@ function uploaderContext(item: { context: string | null }): string {
   return item.context
     ? `NOTE FROM THE UPLOADER (what this is and why it matters — trust it when judging relevance and deciding what to extract):\n${item.context}`
     : "";
+}
+
+/**
+ * Everything on the page a note was typed on, so the reader can tag it and
+ * fill it from what is already there rather than from a 700-character digest.
+ */
+async function currentPageBlock(item: { metadata: unknown }): Promise<string> {
+  const page = (item.metadata as { page?: { type?: string; id?: string } } | null)?.page;
+  if (!page?.type || !page.id) return "";
+  const spec = RECORD_REGISTRY[page.type as IngestTargetType];
+  if (!spec) return "";
+  const hasTags = ["creator", "format", "project", "opportunity"].includes(page.type);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const record = await (db as any)[spec.prismaModel].findUnique({
+    where: { id: page.id },
+    ...(hasTags ? { include: { entityLinks: { include: { entity: { select: { kind: true, name: true } } } } } } : {}),
+  });
+  if (!record) return "";
+  const lines = [`CURRENT PAGE — "${record[spec.nameField]}" (${spec.displayName}, id ${page.id}) as it stands now:`];
+  for (const f of spec.fields) {
+    const v = record[f.name];
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) { lines.push(`${f.label}: (empty)`); continue; }
+    const text = v instanceof Date ? v.toISOString().slice(0, 10) : Array.isArray(v) ? v.join(", ") : String(v);
+    lines.push(`${f.label}: ${text.length > 1500 ? `${text.slice(0, 1500)}…` : text}`);
+  }
+  if (hasTags) {
+    const tags = (record.entityLinks as { entity: { kind: string; name: string } }[]).map((l) => `${l.entity.name} (${l.entity.kind})`);
+    lines.push(`Interests, Sports & Topics: ${tags.length ? tags.join(", ") : "(none yet)"}`);
+  }
+  return lines.join("\n");
 }
 
 function candidateBlock(candidates: DigestCandidate[]): string {
@@ -570,6 +600,7 @@ export async function proposeItemCore(
     // sent straight to the tool call: no prose first, no second call to ask.
     const page = isPageUpdate(item);
     const candidates = await matchCandidates(text, page ? { maxCandidates: 12 } : {});
+    const currentPage = page ? await currentPageBlock(item) : "";
     const thread = await threadContext(item);
     const chunks = chunkText(text);
 
@@ -580,9 +611,11 @@ export async function proposeItemCore(
         maxTokens: page ? 8_000 : 16_000,
         forceTool: !item.webResearch,
         systemStable: proposeSystem(),
+        systemVolatile: page ? pageUpdateSystem() : undefined,
         webSearch: item.webResearch,
         userContent: [
           candidateBlock(candidates),
+          currentPage,
           thread,
           workspaceRules(item),
           item.webResearch ? WEB_RESEARCH_RULES : "",
