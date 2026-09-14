@@ -30,6 +30,8 @@ export const TRIAGE_MODEL = process.env.AI_MODEL_TRIAGE ?? "claude-haiku-4-5";
 export const PROPOSE_MODEL = process.env.AI_MODEL ?? "claude-opus-5";
 /** The page panel. The strongest reader by default (it infers tags and fills the page); AI_MODEL_PAGE=claude-sonnet-5 trades some judgement for speed. */
 export const PAGE_MODEL = process.env.AI_MODEL_PAGE ?? PROPOSE_MODEL;
+/** The tagging pass at the end of a page update: a short, cheap call. */
+export const TAG_MODEL = process.env.AI_MODEL_TAGS ?? "claude-sonnet-5";
 
 export function ingestAiAvailable(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;

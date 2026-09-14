@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import {
   PROPOSE_MODEL,
   PAGE_MODEL,
+  TAG_MODEL,
   TRIAGE_MODEL,
   anthropicRunner,
   ingestAiAvailable,
@@ -12,7 +13,9 @@ import {
   type ModelUsage,
 } from "@/lib/ingest/ai";
 import { matchCandidates, type DigestCandidate } from "@/lib/ingest/matching";
-import { isPageUpdate, pageUpdateSystem } from "@/lib/page-update";
+import { isPageUpdate, pageUpdateSystem, TAG_LINK_KIND } from "@/lib/page-update";
+import { entityKindOf } from "@/lib/ingest/ops";
+import { ENTITY_KINDS } from "@/lib/taxonomy";
 import {
   describeOpVocabulary,
   proposalToolSchema,
@@ -568,6 +571,88 @@ export async function shapeAndStoreProposals(
   return { stored: rows.length, invalid, dropped: collected.length - rows.length - invalid.length };
 }
 
+const TAG_TOOL_SCHEMA = {
+  type: "object",
+  properties: {
+    tags: {
+      type: "array",
+      maxItems: 14,
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "The tag as it should read on the page, e.g. \"Women's soccer\", \"Brazil\"" },
+          kind: { type: "string", enum: [...ENTITY_KINDS] },
+          because: { type: "string", description: "A few words on why, drawn from the page or the note" },
+        },
+        required: ["name", "kind", "because"],
+      },
+    },
+  },
+  required: ["tags"],
+};
+
+/**
+ * The tagging pass. Reads the page as it stands plus the owner's note and
+ * returns link ops for the tags it should carry, leaving out anything the
+ * page has or the main reading already proposed.
+ */
+async function tagPage(
+  itemId: string,
+  item: { metadata: unknown },
+  currentPage: string,
+  text: string,
+  already: ProposedOp[],
+  runner: ModelRunner,
+): Promise<ProposedOp[]> {
+  const pageRef = (item.metadata as { page?: { type?: string; id?: string } } | null)?.page;
+  const kind = pageRef?.type ? TAG_LINK_KIND[pageRef.type] : undefined;
+  if (!kind || !pageRef?.id) return [];
+  const nameLine = currentPage.match(/^CURRENT PAGE — "(.+?)" \(/);
+  const pageName = nameLine?.[1] ?? "";
+  if (!pageName) return [];
+  const have = new Set<string>();
+  for (const m of currentPage.match(/^Interests, Sports & Topics: (.*)$/m)?.[1]?.split(", ") ?? []) have.add(m.replace(/ \([a-z_]+\)$/, "").trim().toLowerCase());
+  for (const op of already) if (op.op === "link" && op.kind === kind) have.add(op.bName.trim().toLowerCase());
+  try {
+    const { output, usage } = await runner({
+      model: TAG_MODEL,
+      maxTokens: 1_500,
+      forceTool: true,
+      systemStable: [
+        "You tag pages in the 4.4.Forty Repo, an entertainment-industry knowledge base, so they can be found and sorted later.",
+        "Given a page and a note from its owner, list the tags the page should carry in its \"Interests, Sports & Topics\" section:",
+        "the sports, genres, places, audiences, verticals, interests and themes it is about — drawn from the page, the note, and",
+        "what you know of the subject. Be specific and generous: a women's football competition set in Brazil carries",
+        "Soccer and Women's soccer (sport), Competition (genre), Brazil (location), International (tag). Skip tags the page",
+        "already has. Give each tag its short, natural name — a proper noun stays a proper noun.",
+      ].join(" "),
+      userContent: [currentPage, "", "THE OWNER'S NOTE:", text].join("\n"),
+      toolName: "submit_tags",
+      toolDescription: "The tags this page should carry.",
+      toolSchema: TAG_TOOL_SCHEMA,
+    });
+    await recordUsage(itemId, "tags", usage);
+    const raw = (output as { tags?: { name?: unknown; kind?: unknown; because?: unknown }[] } | null)?.tags;
+    const ops: ProposedOp[] = [];
+    for (const t of Array.isArray(raw) ? raw : []) {
+      const name = String(t?.name ?? "").trim().slice(0, 80);
+      if (!name || have.has(name.toLowerCase())) continue;
+      have.add(name.toLowerCase());
+      const because = String(t?.because ?? "").trim().slice(0, 200) || "from the page";
+      const parsed = proposedOpSchema.safeParse({
+        op: "link", kind, aName: pageName, aId: pageRef.id, bName: name, entityKind: entityKindOf(String(t?.kind ?? "tag")),
+        confidence: 0.7, rationale: "Tag, from the page", evidence: [because.length >= 3 ? because : "from the page"],
+      });
+      if (parsed.success) ops.push(parsed.data);
+      if (ops.length >= 14) break;
+    }
+    return ops;
+  } catch (e) {
+    console.error(`Ingest ${itemId}: tagging pass failed:`, e);
+    return [];
+  }
+}
+
 export async function proposeItemCore(
   itemId: string,
   runner: ModelRunner = anthropicRunner,
@@ -640,6 +725,14 @@ export async function proposeItemCore(
         else droppedMalformed++;
       }
       if (droppedMalformed) console.warn(`Ingest ${itemId}: dropped ${droppedMalformed} malformed proposal(s).`);
+    }
+
+    // A page update always ends with a tagging pass of its own: a small,
+    // separate call whose only job is the Interests, Sports & Topics section,
+    // so tags arrive whether or not the main reading thought to add them.
+    if (page && currentPage) {
+      const tagOps = await tagPage(itemId, item, currentPage, text, collected, runner);
+      collected.push(...tagOps);
     }
 
     const shaped = await shapeAndStoreProposals(itemId, collected, text, candidates);

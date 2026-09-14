@@ -14,7 +14,7 @@ export const metadata = { title: "Development" };
 
 // On hold belongs on the board: work that has paused is still live work, and
 // leaving it off the slate was the same as pretending it had gone away.
-const PIPELINE = ["idea", "concept", "developing", "on_hold", "outbound", "pitched", "in_discussion", "sold", "produced"];
+const PIPELINE = ["idea", "concept", "developing", "on_hold", "outbound", "pitched", "in_discussion", "sold", "in_production", "post_production", "produced"];
 
 export default async function DevelopmentPage() {
   const user = await requireUser();

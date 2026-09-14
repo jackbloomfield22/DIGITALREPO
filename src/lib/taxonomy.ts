@@ -225,6 +225,8 @@ export const FORMAT_STATUSES = mk([
   "pitched",
   "in_discussion",
   "sold",
+  "in_production",
+  "post_production",
   "produced",
   "passed",
   "archived",

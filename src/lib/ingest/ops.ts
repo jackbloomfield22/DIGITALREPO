@@ -16,6 +16,20 @@ import { CONVERSIONS } from "@/lib/conversions";
 const TARGET_TYPES = Object.keys(RECORD_REGISTRY) as IngestTargetType[];
 
 /** A list field arrives as prose — "brand, agency; podcast company" — and is stored as items. */
+/** A tag kind as the model named it, mapped onto ours; anything unrecognised is a plain tag. */
+const ENTITY_KIND_ALIASES: Record<string, string> = {
+  topic: "tag", topics: "tag", theme: "tag", subject: "tag", keyword: "tag", category: "tag",
+  sports: "sport", league: "sport", country: "location", city: "location", region: "location", place: "location", market: "location",
+  genres: "genre", format: "genre", tone: "genre", style: "genre",
+  audience: "audience_type", demographic: "audience_type", platform: "vertical", industry: "vertical", sector: "vertical",
+  interests: "interest", hobbies: "hobby", skills: "skill", talent_type: "creator_category", role: "creator_category",
+};
+export function entityKindOf(raw: string | undefined | null): string {
+  const kind = (raw ?? "interest").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if ((ENTITY_KINDS as readonly string[]).includes(kind)) return kind;
+  return ENTITY_KIND_ALIASES[kind] ?? "tag";
+}
+
 export function splitList(raw: string): string[] {
   return [...new Set(raw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean))];
 }
@@ -294,11 +308,7 @@ export function validateOp(op: ProposedOp): { ok: true; op: ProposedOp } | { ok:
       }
     }
     if (spec.b.targetType === "entity" || spec.a.targetType === "entity") {
-      const kind = norm(op.entityKind ?? "interest");
-      if (!(ENTITY_KINDS as readonly string[]).includes(kind)) {
-        return { ok: false, error: `link ${op.kind}: unknown entity kind "${op.entityKind}"` };
-      }
-      return { ok: true, op: { ...op, role, entityKind: kind } };
+      return { ok: true, op: { ...op, role, entityKind: entityKindOf(op.entityKind) } };
     }
     return { ok: true, op: { ...op, role } };
   }

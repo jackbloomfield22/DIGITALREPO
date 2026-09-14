@@ -20,7 +20,7 @@ export function isPageUpdate(item: { filename: string | null }): boolean {
 export const BROUGHT_UP_TO_DATE = "brought up to date";
 
 /** Which pages carry an "Interests, Sports & Topics" section, and the link kind that fills it. */
-const TAG_LINK_KIND: Record<string, string> = {
+export const TAG_LINK_KIND: Record<string, string> = {
   creator: "creator_entity", format: "format_entity", project: "project_entity", opportunity: "opportunity_entity",
 };
 

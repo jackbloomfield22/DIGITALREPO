@@ -301,14 +301,29 @@ describe("page updates spend one model call", () => {
     const out = await proposeItemCore(item.id, async (req) => {
       models.push(req.model);
       seen.push({ forceTool: req.forceTool, maxTokens: req.maxTokens, system: req.systemVolatile, user: req.userContent });
-      return { output: { changes: [{ ...base, op: "update", targetType: "project", targetName: project.title, field: "status", value: "cancelled", evidence: ["cancelled"] }] }, usage: { model: req.model, inputTokens: 1200, outputTokens: 300, cacheReadTokens: 1000 } };
+      if (req.toolName === "submit_tags") {
+        // The tagging pass: one already on the page, one the main reading proposed, one with a kind of its own naming.
+        return { output: { tags: [
+          { name: "Soccer", kind: "sport", because: "women's football competition" },
+          { name: "Women's soccer", kind: "sport", because: "women's football" },
+          { name: "Brazil", kind: "country", because: "set in Brazil" },
+          { name: "Competition", kind: "genre", because: "a competition" },
+        ] }, usage: { model: req.model, inputTokens: 900, outputTokens: 120, cacheReadTokens: 0 } };
+      }
+      return { output: { changes: [
+        { ...base, op: "update", targetType: "project", targetName: project.title, field: "status", value: "cancelled", evidence: ["cancelled"] },
+        { ...base, op: "link", kind: "project_entity", aName: project.title, bName: "Competition", entityKind: "genre", evidence: ["a competition"] },
+      ] }, usage: { model: req.model, inputTokens: 1200, outputTokens: 300, cacheReadTokens: 1000 } };
     });
     expect(out).toEqual({ ok: true, status: "proposed" });
-    // One propose call; the triage model never ran. Straight to the tool, on
-    // the page model, with a ceiling that keeps the wait short.
-    expect(models).toHaveLength(1);
+    // One reading call plus the tagging pass; the triage model never ran.
+    // Straight to the tool, on the page model, with a ceiling that keeps the wait short.
+    expect(models).toHaveLength(2);
     expect(models[0]).toBe(process.env.AI_MODEL_PAGE ?? process.env.AI_MODEL ?? "claude-opus-5");
+    expect(models[1]).toBe(process.env.AI_MODEL_TAGS ?? "claude-sonnet-5");
     expect(seen[0]).toMatchObject({ forceTool: true, maxTokens: 8_000 });
+    expect(seen[1]).toMatchObject({ forceTool: true, maxTokens: 1_500 });
+    expect(seen[1].user).toContain("THE OWNER'S NOTE:");
     // The reader sees the whole page as it stands, and is told tags may come from it.
     expect(seen[0].user).toContain(`CURRENT PAGE — "${project.title}"`);
     expect(seen[0].user).toContain("Logline: A women's football competition in Brazil.");
@@ -318,8 +333,14 @@ describe("page updates spend one model call", () => {
     const after = await db.ingestItem.findUnique({ where: { id: item.id } });
     expect(after?.status).toBe("proposed");
     expect((after?.relevance as { reasons?: string[] })?.reasons?.[0]).toContain("Typed on the page");
-    expect(await db.ingestChange.count({ where: { itemId: item.id } })).toBe(1);
-    expect(usageCents(after?.tokenUsage).calls).toBe(1);
+    // The status change, the main reading's tag, and the tagging pass's three
+    // new ones; "Competition" is not proposed twice, and "country" became a location.
+    const changes = await db.ingestChange.findMany({ where: { itemId: item.id }, orderBy: { sortOrder: "asc" } });
+    const tags = changes.filter((c) => c.opType === "link").map((c) => c.payload as { bName: string; entityKind: string });
+    expect(changes.filter((c) => c.opType === "update")).toHaveLength(1);
+    expect(tags.map((t) => t.bName).sort()).toEqual(["Brazil", "Competition", "Soccer", "Women's soccer"]);
+    expect(tags.find((t) => t.bName === "Brazil")?.entityKind).toBe("location");
+    expect(usageCents(after?.tokenUsage).calls).toBe(2);
     await db.ingestItem.delete({ where: { id: item.id } });
     await db.project.delete({ where: { id: project.id } });
   });

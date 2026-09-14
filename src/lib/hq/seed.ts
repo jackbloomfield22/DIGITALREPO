@@ -11,7 +11,7 @@ import { PRIVATE_TABLES } from "@/lib/backup";
 
 const FORMAT_STAGE: Record<string, string> = {
   idea: "idea", concept: "idea", developing: "developing", on_hold: "parked", outbound: "buyer_conversations",
-  pitched: "buyer_conversations", in_discussion: "in_negotiation", sold: "sold", produced: "in_production", passed: "passed",
+  pitched: "buyer_conversations", in_discussion: "in_negotiation", sold: "sold", in_production: "in_production", post_production: "in_production", produced: "in_production", passed: "passed",
 };
 const CHANNEL_STAGE: Record<string, string> = {
   prospect: "idea", in_talks: "buyer_conversations", signed: "sold", building: "in_production", live: "in_production", paused: "parked", ended: "passed",
