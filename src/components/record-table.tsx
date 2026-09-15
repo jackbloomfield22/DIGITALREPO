@@ -14,6 +14,7 @@ import type { SortState } from "@/lib/directory-sort";
 import { usePrefs } from "@/components/prefs-provider";
 import { usePeek } from "@/components/peek-panel";
 import { BulkBar } from "@/components/bulk-bar";
+import { EmptyState } from "@/components/ui";
 import type { LabeledValue } from "@/lib/filters";
 
 export type TableColumn = {
@@ -36,15 +37,18 @@ export type TableRow = {
   cells: ReactNode[];
   /** Open in the side panel on click; the name link still goes to the page. */
   peek?: { type: string; id: string };
+  archived?: boolean;
 };
 
-const DENSITY: Record<string, string> = { compact: "[&_td]:py-1 [&_td]:min-h-10 text-[13px]", regular: "[&_td]:py-2.5 [&_td]:min-h-12", relaxed: "[&_td]:py-4 [&_td]:min-h-14" };
+const DENSITY: Record<string, string> = { compact: "[&_td]:py-1 [&_td]:min-h-10 text-sm", regular: "[&_td]:py-2.5 [&_td]:min-h-12", relaxed: "[&_td]:py-4 [&_td]:min-h-14" };
 
-export function RecordTable({ columns, rows, sort, empty = "Nothing here yet.", view, recordType, selectable, matchingIds = [], statuses, taggable }: {
+export function RecordTable({ columns, rows, sort, empty = "Nothing here yet.", emptyAction, view, recordType, selectable, matchingIds = [], statuses, taggable }: {
   columns: TableColumn[];
   rows: TableRow[];
   sort: SortState;
-  empty?: string;
+  empty?: ReactNode;
+  /** A button or link that adds the first record or clears the filters. */
+  emptyAction?: ReactNode;
   /** Preferences key (usually the section). Without it, column set-up is not remembered. */
   view?: string;
   /** Record type for bulk actions and the side panel. */
@@ -130,7 +134,8 @@ export function RecordTable({ columns, rows, sort, empty = "Nothing here yet.", 
       else if (e.key === "Enter" && rows[i]) { e.preventDefault(); router.push(rows[i].href); }
       else if ((e.key === "x" || e.key === "X") && rows[i] && selectable) { e.preventDefault(); toggle(rows[i].id); }
       else if (e.key === " " && rows[i]) { e.preventDefault(); openRow(rows[i]); }
-      else if (e.key === "Escape" && selected.size) { setSelected(new Set()); }
+      // Escape clears the selection only once nothing else is open above the list.
+      else if (e.key === "Escape" && selected.size && !document.querySelector('[role="dialog"], aside[aria-label="Record details"]')) { setSelected(new Set()); }
     };
     table.addEventListener("keydown", onKey);
     return () => table.removeEventListener("keydown", onKey);
@@ -141,7 +146,7 @@ export function RecordTable({ columns, rows, sort, empty = "Nothing here yet.", 
   const peekedId = peek && !peek.startsWith("href:") ? peek.split(":")[1] : null;
 
   if (!rows.length) {
-    return <div className="rounded-md border border-dashed border-line-strong bg-wash/50 px-6 py-10 text-center text-sm text-muted">{empty}</div>;
+    return <EmptyState title={typeof empty === "string" ? empty : undefined} message={typeof empty === "string" ? undefined : empty} action={emptyAction} />;
   }
 
   return (
@@ -153,7 +158,27 @@ export function RecordTable({ columns, rows, sort, empty = "Nothing here yet.", 
           <button type="button" className="ml-1 underline hover:text-accent" onClick={() => save({ hidden: [], order: [], pinned: [], widths: {} })}>Reset columns</button>
         </div>
       )}
-      <div className="overflow-x-auto rounded-md border border-line bg-surface">
+      <ul className="divide-y divide-line rounded-md border border-line bg-surface md:hidden" aria-label="Results">
+        {rows.map((row) => (
+          <li key={row.id} className={`px-3 py-2.5 ${selected.has(row.id) ? "bg-accent-wash/50" : ""}`} onClick={(e) => { const t = e.target as HTMLElement; if (t.closest("a, button, input, select, label")) return; openRow(row); }}>
+            <div className="flex items-start gap-2">
+              {selectable && <input type="checkbox" className="mt-1 !w-auto" aria-label="Select row" checked={selected.has(row.id)} onChange={() => toggle(row.id)} />}
+              <div className="min-w-0 flex-1">
+                <Link href={row.href} className="font-medium hover:text-accent">{row.cells[cellIndex.get(keyOf(ordered.list[0])) ?? 0]}</Link>
+                {row.archived && <span className="ml-1.5 rounded bg-wash px-1 py-0.5 text-xs font-semibold uppercase tracking-wide text-faint">Archived</span>}
+                <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+                  {ordered.list.slice(1, 4).map((c, i) => {
+                    const cell = row.cells[cellIndex.get(keyOf(c)) ?? i + 1];
+                    if (cell == null || cell === "" || c.label === "") return null;
+                    return <div key={keyOf(c)} className="contents"><dt className="text-faint">{c.label}</dt><dd className="min-w-0 truncate">{cell}</dd></div>;
+                  })}
+                </dl>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-x-auto rounded-md border border-line bg-surface md:block">
         <table ref={tableRef} className={`w-full min-w-0 border-collapse text-sm ${DENSITY[density] ?? DENSITY.regular}`}>
           <thead className="sticky top-0 z-10 bg-wash">
             <tr className="border-b border-line text-left">
@@ -203,7 +228,7 @@ export function RecordTable({ columns, rows, sort, empty = "Nothing here yet.", 
                     const cell = row.cells[cellIndex.get(keyOf(c)) ?? i];
                     return (
                       <td key={keyOf(c)} className={`px-3 align-top ${c.align === "right" ? "text-right tabular-nums" : ""} ${i === 0 ? `sticky left-0 z-[1] ${isSelected ? "bg-accent-wash/50" : isPeeked ? "bg-wash" : "bg-surface group-hover/row:bg-wash/60"}` : c.showAt ?? ""}`}>
-                        {i === 0 ? <Link href={row.href} className="font-medium hover:text-accent">{cell}</Link> : cell}
+                        {i === 0 ? <><Link href={row.href} className="font-medium hover:text-accent">{cell}</Link>{row.archived && <span className="ml-1.5 rounded bg-wash px-1 py-0.5 text-xs font-semibold uppercase tracking-wide text-faint">Archived</span>}</> : cell}
                       </td>
                     );
                   })}

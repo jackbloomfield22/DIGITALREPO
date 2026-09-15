@@ -22,7 +22,7 @@ export default async function ExploreKindPage({
   return (
     <div>
       <div className="mb-5 flex items-baseline gap-3">
-        <h1 className="font-display text-3xl font-bold uppercase tracking-tight">
+        <h1 className="font-display text-2xl font-bold uppercase tracking-tight">
           {ENTITY_KIND_PLURALS[kind as EntityKind]}
         </h1>
         <span className="text-sm text-muted">{entities.length}</span>

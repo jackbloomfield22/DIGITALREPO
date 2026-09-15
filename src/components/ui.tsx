@@ -51,17 +51,26 @@ export function Section({
   );
 }
 
+/**
+ * The one empty state: what this section is for, and the way to add the
+ * first thing or clear what is hiding everything.
+ */
 export function EmptyState({
+  title,
   message,
   action,
+  compact,
 }: {
-  message: string;
+  title?: string;
+  message?: ReactNode;
   action?: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-line-strong bg-wash/50 px-4 py-3 text-sm text-muted">
-      <span>{message}</span>
-      {action}
+    <div className={`flex flex-col items-start gap-2 rounded-md border border-dashed border-line-strong bg-wash/50 text-sm text-muted ${compact ? "px-4 py-3" : "px-5 py-6"}`}>
+      {title && <span className="font-semibold text-ink">{title}</span>}
+      {message && <span>{message}</span>}
+      {action && <div className="mt-1 flex flex-wrap gap-2">{action}</div>}
     </div>
   );
 }
@@ -91,7 +100,7 @@ export function Portrait({
   name,
   imageUrl,
   className = "",
-  textClass = "text-3xl",
+  textClass = "text-2xl",
 }: {
   name: string;
   imageUrl?: string | null;
@@ -138,41 +147,41 @@ const STATUS_COLORS: Record<string, string> = {
   // formats
   idea: "bg-wash text-muted",
   concept: "bg-wash text-muted",
-  developing: "bg-[#eef2ec] text-ok",
+  developing: "bg-ok-wash text-ok",
   on_hold: "bg-wash text-warn",
-  outbound: "bg-[#f5efdd] text-warn",
-  pitched: "bg-[#f5efdd] text-warn",
-  in_discussion: "bg-[#f5efdd] text-warn",
-  sold: "bg-[#eef2ec] text-ok",
-  produced: "bg-[#eef2ec] text-ok",
+  outbound: "bg-warn-wash text-warn",
+  pitched: "bg-warn-wash text-warn",
+  in_discussion: "bg-warn-wash text-warn",
+  sold: "bg-ok-wash text-ok",
+  produced: "bg-ok-wash text-ok",
   passed: "bg-wash text-faint",
   archived: "bg-wash text-faint",
   // opportunities
   researching: "bg-wash text-muted",
-  active: "bg-[#eef2ec] text-ok",
+  active: "bg-ok-wash text-ok",
   completed: "bg-wash text-faint",
   // projects
   announced: "bg-wash text-muted",
-  in_production: "bg-[#f5efdd] text-warn",
-  airing: "bg-[#eef2ec] text-ok",
+  in_production: "bg-warn-wash text-warn",
+  airing: "bg-ok-wash text-ok",
   released: "bg-wash text-charcoal",
   ended: "bg-wash text-faint",
   cancelled: "bg-wash text-faint",
   // creators
-  watch: "bg-[#f5efdd] text-warn",
+  watch: "bg-warn-wash text-warn",
   priority: "bg-accent-wash text-accent-deep",
   // ingest
   uploaded: "bg-wash text-muted",
   parsed: "bg-wash text-charcoal",
-  triaged: "bg-[#f5efdd] text-warn",
+  triaged: "bg-warn-wash text-warn",
   proposed: "bg-accent-wash text-accent-deep",
   irrelevant: "bg-wash text-faint",
-  applied: "bg-[#eef2ec] text-ok",
+  applied: "bg-ok-wash text-ok",
   failed: "bg-accent-wash text-accent-deep",
-  approved: "bg-[#eef2ec] text-ok",
-  edited: "bg-[#eef2ec] text-ok",
+  approved: "bg-ok-wash text-ok",
+  edited: "bg-ok-wash text-ok",
   rejected: "bg-wash text-faint",
-  pending: "bg-[#f5efdd] text-warn",
+  pending: "bg-warn-wash text-warn",
   superseded: "bg-accent-wash text-accent-deep",
 };
 
@@ -180,7 +189,7 @@ export function StatusPill({ status, label }: { status: string; label: string })
   const cls = STATUS_COLORS[status] ?? "bg-wash text-muted";
   return (
     <span
-      className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${cls}`}
+      className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${cls}`}
     >
       {label}
     </span>

@@ -37,7 +37,7 @@ export function GoogleSettings({ configured, status, email, lastSyncAt, lastErro
       {msg && <div className="rounded bg-wash px-3 py-2 text-xs">{msg}</div>}
       {connected ? (
         <>
-          <div>Connected as <span className="font-medium">{email ?? "Google account"}</span>{lastSyncAt ? ` · last sync ${new Date(lastSyncAt).toLocaleString()}` : ""}{status === "error" && <span className="text-[#8a3a30]"> · last sync failed: {lastError}</span>}</div>
+          <div>Connected as <span className="font-medium">{email ?? "Google account"}</span>{lastSyncAt ? ` · last sync ${new Date(lastSyncAt).toLocaleString()}` : ""}{status === "error" && <span className="text-danger"> · last sync failed: {lastError}</span>}</div>
           <div className="flex gap-2">
             <button className="btn btn-secondary btn-sm" disabled={pending} onClick={() => start(async () => { const r = await googleSyncNow(); setMsg(r.ok ? `Synced: ${r.summary}` : r.error); router.refresh(); })}>Sync now</button>
             <button className="btn btn-secondary btn-sm" disabled={pending} onClick={() => { if (confirm("Disconnect Google? Synced events are removed; logged conversations stay.")) start(async () => { await googleDisconnect(); router.refresh(); }); }}>Disconnect</button>

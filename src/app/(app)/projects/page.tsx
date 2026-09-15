@@ -17,7 +17,7 @@ import { RowStatus } from "@/components/row-status";
 import { statusOptionsFor } from "@/lib/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
-import { directoryUser, layoutFor, matchingIds, paging } from "@/lib/directory";
+import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 
 export const metadata = { title: "Projects" };
 
@@ -56,7 +56,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const { prefs, views } = await directoryUser(user.id, "projects");
   const view = layoutFor(params, prefs, "projects");
 
-  const where = { AND: [{ archived: false }, ...(q ? [projectSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.ProjectWhereInput[])] };
+  const where = { AND: [...liveOnly(params), ...(q ? [projectSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.ProjectWhereInput[])] };
   const total = await db.project.count({ where });
   const pg = paging(params, total);
   if (!pg.all && pg.requested > pg.pages) redirect(directoryPageUrl("/projects", params, pg.pages));
@@ -77,7 +77,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div>
-      <DirectoryControls
+      <DirectoryControls showArchived={showArchived(params)}
         title="Projects" total={total} createHref="/projects/new" createLabel="+ Add Project" searchPlaceholder="Search projects…"
         canEdit={canEdit} viewToggle section="projects" fields={FIELDS} state={state} names={Object.fromEntries(names)} savedViews={views} defaultViews={DEFAULT_VIEWS}
         sorts={[
@@ -105,7 +105,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             { key: "updated", label: "Updated", sortKey: "updated", filterKey: "updated", showAt: "hidden xl:table-cell" },
           ]}
           rows={projects.map((p) => ({
-            id: p.id, href: `/projects/${p.slug}`, peek: { type: "project", id: p.id },
+            id: p.id, href: `/projects/${p.slug}`, archived: p.archived, peek: { type: "project", id: p.id },
             cells: [
               <span key="t">{p.title}{p.logline && <span className="block text-xs font-normal text-muted line-clamp-1">{p.logline}</span>}</span>,
               <RowStatus key="s" type="project" id={p.id} status={p.status} name={p.title} canEdit={canEdit} />,
@@ -126,7 +126,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             const platform = p.organizations.find((o) => ["network", "streamer", "platform", "distributor"].includes(o.relationship));
             return (
               <Link key={p.id} href={`/projects/${p.slug}`} className="card block p-4 transition-shadow hover:shadow-pop">
-                <div className="flex items-start justify-between gap-2"><div className="font-display text-base font-bold leading-snug">{p.title}</div><KindBadge kind="project" /></div>
+                <div className="flex items-start justify-between gap-2"><div className="font-display text-sm font-bold leading-snug">{p.title}</div><KindBadge kind="project" /></div>
                 <div className="mt-1 text-xs text-muted">{[labelFor(p.projectType), p.premiereYear, p.seasons ? `${p.seasons} seasons` : null].filter(Boolean).join(" · ")}</div>
                 {p.logline && <p className="mt-2 line-clamp-2 text-sm text-charcoal">{p.logline}</p>}
                 <div className="mt-2 space-y-0.5 text-xs text-muted">

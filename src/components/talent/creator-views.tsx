@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Combobox, lookupItems } from "@/components/combobox";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Portrait } from "@/components/ui";
 import { FavoriteButton } from "@/components/action-buttons";
@@ -11,6 +12,7 @@ import { bulkAddEntity, bulkAddToCollection, bulkArchive, bulkSetStatus } from "
 import { createCollectionInline, createEntityInline } from "@/lib/actions/create-inline";
 import { CREATOR_STATUSES } from "@/lib/taxonomy";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 import { usePrefs } from "@/components/prefs-provider";
 import type { CreatorCardVM } from "./types";
 
@@ -129,7 +131,7 @@ export function CreatorCardGrid({
                 />
                 <button
                   aria-label={`Preview ${creator.name}`}
-                  className="text-base text-paper/80 hover:text-paper lg:hidden"
+                  className="text-sm text-paper/80 hover:text-paper lg:hidden"
                   onClick={(e) => {
                     e.preventDefault();
                     setPreviewSlug(creator.slug);
@@ -140,7 +142,7 @@ export function CreatorCardGrid({
               </div>
             </div>
             <div className="p-3">
-              <div className="truncate font-display text-base font-bold uppercase tracking-wide">
+              <div className="truncate font-display text-sm font-bold uppercase tracking-wide">
                 {creator.name}
               </div>
               <div className="mt-0.5 truncate text-xs text-muted">
@@ -227,75 +229,29 @@ function BulkPicker({
   onPick: (id: string, name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const [items, setItems] = useState<{ id: string; name: string }[]>([]);
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (!open) return;
-    const controller = new AbortController();
-    const t = setTimeout(async () => {
-      const params = new URLSearchParams({ type: lookupType, q });
-      if (lookupKind) params.set("kind", lookupKind);
-      try {
-        const res = await fetch(`/api/lookup?${params}`, { signal: controller.signal });
-        if (res.ok) setItems(await res.json());
-      } catch {}
-    }, 150);
-    return () => {
-      clearTimeout(t);
-      controller.abort();
-    };
-  }, [q, open, lookupType, lookupKind]);
+  const fetchItems = useMemo(() => lookupItems(lookupType, lookupKind), [lookupType, lookupKind]);
 
   return (
     <span className="relative">
-      <button className="btn btn-secondary btn-sm" onClick={() => setOpen((v) => !v)}>
+      <button className="btn btn-secondary btn-sm" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         {label}
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-20" aria-hidden onClick={() => setOpen(false)} />
           <div className="absolute bottom-full left-0 z-30 mb-1 w-64 rounded-md border border-line bg-surface p-2 shadow-pop">
-            <input
-              type="text"
+            <Combobox
               autoFocus
-              placeholder="Search…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
               aria-label={label}
+              fetchItems={fetchItems}
+              onEscape={() => setOpen(false)}
+              onPick={(item) => { setOpen(false); onPick(item.id, item.name); }}
+              onCreate={allowCreate ? async (name) => {
+                const result = allowCreate === "collection" ? await createCollectionInline(name) : await createEntityInline(lookupKind ?? "tag", name);
+                if (result.ok) { setOpen(false); onPick(result.id, result.name); } else toast(result.error, { tone: "error" });
+              } : undefined}
             />
-            <div className="mt-1 max-h-44 overflow-y-auto">
-              {items.map((item) => (
-                <button
-                  key={item.id}
-                  className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-wash"
-                  onClick={() => {
-                    setOpen(false);
-                    onPick(item.id, item.name);
-                  }}
-                >
-                  {item.name}
-                </button>
-              ))}
-              {allowCreate && q.trim() && !items.some((i) => i.name.toLowerCase() === q.trim().toLowerCase()) && (
-                <button
-                  className="mt-1 w-full rounded border-t border-line px-2 py-1.5 text-left text-sm text-accent-deep hover:bg-accent-wash"
-                  onClick={async () => {
-                    const result =
-                      allowCreate === "collection"
-                        ? await createCollectionInline(q.trim())
-                        : await createEntityInline(lookupKind ?? "tag", q.trim());
-                    if (result.ok) {
-                      setOpen(false);
-                      onPick(result.id, result.name);
-                    } else toast(result.error, { tone: "error" });
-                  }}
-                >
-                  + Create “{q.trim()}”
-                </button>
-              )}
-            </div>
           </div>
         </>
       )}
@@ -324,6 +280,7 @@ export function CreatorTable({
   const [editSlug, setEditSlug] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const rowPad = density === "compact" ? "py-1" : density === "relaxed" ? "py-4" : "py-2.5";
   const persistColumns = (next: ColumnKey[]) => setColumns(next);
 
@@ -474,7 +431,7 @@ export function CreatorTable({
                       name={creator.name}
                       imageUrl={creator.imageUrl}
                       className="h-7 w-7 shrink-0 rounded"
-                      textClass="text-[10px]"
+                      textClass="text-xs"
                     />
                     {creator.name}
                   </Link>
@@ -566,7 +523,7 @@ export function CreatorTable({
             <button
               className="btn btn-secondary btn-sm text-accent"
               onClick={async () => {
-                if (!window.confirm(`Archive ${ids.length} creators? Nothing is deleted — they move to the Archive and can be restored from there.`)) return;
+                if (!(await confirm({ title: `Archive ${ids.length} creators? Nothing is deleted — they move to the Archive and can be restored from there.`, tone: "danger", action: "Archive" }))) return;
                 const res = await bulkArchive(ids);
                 toast(res.ok ? `Archived ${ids.length} talent records` : res.error, res.ok ? {} : { tone: "error" });
                 setSelected(new Set());

@@ -21,7 +21,7 @@ export default async function CollectionsPage() {
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
-          <h1 className="font-display text-3xl font-bold tracking-tight">COLLECTIONS</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">COLLECTIONS</h1>
           <span className="text-sm text-muted">{collections.length}</span>
         </div>
         {hasRole(user, "EDITOR") && (
@@ -37,7 +37,7 @@ export default async function CollectionsPage() {
         {collections.map((c) => (
           <Link key={c.id} href={`/collections/${c.slug}`} className="card block p-4 transition-shadow hover:shadow-pop">
             <div className="flex items-start justify-between gap-2">
-              <div className="font-display text-base font-bold">{c.name}</div>
+              <div className="font-display text-sm font-bold">{c.name}</div>
               <span className="kind-badge kind-project">Collection</span>
             </div>
             {c.description && <p className="mt-1 line-clamp-2 text-sm text-muted">{c.description}</p>}

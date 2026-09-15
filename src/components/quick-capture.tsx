@@ -272,7 +272,7 @@ export function QuickCapture() {
       <button
         onClick={reveal}
         aria-label="Write a note or ask for a change"
-        className="fixed bottom-4 right-4 z-40 rounded-full border border-line-strong bg-surface px-4 py-2.5 text-sm font-medium shadow-pop transition-colors hover:border-accent hover:text-accent"
+        className="fixed bottom-20 right-4 z-40 rounded-full lg:bottom-4 border border-line-strong bg-surface px-4 py-2.5 text-sm font-medium shadow-pop transition-colors hover:border-accent hover:text-accent"
       >
         ✎ Note{text ? <span className="ml-1.5 text-xs text-accent">draft</span> : null}
       </button>
@@ -400,7 +400,7 @@ export function QuickCapture() {
                     <span className="min-w-0">
                       <span className={on ? "" : "text-faint line-through"}>{p.summary}</span>
                       {(p.sensitive || p.confidence < 0.5) && (
-                        <span className="mt-0.5 block text-[11px] text-accent-deep">
+                        <span className="mt-0.5 block text-xs text-accent-deep">
                           {p.sensitive ? "Worth a second look" : "Not certain about this one"}
                         </span>
                       )}

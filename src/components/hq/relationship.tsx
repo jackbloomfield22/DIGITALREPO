@@ -35,7 +35,7 @@ export function RelationshipEditor({ rel }: { rel: RelationshipVM }) {
       <AutoText label="How we met" value={rel.howWeMet} placeholder="Where, when, who introduced you." onSave={(v) => save({ howWeMet: v })} />
       <AutoText label="Potential opportunities" value={rel.opportunities} multiline rows={3} placeholder="What could you do together? What do they need?" onSave={(v) => save({ opportunities: v })} />
       <AutoText label="Notes" value={rel.notes} multiline rows={8} placeholder="Everything worth remembering about them." onSave={(v) => save({ notes: v })} />
-      <button className="text-xs text-faint hover:text-[#8a3a30]" onClick={() => { if (confirm("Remove this person from HQ? Their Repo record stays.")) start(async () => { await deleteRelationship(rel.id); router.push("/hq/people"); }); }}>
+      <button className="text-xs text-faint hover:text-danger" onClick={() => { if (confirm("Remove this person from HQ? Their Repo record stays.")) start(async () => { await deleteRelationship(rel.id); router.push("/hq/people"); }); }}>
         Remove from HQ
       </button>
     </div>
@@ -90,7 +90,7 @@ export function InteractionLog({ relationshipId, name, interactions }: { relatio
               <span>{new Date(i.at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
               <span className="uppercase tracking-wide">{i.kind}</span>
               {i.source === "google" && <span>via Gmail</span>}
-              <button className="ml-auto opacity-0 hover:text-[#8a3a30] group-hover:opacity-100" onClick={() => start(async () => { await deleteInteraction(i.id); router.refresh(); })} aria-label="Delete">×</button>
+              <button className="ml-auto opacity-0 hover:text-danger group-hover:opacity-100" onClick={() => start(async () => { await deleteInteraction(i.id); router.refresh(); })} aria-label="Delete">×</button>
             </div>
             <div className="whitespace-pre-wrap">{i.summary}</div>
           </li>

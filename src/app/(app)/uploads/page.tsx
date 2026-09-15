@@ -50,7 +50,7 @@ export default async function UploadsPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">ADD INFORMATION</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">ADD INFORMATION</h1>
       <p className="mb-6 max-w-2xl text-sm text-muted">
         A few ways in, depending on what you have. Everything you submit is listed below with
         what it did, and anything can be taken back out — so it is always safe to try.
@@ -59,7 +59,7 @@ export default async function UploadsPage() {
       <div className="mb-8 grid gap-3 sm:grid-cols-2">
         {routes.map((r) => (
           <Link key={r.href} href={r.href} className="card block p-4 transition-colors hover:border-accent">
-            <div className="font-display text-base font-bold">{r.title}</div>
+            <div className="font-display text-sm font-bold">{r.title}</div>
             <p className="mt-1 text-sm text-muted">{r.body}</p>
             <span className="mt-2 inline-block text-sm font-medium text-accent">{r.cta} →</span>
           </Link>
@@ -67,7 +67,7 @@ export default async function UploadsPage() {
       </div>
 
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-display text-lg font-bold tracking-tight">HISTORY</h2>
+        <h2 className="font-display text-xl font-bold tracking-tight">HISTORY</h2>
         {needsReview > 0 && (
           <Link href="/ingest?status=proposed" className="text-sm text-accent">
             {needsReview} waiting for your review →

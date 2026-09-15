@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { directoryPageUrl } from "@/lib/directory-params";
+import { directoryPageUrl, firstParam } from "@/lib/directory-params";
 import { requireUser, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseCreatorFilters, queryCreators, TALENT_FIELDS, TALENT_DEFAULT_VIEWS } from "@/lib/queries/talent";
@@ -31,7 +31,7 @@ export default async function CreatorsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div>
-      <CreatorDirectoryControls total={total} canEdit={canEdit} fields={TALENT_FIELDS} state={filters.state} names={Object.fromEntries(names)} savedViews={views} defaultViews={TALENT_DEFAULT_VIEWS} />
+      <CreatorDirectoryControls showArchived={firstParam(params.archived) === "1"} total={total} canEdit={canEdit} fields={TALENT_FIELDS} state={filters.state} names={Object.fromEntries(names)} savedViews={views} defaultViews={TALENT_DEFAULT_VIEWS} />
       {vms.length === 0 ? (
         <div className="rounded-md border border-dashed border-line-strong bg-wash/50 px-6 py-10 text-center text-sm text-muted">
           {filters.q || filters.state.and.length || filters.state.or.length ? "No talent matches these filters." : "No talent yet. Creators, athletes and personalities live here."}

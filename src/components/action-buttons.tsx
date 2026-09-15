@@ -6,6 +6,7 @@ import { toggleFavorite } from "@/lib/actions/misc";
 import { addLink, removeLink } from "@/lib/actions/links";
 import { createCollectionInline } from "@/lib/actions/create-inline";
 import { useToast } from "@/components/toast";
+import { Combobox, lookupItems } from "@/components/combobox";
 
 export function FavoriteButton({
   targetType,
@@ -26,7 +27,7 @@ export function FavoriteButton({
       aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
       aria-pressed={isFav}
       title={isFav ? "Favorited" : "Favorite"}
-      className={`${small ? "text-base" : "btn btn-secondary btn-sm"} leading-none ${
+      className={`${small ? "text-sm" : "btn btn-secondary btn-sm"} leading-none ${
         isFav ? "text-warn" : "text-faint hover:text-warn"
       }`}
       onClick={async (e) => {
@@ -43,7 +44,7 @@ export function FavoriteButton({
   );
 }
 
-type LookupItem = { id: string; name: string };
+const collectionLookup = lookupItems("collection");
 
 export function AddToCollectionButton({
   targetType,
@@ -57,18 +58,8 @@ export function AddToCollectionButton({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const [items, setItems] = useState<LookupItem[]>([]);
   const router = useRouter();
   const { toast } = useToast();
-
-  const search = async (value: string) => {
-    setQ(value);
-    try {
-      const res = await fetch(`/api/lookup?type=collection&q=${encodeURIComponent(value)}`);
-      if (res.ok) setItems(await res.json());
-    } catch {}
-  };
 
   const add = async (collectionId: string, collectionName: string) => {
     const payload = { kind: "collection_item" as const, collectionId, targetType, targetId };
@@ -93,7 +84,6 @@ export function AddToCollectionButton({
           e.preventDefault();
           e.stopPropagation();
           setOpen((v) => !v);
-          if (!open) search("");
         }}
         aria-expanded={open}
       >
@@ -113,38 +103,20 @@ export function AddToCollectionButton({
             className="absolute right-0 top-full z-30 mt-1 w-64 rounded-md border border-line bg-surface p-2 shadow-pop"
             onClick={(e) => e.stopPropagation()}
           >
-            <input
-              type="text"
+            <Combobox
               autoFocus
-              placeholder="Find or create collection…"
-              value={q}
-              onChange={(e) => search(e.target.value)}
               aria-label="Collection name"
+              placeholder="Find or create collection…"
+              fetchItems={collectionLookup}
+              onEscape={() => setOpen(false)}
+              onPick={(item) => add(item.id, item.name)}
+              createLabel={(name) => `+ New collection “${name}”`}
+              onCreate={async (name) => {
+                const result = await createCollectionInline(name);
+                if (result.ok) await add(result.id, result.name);
+                else toast(result.error, { tone: "error" });
+              }}
             />
-            <div className="mt-1 max-h-48 overflow-y-auto">
-              {items.map((item) => (
-                <button
-                  key={item.id}
-                  className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-wash"
-                  onClick={() => add(item.id, item.name)}
-                >
-                  {item.name}
-                </button>
-              ))}
-              {q.trim() &&
-                !items.some((i) => i.name.toLowerCase() === q.trim().toLowerCase()) && (
-                  <button
-                    className="mt-1 w-full rounded border-t border-line px-2 py-1.5 text-left text-sm text-accent-deep hover:bg-accent-wash"
-                    onClick={async () => {
-                      const result = await createCollectionInline(q.trim());
-                      if (result.ok) await add(result.id, result.name);
-                      else toast(result.error, { tone: "error" });
-                    }}
-                  >
-                    + New collection “{q.trim()}”
-                  </button>
-                )}
-            </div>
           </div>
         </>
       )}

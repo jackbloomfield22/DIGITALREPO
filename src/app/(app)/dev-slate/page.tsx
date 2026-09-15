@@ -17,7 +17,7 @@ export default async function DevSlatePage() {
   return (
     <div className="max-w-3xl">
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-display text-3xl font-bold tracking-tight">DEV SLATE</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">DEV SLATE</h1>
       </div>
       <p className="mb-5 max-w-2xl text-sm text-muted">
         The working slate, kept here rather than linked from here. Edit it like any

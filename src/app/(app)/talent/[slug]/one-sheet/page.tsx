@@ -55,7 +55,7 @@ export default async function OneSheetPage({
       <div className="flex items-start gap-6 border-b-2 border-ink pb-5">
         <Portrait name={creator.name} imageUrl={creator.imageUrl} className="h-32 w-32 shrink-0 rounded" textClass="text-4xl" />
         <div>
-          <h1 className="font-display text-3xl font-bold uppercase tracking-wide">{creator.name}</h1>
+          <h1 className="font-display text-2xl font-bold uppercase tracking-wide">{creator.name}</h1>
           <div className="mt-1 text-sm font-medium text-charcoal">{categories.join(" / ")}</div>
           <div className="mt-0.5 text-sm text-muted">
             {[age, basedIn?.entity.name].filter(Boolean).join(" · ")}

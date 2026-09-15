@@ -22,12 +22,12 @@ export function SavedViewList({
   return (
     <div className="flex flex-wrap gap-1.5">
       {views.map((v) => (
-        <span key={v.id} className="chip bg-accent-wash !border-[#e4c8bd]">
+        <span key={v.id} className="chip bg-accent-wash !border-accent-wash">
           <Link href={v.href} className="font-medium hover:underline">
             {v.name}
           </Link>
           <span className="text-xs text-muted">{v.targetType}</span>
-          <span className="kind-badge kind-format !text-[9px]">Saved View</span>
+          <span className="kind-badge kind-format !text-xs">Saved View</span>
           <button
             aria-label={`Delete saved view ${v.name}`}
             className="ml-0.5 text-muted hover:text-accent"

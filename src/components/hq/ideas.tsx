@@ -73,7 +73,7 @@ export function IdeaEditor({ idea }: { idea: IdeaVM }) {
           )}
         </div>
         <div className="text-xs text-faint">Saved {new Date(idea.createdAt).toLocaleDateString()} · last touched {new Date(idea.lastTouchedAt).toLocaleDateString()}</div>
-        <button className="text-xs text-faint hover:text-[#8a3a30]" onClick={() => { if (confirm("Delete this idea?")) start(async () => { await deleteIdea(idea.id); router.push("/hq/ideas"); }); }}>Delete idea</button>
+        <button className="text-xs text-faint hover:text-danger" onClick={() => { if (confirm("Delete this idea?")) start(async () => { await deleteIdea(idea.id); router.push("/hq/ideas"); }); }}>Delete idea</button>
       </div>
     </div>
   );

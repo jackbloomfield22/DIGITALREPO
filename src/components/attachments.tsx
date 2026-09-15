@@ -9,6 +9,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 import { recordBlobUpload, recordDatabaseUpload, removeAttachment } from "@/lib/actions/attachments";
 
 export type AttachmentVM = {
@@ -135,6 +136,7 @@ export function AttachmentList({
   const [progress, setProgress] = useState<{ name: string; percent: number } | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   const upload = async (file: File) => {
     if (file.size > maxBytes) {
@@ -221,7 +223,7 @@ export function AttachmentList({
                   aria-label={`Delete ${a.filename}`}
                   className="shrink-0 text-muted hover:text-accent"
                   onClick={async () => {
-                    if (!window.confirm(`Delete ${a.filename}? The file itself is removed too.`)) return;
+                    if (!(await confirm({ title: `Delete ${a.filename}? The file itself is removed too.`, tone: "danger", action: "Delete" }))) return;
                     const res = await removeAttachment(a.id);
                     toast(res.ok ? "File deleted" : (res.error ?? "Failed"), res.ok ? {} : { tone: "error" });
                     router.refresh();

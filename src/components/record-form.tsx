@@ -11,6 +11,7 @@ import {
   type RecordResult,
 } from "@/lib/actions/records";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 import type { LabeledValue } from "@/lib/taxonomy";
 
 export type FieldDef = {
@@ -88,6 +89,7 @@ export function RecordForm({
   const [conflict, setConflict] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   const set = (name: string, value: string | string[]) => {
     setValues((v) => ({ ...v, [name]: value }));
@@ -223,8 +225,8 @@ export function RecordForm({
           <div className="flex gap-2">
             <button
               className="btn btn-secondary"
-              onClick={() => {
-                if (dirty && !window.confirm("Discard unsaved changes?")) return;
+              onClick={async () => {
+                if (dirty && !(await confirm({ title: "Discard unsaved changes?", tone: "danger", action: "Discard" }))) return;
                 setDirty(false);
                 router.push(isEdit ? `${BASE_PATH[kind]}/${initial!.slug}` : BASE_PATH[kind]);
               }}

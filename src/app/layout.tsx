@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/toast";
+import { ConfirmProvider } from "@/components/confirm";
+import { LiveRegion } from "@/components/live-region";
 
 export const metadata: Metadata = {
   title: {
@@ -17,7 +19,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider><ConfirmProvider>{children}</ConfirmProvider></ToastProvider>
+        <LiveRegion />
       </body>
     </html>
   );

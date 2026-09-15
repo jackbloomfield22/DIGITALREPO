@@ -23,7 +23,7 @@ export default async function DataHealthPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">DATA HEALTH</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">DATA HEALTH</h1>
       <p className="mb-6 text-sm text-muted">
         Duplicates, stale records, and gaps — with safe resolution tools.
       </p>

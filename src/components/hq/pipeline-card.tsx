@@ -68,7 +68,7 @@ export function PipelineCardEditor({ card }: { card: CardDetail }) {
                 <select value={c.role} className="!w-auto text-xs" onChange={(e) => start(async () => { await setPipelineContact(card.id, c.relationshipId, e.target.value); router.refresh(); })}>
                   {CONTACT_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
-                <button className="text-xs text-faint hover:text-[#8a3a30]" onClick={() => start(async () => { await removePipelineContact(card.id, c.relationshipId); router.refresh(); })} aria-label="Remove">×</button>
+                <button className="text-xs text-faint hover:text-danger" onClick={() => start(async () => { await removePipelineContact(card.id, c.relationshipId); router.refresh(); })} aria-label="Remove">×</button>
               </li>
             ))}
           </ul>
@@ -81,7 +81,7 @@ export function PipelineCardEditor({ card }: { card: CardDetail }) {
         </div>
 
         <button
-          className="text-xs text-faint hover:text-[#8a3a30]"
+          className="text-xs text-faint hover:text-danger"
           onClick={() => { if (confirm("Delete this card? Tasks and notes stay, unlinked.")) start(async () => { await deletePipeline(card.id); router.push("/hq/pipeline"); }); }}
         >
           Delete card

@@ -24,12 +24,12 @@ const EXAMPLES = [
 // which of these are our own concepts, which are outside productions, who is a
 // person rather than a company.
 const TYPE_STYLE: Record<string, { label: string; className: string }> = {
-  creator: { label: "Talent", className: "bg-[#eef2ec] text-[#4a6146] border-[#cfdac9]" },
+  creator: { label: "Talent", className: "bg-ok-wash text-ok border-ok/20" },
   project: { label: "Project", className: "bg-wash text-muted border-line-strong" },
-  organization: { label: "Company", className: "bg-[#eaeef4] text-[#4a5a72] border-[#ccd7e5]" },
-  format: { label: "4.4.Forty Format", className: "bg-accent-wash text-accent-deep border-[#e4c8bd]" },
-  person: { label: "Industry", className: "bg-[#f2eef6] text-[#5d4d70] border-[#dbd0e5]" },
-  opportunity: { label: "Opportunity", className: "bg-[#f6f1e6] text-[#6b5b39] border-[#e2d6bd]" },
+  organization: { label: "Company", className: "bg-info-wash text-info border-info/20" },
+  format: { label: "4.4.Forty Format", className: "bg-accent-wash text-accent-deep border-accent-wash" },
+  person: { label: "Industry", className: "bg-wash text-charcoal border-line-strong" },
+  opportunity: { label: "Opportunity", className: "bg-warn-wash text-warn border-warn/20" },
   entity: { label: "Topic", className: "bg-wash text-muted border-line-strong" },
 };
 
@@ -104,12 +104,12 @@ export function AiChat({
       </aside>
 
       <div className="flex min-h-[70vh] flex-col">
-        <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">AI SEARCH</h1>
+        <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">AI SEARCH</h1>
         <p className="mb-6 text-sm text-muted">
           Ask the Repo anything — answers come from the database itself, with links back
           into it.
           {!available && (
-            <span className="ml-1 rounded bg-[#f5efdd] px-1.5 py-0.5 text-xs font-medium text-warn">
+            <span className="ml-1 rounded bg-warn-wash px-1.5 py-0.5 text-xs font-medium text-warn">
               AI key not configured — falling back to keyword search
             </span>
           )}

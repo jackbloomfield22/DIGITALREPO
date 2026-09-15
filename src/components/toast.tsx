@@ -39,7 +39,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const toast = useCallback(
     (message: string, opts?: ToastOpts) => {
       const id = ++idRef.current;
-      setToasts((t) => [...t.slice(-3), { id, message, undo: opts?.undo, action: opts?.action, tone: opts?.tone }]);
+      setToasts((t) => [...t.slice(-2), { id, message, undo: opts?.undo, action: opts?.action, tone: opts?.tone }]);
       setTimeout(() => dismiss(id), opts?.duration ?? (opts?.undo || opts?.action ? 8000 : 4000));
     },
     [dismiss],

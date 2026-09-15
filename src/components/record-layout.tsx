@@ -4,7 +4,7 @@
 // can drag (remembered per person), and the tabbed main column. Below the
 // large breakpoint the two stack and the handle disappears.
 
-import { useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { usePrefs } from "@/components/prefs-provider";
 
 const MIN = 240;
@@ -16,6 +16,12 @@ export function RecordLayout({ children, details }: { children: ReactNode; detai
   const [live, setLive] = useState<number | null>(null);
   const drag = useRef<{ startX: number; startW: number } | null>(null);
   const width = live ?? Math.min(MAX, Math.max(MIN, prefs.asideWidth ?? DEFAULT));
+  const hidden = !!prefs.detailsHidden;
+  useEffect(() => {
+    const toggle = () => update({ detailsHidden: !prefs.detailsHidden });
+    window.addEventListener("toggle-details", toggle);
+    return () => window.removeEventListener("toggle-details", toggle);
+  }, [prefs.detailsHidden, update]);
 
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
     drag.current = { startX: e.clientX, startW: width };
@@ -38,13 +44,15 @@ export function RecordLayout({ children, details }: { children: ReactNode; detai
 
   return (
     <div>
-      <style>{`@media (min-width: 1024px) { .record-grid { grid-template-columns: ${width}px 1.25rem minmax(0, 1fr); } }`}</style>
+      <style>{`@media (min-width: 1024px) { .record-grid { grid-template-columns: ${hidden ? "0px 1.25rem" : `${width}px 1.25rem`} minmax(0, 1fr); } }`}</style>
       <div className="record-grid grid gap-6 lg:gap-0">
-        <aside className="min-w-0 space-y-4 lg:pr-5">{details}</aside>
+        <aside className={`min-w-0 space-y-4 lg:pr-5 ${hidden ? "lg:hidden" : ""}`}>{details}</aside>
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize the details column"
+          aria-label={hidden ? "Show the details column ([)" : "Resize the details column — [ hides it"}
+          title={hidden ? "Show details ([)" : "Drag to resize · [ hides"}
+          onDoubleClick={() => update({ detailsHidden: !hidden })}
           aria-valuenow={width}
           aria-valuemin={MIN}
           aria-valuemax={MAX}

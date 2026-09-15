@@ -104,7 +104,7 @@ export function CreateSheet({ isEditor }: { isEditor: boolean }) {
       <div className="absolute inset-0 bg-ink/40" aria-hidden onClick={() => setOpen(false)} />
       <div ref={panel} role="dialog" aria-modal="true" aria-label="Create a record" tabIndex={-1} className="relative w-full max-w-lg rounded-lg bg-surface p-5 shadow-pop outline-none" onKeyDown={onKey}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold">New</h2>
+          <h2 className="text-sm font-semibold">New</h2>
           <div role="tablist" aria-label="Record type" className="flex flex-wrap gap-1">
             {TYPES.map((t) => (
               <button key={t.value} role="tab" type="button" aria-selected={type === t.value} className={`rounded px-2 py-1 text-xs ${type === t.value ? "bg-ink text-paper" : "bg-wash text-muted hover:text-ink"}`} onClick={() => { setType(t.value); setValues((cur) => ({ [RECORD_REGISTRY[t.value].nameField]: cur[spec.nameField] ?? "" })); setError(null); }}>

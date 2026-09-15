@@ -46,7 +46,7 @@ export default async function HqTodayPage() {
   return (
     <HqFrame active="/hq">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-display text-3xl font-bold tracking-tight">
+        <h1 className="font-display text-2xl font-bold tracking-tight">
           {greeting}, {user.name.split(" ")[0]}.
         </h1>
         <div className="text-sm text-muted">
@@ -57,7 +57,7 @@ export default async function HqTodayPage() {
 
       {empty && (
         <div className="card mb-6 p-5">
-          <div className="font-display text-lg font-bold">This is your operating system. It is empty until it isn&rsquo;t.</div>
+          <div className="font-display text-xl font-bold">This is your operating system. It is empty until it isn&rsquo;t.</div>
           <p className="mt-1 max-w-2xl text-sm text-muted">
             The fastest start is <Link href="/hq/settings" className="underline hover:text-accent">Settings → Seed from the Repo</Link>: every live format, channel and
             production becomes a pipeline card, and every person and talent becomes a relationship you can start logging against.

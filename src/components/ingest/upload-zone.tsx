@@ -4,7 +4,8 @@
 // runner advances items one short stage at a time (parse → triage → propose)
 // so no single request approaches the serverless duration limit.
 
-import { useEffect, useRef, useState } from "react";
+import { Combobox, lookupItems } from "@/components/combobox";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { upload as uploadToBlob } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast";
@@ -25,21 +26,7 @@ type Pick = { type: "format" | "project"; id: string; name: string };
 /** "This file is for…" — a typeahead over formats and projects, so a deck lands on its page. */
 function ForPicker({ value, onChange }: { value: Pick | null; onChange: (p: Pick | null) => void }) {
   const [type, setType] = useState<"format" | "project">("format");
-  const [q, setQ] = useState("");
-  const [found, setFound] = useState<{ q: string; type: string; items: { id: string; name: string; sub?: string }[] }>({ q: "", type: "format", items: [] });
-  // Results only count while they match what is typed; nothing to clear when the box empties.
-  const items = q.trim() && found.q === q && found.type === type ? found.items : [];
-  useEffect(() => {
-    if (!q.trim()) return;
-    const controller = new AbortController();
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/lookup?${new URLSearchParams({ type, q })}`, { signal: controller.signal });
-        if (res.ok) setFound({ q, type, items: (await res.json()) as { id: string; name: string; sub?: string }[] });
-      } catch { /* typed on */ }
-    }, 200);
-    return () => { clearTimeout(t); controller.abort(); };
-  }, [q, type]);
+  const fetchItems = useMemo(() => lookupItems(type), [type]);
   if (value) {
     return (
       <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
@@ -57,20 +44,17 @@ function ForPicker({ value, onChange }: { value: Pick | null; onChange: (p: Pick
           <option value="format">a format</option>
           <option value="project">a project</option>
         </select>
-        <input type="text" className="!w-56" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Start typing its name…" aria-label="Record name" />
         <span className="text-xs text-faint">The file goes on that page after review. A new page made from this upload gets it too.</span>
       </div>
-      {items.length > 0 && (
-        <ul className="mt-1 max-w-md divide-y divide-line rounded-md border border-line bg-surface">
-          {items.map((i) => (
-            <li key={i.id}>
-              <button type="button" className="flex w-full items-baseline justify-between gap-2 px-3 py-1.5 text-left hover:bg-wash" onClick={() => { onChange({ type, id: i.id, name: i.name }); setQ(""); }}>
-                <span>{i.name}</span>{i.sub && <span className="truncate text-xs text-faint">{i.sub}</span>}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <Combobox
+        className="mt-1 max-w-md"
+        aria-label="Record name"
+        placeholder="Start typing its name…"
+        minChars={1}
+        fetchItems={fetchItems}
+        listClassName="empty:hidden"
+        onPick={(i) => onChange({ type, id: i.id, name: i.name })}
+      />
     </div>
   );
 }

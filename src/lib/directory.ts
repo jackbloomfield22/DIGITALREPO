@@ -36,3 +36,13 @@ export async function directoryUser(userId: string, section: string) {
   ]);
   return { prefs, views };
 }
+
+/** "Show archived" on a list: `archived=1` in the URL. */
+export function showArchived(params: Record<string, string | string[] | undefined>): boolean {
+  return firstParam(params.archived) === "1";
+}
+
+/** The clause that keeps a list to live records unless the viewer asked for the Archive too. */
+export function liveOnly(params: Record<string, string | string[] | undefined>): { archived: false }[] {
+  return showArchived(params) ? [] : [{ archived: false }];
+}

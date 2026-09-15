@@ -16,7 +16,7 @@ export default async function EditChannelPage({ params }: { params: Promise<{ sl
 
   return (
     <div>
-      <h1 className="mb-6 font-display text-3xl font-bold tracking-tight">EDIT {channel.name.toUpperCase()}</h1>
+      <h1 className="mb-6 font-display text-2xl font-bold tracking-tight">EDIT {channel.name.toUpperCase()}</h1>
       <ChannelForm
         talent={talent}
         initial={{

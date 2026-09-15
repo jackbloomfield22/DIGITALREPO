@@ -166,7 +166,7 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
         archived={creator.archived} archivedReason={creator.archivedReason} mergedInto={chrome.merged} duplicates={chrome.duplicates}
         status={{ type: "creator", value: creator.status }} editHref={`${path}/edit`}
         media={<Portrait name={creator.name} imageUrl={creator.imageUrl} className="h-32 w-32 shrink-0 rounded-lg sm:h-40 sm:w-40" textClass="text-5xl" />}
-        badges={needsReview ? <span className="rounded bg-[#f5efdd] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-warn" title={creator.lastVerifiedAt ? `Last verified ${formatDate(creator.lastVerifiedAt)}` : "Never verified"}>Needs review</span> : null}
+        badges={needsReview ? <span className="rounded bg-warn-wash px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warn" title={creator.lastVerifiedAt ? `Last verified ${formatDate(creator.lastVerifiedAt)}` : "Never verified"}>Needs review</span> : null}
         subtitle={
           <>
             <p className="mt-1 text-muted"><InlineField type="creator" id={creator.id} field={fieldNamed(all, "headline")} canEdit={canEdit} placeholder="Add a headline…" /></p>
@@ -220,7 +220,7 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
             <ul className="space-y-3">
               {related.map((r) => (
                 <li key={r.id}>
-                  <Link href={`/talent/${r.slug}`} className="flex items-center gap-2 font-medium hover:text-accent-deep"><Portrait name={r.name} imageUrl={r.imageUrl} className="h-7 w-7 shrink-0 rounded" textClass="text-[10px]" /><span className="truncate">{r.name}</span></Link>
+                  <Link href={`/talent/${r.slug}`} className="flex items-center gap-2 font-medium hover:text-accent-deep"><Portrait name={r.name} imageUrl={r.imageUrl} className="h-7 w-7 shrink-0 rounded" textClass="text-xs" /><span className="truncate">{r.name}</span></Link>
                   <div className="ml-9 text-xs text-muted">{r.reasons.join(" · ")}</div>
                 </li>
               ))}
@@ -241,10 +241,10 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
             <Highlights type="creator" id={creator.id} fields={highlights} canEdit={canEdit} />
             <UpdatePanel user={user} targetType="creator" targetId={creator.id} name={creator.name} path={path} recordType="talent profile" />
             <Section title="Bio">
-              <InlineField type="creator" id={creator.id} field={fieldNamed(all, "miniBio")} canEdit={canEdit} className="text-[15px] leading-relaxed" placeholder="Who are they, in a paragraph?" />
+              <InlineField type="creator" id={creator.id} field={fieldNamed(all, "miniBio")} canEdit={canEdit} className="text-sm leading-relaxed" placeholder="Who are they, in a paragraph?" />
             </Section>
             <Section title="Digital">
-              <div className="mb-3"><InlineField type="creator" id={creator.id} field={fieldNamed(all, "digitalSummary")} canEdit={canEdit} className="text-[15px] leading-relaxed" placeholder="What is their digital presence like?" /></div>
+              <div className="mb-3"><InlineField type="creator" id={creator.id} field={fieldNamed(all, "digitalSummary")} canEdit={canEdit} className="text-sm leading-relaxed" placeholder="What is their digital presence like?" /></div>
               {creator.socialProfiles.length > 0 && (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {creator.socialProfiles.map((s) => (
@@ -254,8 +254,8 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
                         {s.handle && <span className="ml-2 truncate text-muted">{s.url ? <a className="hover:text-accent-deep hover:underline" href={s.url} target="_blank" rel="noreferrer">@{s.handle}</a> : `@${s.handle}`}</span>}
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold">{s.followerCount != null ? compactNumber(s.followerCount) : "—"}{s.engagementRate != null && <span className="ml-1.5 text-[11px] font-medium text-muted">{s.engagementRate}% eng.</span>}</div>
-                        {s.countUpdatedAt && <div className="text-[11px] text-faint">updated {relativeTime(s.countUpdatedAt)}</div>}
+                        <div className="font-semibold">{s.followerCount != null ? compactNumber(s.followerCount) : "—"}{s.engagementRate != null && <span className="ml-1.5 text-xs font-medium text-muted">{s.engagementRate}% eng.</span>}</div>
+                        {s.countUpdatedAt && <div className="text-xs text-faint">updated {relativeTime(s.countUpdatedAt)}</div>}
                       </div>
                     </div>
                   ))}
@@ -270,7 +270,7 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
               <LinkChips canEdit={canEdit} items={sports.map((l) => ({ key: l.id, label: l.entity.name, href: `/explore/sport/${l.entity.slug}`, removePayload: { kind: "creator_entity", creatorId: creator.id, entityId: l.entityId, relationship: l.relationship } }))} addConfig={{ template: chipTemplate, idField: "entityId", lookupType: "entity", lookupKind: "sport", createKind: "entity", buttonLabel: "+ Add sport" }} emptyMessage="No sports mapped yet." />
             </Section>
             <Section title="Opportunity Notes">
-              <InlineField type="creator" id={creator.id} field={fieldNamed(all, "opportunityNotes")} canEdit={canEdit} className="text-[15px] leading-relaxed" placeholder="Why is this person interesting creatively or commercially?" />
+              <InlineField type="creator" id={creator.id} field={fieldNamed(all, "opportunityNotes")} canEdit={canEdit} className="text-sm leading-relaxed" placeholder="Why is this person interesting creatively or commercially?" />
             </Section>
             <Section title="Sources">
               <SourceList canEdit={canEdit} targetType="creator" targetId={creator.id} sources={recordSources.map((rs) => ({ recordSourceId: rs.id, title: rs.source.title, url: rs.source.url, sourceType: rs.source.sourceType }))} />
@@ -312,7 +312,7 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
             canEdit={canEdit} autoOpen={autoLink} title="Format" columns={{ extra: "Status" }}
             rows={creator.formats.map((cf) => ({
               id: cf.id, name: cf.format.title, href: `/formats/${cf.format.slug}`,
-              extra: <span className="flex items-center gap-2"><StatusPill status={cf.format.status} label={labelFor(cf.format.status)} />{cf.isPrimary && <span className="text-[11px] font-semibold uppercase tracking-wide text-accent-deep">Primary</span>}<KindBadge kind="format" /></span>,
+              extra: <span className="flex items-center gap-2"><StatusPill status={cf.format.status} label={labelFor(cf.format.status)} />{cf.isPrimary && <span className="text-xs font-semibold uppercase tracking-wide text-accent-deep">Primary</span>}<KindBadge kind="format" /></span>,
               removePayload: { kind: "creator_format", creatorId: creator.id, formatId: cf.formatId },
             }))}
             addConfig={{ template: { kind: "creator_format", creatorId: creator.id }, idField: "formatId", lookupType: "format", createKind: "format", buttonLabel: "+ Attach format" }}

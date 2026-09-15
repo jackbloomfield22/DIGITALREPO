@@ -19,7 +19,7 @@ export default async function BackupsPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">BACKUPS</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">BACKUPS</h1>
       <p className="mb-6 max-w-2xl text-sm text-muted">
         Complete snapshots of everything in the 4.4.Forty Repo — users, creators, every
         relationship, notes, and history. A snapshot is taken automatically every day
@@ -89,7 +89,7 @@ export default async function BackupsPage() {
             outside the database.
           </span>
         ) : (
-          <span className="rounded bg-[#f5efdd] px-2 py-1 text-xs text-warn">
+          <span className="rounded bg-warn-wash px-2 py-1 text-xs text-warn">
             Offsite copies off — snapshots live inside the same database they protect.
             Add a Blob store in Vercel (Storage → Create → Blob) to store encrypted
             copies outside it.

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Drawer } from "@/components/overlay";
 import { createEvent, updateEvent, deleteEvent, importStandardCalendar, type EventInput } from "@/lib/actions/events";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 
 export type EventVM = {
   id: string;
@@ -38,6 +39,7 @@ function EventForm({
   const [saving, setSaving] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const set = (patch: Partial<EventInput>) => setForm((f) => ({ ...f, ...patch }));
 
   return (
@@ -87,7 +89,7 @@ function EventForm({
             className="btn btn-ghost btn-sm text-accent"
             disabled={saving}
             onClick={async () => {
-              if (!window.confirm(`Delete “${initial.title}”?`)) return;
+              if (!(await confirm({ title: `Delete “${initial.title}”?`, tone: "danger", action: "Delete" }))) return;
               setSaving(true);
               const res = await deleteEvent(initial.id);
               toast(res.ok ? "Event deleted" : (res.error ?? "Failed"), res.ok ? {} : { tone: "error" });

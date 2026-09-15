@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { mergeEntities } from "@/lib/actions/admin";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 import { labelFor } from "@/lib/taxonomy";
 
 export function EntityMergeTool({
@@ -16,6 +17,7 @@ export function EntityMergeTool({
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   const source = entities.find((e) => e.id === sourceId);
   const sameKind = entities.filter((e) => !source || e.kind === source.kind);
@@ -65,7 +67,7 @@ export function EntityMergeTool({
         disabled={!sourceId || !targetId || busy}
         onClick={async () => {
           const target = entities.find((e) => e.id === targetId);
-          if (!window.confirm(`Merge "${source?.name}" into "${target?.name}"? All relationships move over; "${source?.name}" becomes an alias.`)) return;
+          if (!(await confirm({ title: `Merge "${source?.name}" into "${target?.name}"? All relationships move over; "${source?.name}" becomes an alias.`, tone: "default", action: "Merge" }))) return;
           setBusy(true);
           const res = await mergeEntities(sourceId, targetId);
           toast(res.ok ? "Merged" : (res.error ?? "Merge failed"), res.ok ? {} : { tone: "error" });

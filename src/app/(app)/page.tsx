@@ -76,7 +76,7 @@ export default async function Home() {
               <div className="grid gap-1.5 sm:grid-cols-2">
                 {favRefs.map((r) => (
                   <Link key={`${r.type}:${r.id}`} href={r.href} className="card flex items-center gap-2.5 px-3 py-2 transition-shadow hover:shadow-pop">
-                    <span className="w-14 shrink-0 text-[10px] uppercase tracking-wide text-faint">{typeLabel(r.type)}</span>
+                    <span className="w-14 shrink-0 text-xs uppercase tracking-wide text-faint">{typeLabel(r.type)}</span>
                     <span className="min-w-0"><span className="block truncate text-sm font-medium">{r.name}</span>{r.sub && <span className="block truncate text-xs text-muted">{r.sub}</span>}</span>
                   </Link>
                 ))}
@@ -91,7 +91,7 @@ export default async function Home() {
                   const r = refOf.get(`${a.targetType}:${a.targetId}`);
                   return (
                     <li key={`${a.targetType}:${a.targetId}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-3 py-2 text-sm">
-                      <span className="w-14 shrink-0 text-[10px] uppercase tracking-wide text-faint">{typeLabel(a.targetType)}</span>
+                      <span className="w-14 shrink-0 text-xs uppercase tracking-wide text-faint">{typeLabel(a.targetType)}</span>
                       {r ? <Link href={r.href} className="font-medium hover:text-accent-deep">{r.name}</Link> : <span className="text-muted">{a.targetLabel}</span>}
                       <span className="text-xs text-muted">{a.action}{a.field ? ` · ${a.field}` : ""}</span>
                       <span className="ml-auto text-xs text-faint">{a.userName ?? "System"} · {relativeTime(a.createdAt)}</span>

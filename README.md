@@ -226,6 +226,13 @@ status, years, confidence, source).
   company, a rep. Entity pages aggregate creators/projects/formats plus co-occurrence
   intelligence (common locations, common orgs, related interests) and jump straight into
   the filtered directory.
+- **Keyboard** — `⌘K` palette, `/` search, `?` the shortcut list, `C` create, `G` then
+  `T/P/C/F/O` to jump between sections, `J/K` `X` `Space` `Enter` on lists, `F` filters,
+  and on a record `E` name, `S` status, `N` note, `L` link, `[` folds the Details column.
+  Single keys never fire while you are typing; Escape cancels the editor first, then the
+  palette or dialog, then the side panel, then a selection.
+- **Show archived** — every list and the search page can include the Archive with one
+  toggle; archived rows carry a pill and every page still works for an archived record.
 - **⌘K command bar** — typo-tolerant global search across every type, grouped, plus
   create actions.
 - **Edit in place** — every field on every record page is editable where it sits: click

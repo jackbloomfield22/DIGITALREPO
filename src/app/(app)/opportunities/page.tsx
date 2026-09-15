@@ -16,7 +16,7 @@ import { RowStatus } from "@/components/row-status";
 import { statusOptionsFor } from "@/lib/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
-import { directoryUser, layoutFor, matchingIds, paging } from "@/lib/directory";
+import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 
 export const metadata = { title: "Opportunities" };
 
@@ -51,7 +51,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   const { prefs, views } = await directoryUser(user.id, "opportunities");
   const view = layoutFor(params, prefs, "opportunities");
 
-  const where = { AND: [{ archived: false }, ...(q ? [opportunitySearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.OpportunityWhereInput[])] };
+  const where = { AND: [...liveOnly(params), ...(q ? [opportunitySearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.OpportunityWhereInput[])] };
   const total = await db.opportunity.count({ where });
   const pg = paging(params, total);
   if (!pg.all && pg.requested > pg.pages) redirect(directoryPageUrl("/opportunities", params, pg.pages));
@@ -68,7 +68,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
 
   return (
     <div>
-      <DirectoryControls
+      <DirectoryControls showArchived={showArchived(params)}
         title="Opportunities" total={total} createHref="/opportunities/new" createLabel="+ Add Opportunity" searchPlaceholder="Search opportunities…"
         canEdit={canEdit} viewToggle section="opportunities" fields={FIELDS} state={state} names={Object.fromEntries(names)} savedViews={views} defaultViews={DEFAULT_VIEWS}
         sorts={[{ value: "date-desc", label: "Latest activity" }, { value: "date", label: "Oldest activity" }, { value: "status", label: "Status" }, { value: "type", label: "Type" }, { value: "title", label: "Alphabetical" }]}
@@ -87,7 +87,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
             { key: "updated", label: "Updated", sortKey: "updated", filterKey: "updated", showAt: "hidden xl:table-cell" },
           ]}
           rows={opportunities.map((o) => ({
-            id: o.id, href: `/opportunities/${o.slug}`, peek: { type: "opportunity", id: o.id },
+            id: o.id, href: `/opportunities/${o.slug}`, archived: o.archived, peek: { type: "opportunity", id: o.id },
             cells: [
               <span key="t">{o.title}{o.description && <span className="block text-xs font-normal text-muted line-clamp-1">{o.description}</span>}</span>,
               <RowStatus key="s" type="opportunity" id={o.id} status={o.status} name={o.title} canEdit={canEdit} />,
@@ -104,7 +104,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
           {opportunities.map((o) => (
             <Link key={o.id} href={`/opportunities/${o.slug}`} className="card block p-4 transition-shadow hover:shadow-pop">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0"><div className="font-display text-base font-bold">{o.title}</div><div className="mt-0.5 text-xs text-muted">{[labelFor(o.type), o.owner?.name, o.deadline ? `due ${formatDate(o.deadline)}` : null].filter(Boolean).join(" · ")}</div></div>
+                <div className="min-w-0"><div className="font-display text-sm font-bold">{o.title}</div><div className="mt-0.5 text-xs text-muted">{[labelFor(o.type), o.owner?.name, o.deadline ? `due ${formatDate(o.deadline)}` : null].filter(Boolean).join(" · ")}</div></div>
                 <StatusPill status={o.status} label={labelFor(o.status)} />
               </div>
               {o.description && <p className="mt-2 line-clamp-2 max-w-3xl text-sm text-charcoal">{o.description}</p>}

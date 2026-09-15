@@ -98,7 +98,7 @@ export default async function YouTubeIdeasPage({
           {[...byChannel.values()].map((group) => (
             <section key={group.slug}>
               <div className="mb-2 flex items-baseline gap-2">
-                <Link href={`/youtube/${group.slug}`} className="font-display text-base font-bold hover:text-accent">
+                <Link href={`/youtube/${group.slug}`} className="font-display text-sm font-bold hover:text-accent">
                   {group.name}
                 </Link>
                 <span className="text-xs text-faint">{group.items.length}</span>

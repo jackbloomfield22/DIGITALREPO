@@ -60,7 +60,7 @@ export default async function ActivityPage({
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">RECENT ACTIVITY</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">RECENT ACTIVITY</h1>
       <p className="mb-5 text-sm text-muted">Every change to the Repo, newest first.</p>
 
       <div className="mb-6 flex flex-wrap items-center gap-1.5 text-sm">

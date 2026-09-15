@@ -37,7 +37,7 @@ export function YouTubeHeader({ active, action }: { active: string; action?: Rea
   return (
     <>
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-display text-3xl font-bold tracking-tight">YOUTUBE</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">YOUTUBE</h1>
         {action}
       </div>
       <p className="mb-4 max-w-2xl text-sm text-muted">

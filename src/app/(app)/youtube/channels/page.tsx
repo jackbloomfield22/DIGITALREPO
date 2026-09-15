@@ -17,7 +17,7 @@ import { CHANNEL_STATUSES, labelFor } from "@/lib/taxonomy";
 import { YouTubeHeader } from "@/components/youtube-nav";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
 import { filterWhere, type FieldMap } from "@/lib/filter-where";
-import { directoryUser } from "@/lib/directory";
+import { directoryUser, liveOnly, showArchived } from "@/lib/directory";
 
 const FIELDS: FilterField[] = [{ key: "status", label: "Channel status", kind: "select", options: CHANNEL_STATUSES.filter((s) => s.value !== "archived"), legacy: "status" }];
 const MAPS: Record<string, FieldMap> = { status: { column: "status" } };
@@ -52,7 +52,7 @@ export default async function ChannelsPage({
   const page = pageNumber(one(params.page));
   const canEdit = hasRole(user, "EDITOR");
 
-  const and: Prisma.ChannelWhereInput[] = [{ archived: false }, ...(q ? [channelSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.ChannelWhereInput[])];
+  const and: Prisma.ChannelWhereInput[] = [...liveOnly(params), ...(q ? [channelSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.ChannelWhereInput[])];
   const where = { AND: and };
 
   const orderBy: Prisma.ChannelOrderByWithRelationInput[] =
@@ -100,7 +100,7 @@ export default async function ChannelsPage({
         action={canEdit ? <Link href="/youtube/new" className="btn btn-primary btn-sm">+ Add Channel</Link> : null}
       />
 
-      <DirectoryControls headingLevel={2} title="Channels" total={view === "board" ? board.length : total} canEdit={canEdit} searchPlaceholder="Search channels, athletes, ideas…" section="youtube/channels" layouts={[{ value: "table", label: "List" }, { value: "board", label: "Pipeline" }]} fields={FIELDS} state={state} savedViews={views} sorts={[
+      <DirectoryControls showArchived={showArchived(params)} headingLevel={2} title="Channels" total={view === "board" ? board.length : total} canEdit={canEdit} searchPlaceholder="Search channels, athletes, ideas…" section="youtube/channels" layouts={[{ value: "table", label: "List" }, { value: "board", label: "Pipeline" }]} fields={FIELDS} state={state} savedViews={views} sorts={[
         { value: "subscribers-desc", label: "Most subscribers" }, { value: "name", label: "Alphabetical" }, { value: "date-desc", label: "Latest activity" }, { value: "status", label: "Status" },
       ]} />
       <p className="mb-4 text-sm text-muted">{live} live channels · {compactNumber(reach._sum.subscribers ?? 0)} subscribers overall · {ideasInFlight} ideas in this pipeline</p>
@@ -124,10 +124,10 @@ export default async function ChannelsPage({
                     <div key={c.id} className="card px-3 py-2.5 transition-shadow hover:shadow-pop">
                       <Link href={`/youtube/${c.slug}`} className="block">
                         <div className="truncate text-sm font-semibold hover:text-accent">{c.name}</div>
-                        <div className="mt-0.5 truncate text-[11px] text-faint">
+                        <div className="mt-0.5 truncate text-xs text-faint">
                           {[c.creator?.name, c.handle, c.cadence].filter(Boolean).join(" · ") || "No details yet"}
                         </div>
-                        <div className="mt-1 text-[11px] text-muted">
+                        <div className="mt-1 text-xs text-muted">
                           {[
                             c.subscribers ? `${compactNumber(c.subscribers)} subs` : null,
                             c._count.ideas ? `${c._count.ideas} idea${c._count.ideas === 1 ? "" : "s"}` : null,
@@ -136,7 +136,7 @@ export default async function ChannelsPage({
                       </Link>
                       <div className="mt-1.5 flex items-center justify-between gap-2">
                         <RowStatus type="channel" id={c.id} status={c.status} name={c.name} canEdit={canEdit} />
-                        <span className="text-[11px] text-faint">{relativeTime(c.updatedAt)}</span>
+                        <span className="text-xs text-faint">{relativeTime(c.updatedAt)}</span>
                       </div>
                     </div>
                   ))}
@@ -163,6 +163,7 @@ export default async function ChannelsPage({
             rows={channels.map((c) => ({
               id: c.id,
               href: `/youtube/${c.slug}`,
+              archived: c.archived,
               cells: [
                 <span key="n">
                   {c.name}

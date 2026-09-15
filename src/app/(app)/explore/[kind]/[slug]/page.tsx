@@ -88,7 +88,7 @@ export default async function EntityPage({
     <div>
       <div className="mb-8">
         <div className="overline">{ENTITY_KIND_LABELS[entity.kind as EntityKind] ?? labelFor(entity.kind)}</div>
-        <h1 className="mt-1 font-display text-3xl font-bold uppercase tracking-tight sm:text-4xl">{entity.name}</h1>
+        <h1 className="mt-1 font-display text-2xl font-bold uppercase tracking-tight">{entity.name}</h1>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
           <span><strong className="text-ink">{uniqueCreators.length}</strong> Talent</span>
           <span><strong className="text-ink">{projects.length}</strong> Projects</span>

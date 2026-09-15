@@ -10,6 +10,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { StatusPill } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 import { labelFor } from "@/lib/taxonomy";
 import { statusOptionsFor, type ArchiveType, type StatusType } from "@/lib/row-status";
 import { archiveRecord, restoreRecord, setRecordStatus } from "@/lib/actions/quick-edit";
@@ -39,13 +40,14 @@ export function RowStatus({
   const [pending, start] = useTransition();
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   if (!canEdit) return <StatusPill status={current} label={labelFor(current)} />;
 
-  const change = (value: string) => {
+  const change = async (value: string) => {
     if (value === current) return;
     if (value === ARCHIVE) {
-      if (!window.confirm(`Move "${name}" to the Archive? It leaves the live list but keeps everything — you can bring it back any time.`)) return;
+      if (!(await confirm({ title: `Move "${name}" to the Archive?`, message: "It leaves the live list but keeps everything — you can bring it back any time.", tone: "danger", action: "Archive" }))) return;
       start(async () => {
         const res = await archiveRecord(type, id);
         if (!res.ok) return toast(res.error ?? "Could not archive that.", { tone: "error" });
@@ -70,13 +72,14 @@ export function RowStatus({
   return (
     <span className={`relative inline-flex items-center ${pending ? "opacity-50" : ""}`}>
       <StatusPill status={current} label={labelFor(current)} />
-      <span aria-hidden className="ml-0.5 text-[9px] text-faint">▾</span>
+      <span aria-hidden className="ml-0.5 text-xs text-faint">▾</span>
       <select
         aria-label={`Status for ${name}`}
+        data-status-select
         className="absolute inset-0 cursor-pointer opacity-0"
         value={current}
         disabled={pending}
-        onChange={(e) => change(e.target.value)}
+        onChange={(e) => void change(e.target.value)}
         onClick={(e) => e.stopPropagation()}
       >
         {statusOptionsFor(type).map((s) => (
@@ -107,6 +110,7 @@ export function RowArchive({
   const [pending, start] = useTransition();
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
   if (!canEdit) return null;
 
   return (
@@ -115,10 +119,10 @@ export function RowArchive({
       className="text-xs text-faint hover:text-accent"
       disabled={pending}
       title={`Move ${name} to the Archive`}
-      onClick={(e) => {
+      onClick={async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!window.confirm(`Move "${name}" to the Archive? It leaves the live list but keeps everything — you can bring it back any time.`)) return;
+        if (!(await confirm({ title: `Move "${name}" to the Archive?`, message: "It leaves the live list but keeps everything — you can bring it back any time.", tone: "danger", action: "Archive" }))) return;
         start(async () => {
           const res = await archiveRecord(type, id);
           if (!res.ok) return toast(res.error ?? "Could not archive that.", { tone: "error" });

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBackupNow, deleteSnapshot } from "@/lib/actions/backup";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 
 export function BackupControls() {
   const [busy, setBusy] = useState(false);
@@ -29,12 +30,13 @@ export function BackupControls() {
 export function DeleteSnapshotButton({ id }: { id: string }) {
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
   return (
     <button
       className="btn btn-ghost btn-sm text-accent"
       aria-label="Delete backup"
       onClick={async () => {
-        if (!window.confirm("Delete this backup? Downloaded copies are unaffected.")) return;
+        if (!(await confirm({ title: "Delete this backup? Downloaded copies are unaffected.", tone: "danger", action: "Delete" }))) return;
         const res = await deleteSnapshot(id);
         toast(res.ok ? "Backup deleted" : (res.error ?? "Failed"), res.ok ? {} : { tone: "error" });
         router.refresh();

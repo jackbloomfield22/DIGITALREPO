@@ -21,7 +21,7 @@ export default async function AdminEntitiesPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">ENTITY MANAGEMENT</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">ENTITY MANAGEMENT</h1>
       <p className="mb-6 text-sm text-muted">
         The canonical taxonomy. Merge accidental duplicates — all relationships automatically
         move to the record you keep, and the merged name is preserved as an alias.

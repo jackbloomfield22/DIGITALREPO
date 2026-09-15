@@ -92,7 +92,7 @@ export default async function AttentionPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">NEEDS ATTENTION</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">NEEDS ATTENTION</h1>
       <p className="mb-8 text-sm text-muted">
         The maintenance queue — what&apos;s missing, stale, or due soon across the Repo. Work it
         down from the top; each chip links straight to the record.

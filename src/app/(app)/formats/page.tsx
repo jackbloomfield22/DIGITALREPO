@@ -16,7 +16,7 @@ import { Pagination } from "@/components/pagination";
 import { RowStatus } from "@/components/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
-import { directoryUser, layoutFor, matchingIds, paging } from "@/lib/directory";
+import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 import { statusOptionsFor } from "@/lib/row-status";
 
 export const metadata = { title: "Formats" };
@@ -57,7 +57,7 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
   const view = layoutFor(params, prefs, "formats");
 
   // Shelved formats live in the Archive — one place for everything that is no longer live.
-  const and: Prisma.FormatWhereInput[] = [{ archived: false }, ...(q ? [formatSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.FormatWhereInput[])];
+  const and: Prisma.FormatWhereInput[] = [...liveOnly(params), ...(q ? [formatSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.FormatWhereInput[])];
   const where = { AND: and };
   const total = await db.format.count({ where });
   const pg = paging(params, total);
@@ -76,7 +76,7 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div>
-      <DirectoryControls
+      <DirectoryControls showArchived={showArchived(params)} archivedCount={archivedCount}
         title="Formats" total={total} createHref="/formats/new" createLabel="+ Add Format" searchPlaceholder="Search formats…"
         canEdit={canEdit} viewToggle section="formats" fields={FIELDS} state={state} names={Object.fromEntries(names)} savedViews={views} defaultViews={DEFAULT_VIEWS}
         sorts={[
@@ -84,7 +84,6 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
           { value: "updated-desc", label: "Recently updated" }, { value: "title", label: "Alphabetical" },
         ]}
       />
-      {archivedCount > 0 && <p className="-mt-2 mb-3 text-xs text-muted">{archivedCount} more {archivedCount === 1 ? "format is" : "formats are"} in the <Link className="underline hover:text-accent" href="/archive?type=format">Archive</Link>.</p>}
 
       {formats.length === 0 ? (
         <div className="rounded-md border border-dashed border-line-strong bg-wash/50 px-6 py-10 text-center text-sm text-muted">
@@ -104,7 +103,7 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
             { key: "updated", label: "Updated", sortKey: "updated", filterKey: "updated", showAt: "hidden xl:table-cell" },
           ]}
           rows={formats.map((f) => ({
-            id: f.id, href: `/formats/${f.slug}`, peek: { type: "format", id: f.id },
+            id: f.id, href: `/formats/${f.slug}`, archived: f.archived, peek: { type: "format", id: f.id },
             cells: [
               <span key="t">{f.title}{f.logline && <span className="block text-xs font-normal text-muted line-clamp-1">{f.logline}</span>}</span>,
               <RowStatus key="s" type="format" id={f.id} status={f.status} name={f.title} canEdit={canEdit} />,
@@ -122,7 +121,7 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
             const primary = f.creators.find((c) => c.isPrimary) ?? f.creators[0];
             return (
               <Link key={f.id} href={`/formats/${f.slug}`} className="card block p-4 transition-shadow hover:shadow-pop">
-                <div className="flex items-start justify-between gap-2"><div className="font-display text-base font-bold leading-snug">{f.title}</div><KindBadge kind="format" /></div>
+                <div className="flex items-start justify-between gap-2"><div className="font-display text-sm font-bold leading-snug">{f.title}</div><KindBadge kind="format" /></div>
                 {f.logline && <p className="mt-1.5 line-clamp-2 text-sm text-charcoal">{f.logline}</p>}
                 <div className="mt-2 space-y-0.5 text-xs text-muted">
                   {primary && <div className="truncate">{f.creators.length > 1 ? `${primary.creator.name} +${f.creators.length - 1} more` : primary.creator.name}</div>}

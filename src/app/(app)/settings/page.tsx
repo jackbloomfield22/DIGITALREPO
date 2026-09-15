@@ -15,7 +15,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-6 font-display text-3xl font-bold tracking-tight">SETTINGS</h1>
+      <h1 className="mb-6 font-display text-2xl font-bold tracking-tight">SETTINGS</h1>
 
       <Section title="Account">
         <div className="card p-4 text-sm">

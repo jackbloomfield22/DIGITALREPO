@@ -142,13 +142,13 @@ function ChangeCard({
                     seg.type === "same" ? (
                       <span key={i}>{seg.text}</span>
                     ) : seg.type === "added" ? (
-                      <span key={i} className="rounded bg-[#e6f0e4] px-0.5 text-[#2f5e2a]">{seg.text}</span>
+                      <span key={i} className="rounded bg-ok-wash px-0.5 text-ok">{seg.text}</span>
                     ) : (
-                      <span key={i} className="rounded bg-[#f6e3e0] px-0.5 text-[#8a3a30] line-through decoration-[#8a3a30]/50">{seg.text}</span>
+                      <span key={i} className="rounded bg-danger-wash px-0.5 text-danger line-through decoration-danger/50">{seg.text}</span>
                     ),
                   )
                 ) : (
-                  <span className="rounded bg-[#e6f0e4] px-0.5 text-[#2f5e2a]">{p.after}</span>
+                  <span className="rounded bg-ok-wash px-0.5 text-ok">{p.after}</span>
                 )}
               </div>
             ) : (
@@ -401,7 +401,7 @@ export function UpdatePanelClient({
           <textarea
             ref={areaRef}
             rows={8}
-            className="w-full text-[15px] leading-relaxed"
+            className="w-full text-sm leading-relaxed"
             placeholder={`Where does ${name} actually stand today? Type it the way you'd tell a colleague — status, who's involved, what's happened, what on this page is wrong. Loose is fine; it gets tidied up.`}
             value={text}
             onChange={(e) => setText(e.target.value)}

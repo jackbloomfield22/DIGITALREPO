@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { AddLinkPopover, type AddConfig } from "@/components/link-editor";
 import { addLink, removeLink, type LinkPayload } from "@/lib/actions/links";
 import { useToast } from "@/components/toast";
+import { EmptyState } from "@/components/ui";
 
 export type RelationRow = {
   id: string;
@@ -46,7 +47,7 @@ export function RelationTable({ rows, addConfig, canEdit, columns, emptyMessage,
       {rows.length > 0 ? (
         <div className="overflow-x-auto rounded-md border border-line bg-surface">
           <table className="w-full text-sm">
-            <thead className="text-left text-[11px] uppercase tracking-wide text-muted">
+            <thead className="text-left text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-3 py-2 font-semibold">{title ?? "Name"}</th>
                 {hasSub && <th className="px-3 py-2 font-semibold">{columns?.sub ?? ""}</th>}
@@ -73,7 +74,7 @@ export function RelationTable({ rows, addConfig, canEdit, columns, emptyMessage,
           </table>
         </div>
       ) : (
-        <p className="text-sm text-faint">{emptyMessage ?? "Nothing linked yet."}</p>
+        <EmptyState compact message={emptyMessage ?? "Nothing linked yet."} />
       )}
       {canEdit && addConfig && (
         <div className="relative mt-3 inline-block">

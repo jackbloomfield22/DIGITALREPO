@@ -15,7 +15,7 @@ const SOURCE_WORD: Record<string, string> = { note: "Note", idea: "Idea", task: 
 
 function Snippet({ text }: { text: string }) {
   const parts = text.split(/(«[^»]*»)/g);
-  return <>{parts.map((p, i) => (p.startsWith("«") ? <mark key={i} className="rounded bg-[#f5efdd] px-0.5">{p.slice(1, -1)}</mark> : <span key={i}>{p}</span>))}</>;
+  return <>{parts.map((p, i) => (p.startsWith("«") ? <mark key={i} className="rounded bg-warn-wash px-0.5">{p.slice(1, -1)}</mark> : <span key={i}>{p}</span>))}</>;
 }
 
 export default async function BrainPage({ searchParams }: { searchParams: Promise<{ q?: string; kind?: string; ask?: string }> }) {

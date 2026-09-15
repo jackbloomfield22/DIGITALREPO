@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { Combobox, lookupItems } from "@/components/combobox";
 import { useRouter } from "next/navigation";
 import { addLink, removeLink, type LinkPayload } from "@/lib/actions/links";
 import {
@@ -44,39 +45,13 @@ export function AddLinkPopover({
   config: AddConfig;
   onDone: () => void;
 }) {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<LookupItem[]>([]);
   const [role, setRole] = useState(
     config.roleDefault ?? config.roleOptions?.[0]?.value ?? "",
   );
   const [busy, setBusy] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { toast } = useToast();
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const t = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({ type: config.lookupType, q });
-        if (config.lookupKind) params.set("kind", config.lookupKind);
-        const res = await fetch(`/api/lookup?${params}`, {
-          signal: controller.signal,
-        });
-        if (res.ok) setResults(await res.json());
-      } catch {
-        /* aborted */
-      }
-    }, 150);
-    return () => {
-      clearTimeout(t);
-      controller.abort();
-    };
-  }, [q, config.lookupType, config.lookupKind]);
+  const fetchItems = useMemo(() => lookupItems(config.lookupType, config.lookupKind), [config.lookupType, config.lookupKind]);
 
   const link = async (item: LookupItem) => {
     setBusy(true);
@@ -101,8 +76,7 @@ export function AddLinkPopover({
     }
   };
 
-  const createAndLink = async () => {
-    const name = q.trim();
+  const createAndLink = async (name: string) => {
     if (!name || !config.createKind) return;
     setBusy(true);
     const result =
@@ -124,65 +98,32 @@ export function AddLinkPopover({
     await link({ id: result.id, name: result.name });
   };
 
-  const exactMatch = results.some(
-    (r) => r.name.toLowerCase() === q.trim().toLowerCase(),
-  );
-
   return (
     <div className="absolute left-0 top-full z-30 mt-1 w-72 rounded-md border border-line bg-surface p-2 shadow-pop">
-      <input
-        ref={inputRef}
-        type="text"
-        placeholder={config.placeholder ?? "Search…"}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && results[0]) {
-            e.preventDefault();
-            link(results[0]);
-          }
-        }}
+      <Combobox
+        autoFocus
         aria-label={config.placeholder ?? "Search"}
+        placeholder={config.placeholder ?? "Search…"}
+        fetchItems={fetchItems}
+        onPick={link}
+        onCreate={config.createKind ? createAndLink : undefined}
+        onEscape={onDone}
+        busy={busy}
+        before={config.roleOptions && (
+          <select
+            className="mt-2"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            aria-label="Relationship type"
+          >
+            {config.roleOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
       />
-      {config.roleOptions && (
-        <select
-          className="mt-2"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          aria-label="Relationship type"
-        >
-          {config.roleOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      )}
-      <div className="mt-2 max-h-56 overflow-y-auto">
-        {results.map((r) => (
-          <button
-            key={r.id}
-            disabled={busy}
-            onClick={() => link(r)}
-            className="flex w-full items-baseline justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-wash"
-          >
-            <span className="truncate">{r.name}</span>
-            {r.sub && <span className="shrink-0 text-xs text-muted">{r.sub}</span>}
-          </button>
-        ))}
-        {q.trim() && !exactMatch && config.createKind && (
-          <button
-            disabled={busy}
-            onClick={createAndLink}
-            className="mt-1 w-full rounded border-t border-line px-2 py-1.5 text-left text-sm text-accent-deep hover:bg-accent-wash"
-          >
-            + Create “{q.trim()}”
-          </button>
-        )}
-        {!results.length && !q.trim() && (
-          <div className="px-2 py-1.5 text-xs text-faint">Type to search…</div>
-        )}
-      </div>
     </div>
   );
 }

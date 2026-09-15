@@ -92,7 +92,7 @@ export function TagsField({ label, value, onSave, placeholder = "Add and press E
         {tags.map((t) => (
           <span key={t} className="chip">
             {t}
-            <button type="button" className="ml-1 text-faint hover:text-[#8a3a30]" onClick={() => commit(tags.filter((x) => x !== t))} aria-label={`Remove ${t}`}>×</button>
+            <button type="button" className="ml-1 text-faint hover:text-danger" onClick={() => commit(tags.filter((x) => x !== t))} aria-label={`Remove ${t}`}>×</button>
           </span>
         ))}
         <input
@@ -117,7 +117,7 @@ export function Stars({ value, onSave }: { value: number; onSave: (v: number) =>
   return (
     <span className="inline-flex gap-0.5" role="radiogroup" aria-label="Rating">
       {[1, 2, 3, 4, 5].map((n) => (
-        <button key={n} type="button" className={`text-lg leading-none ${n <= v ? "text-accent" : "text-line-strong hover:text-faint"}`} onClick={() => { const next = n === v ? 0 : n; setV(next); void onSave(next); }} aria-label={`${n} star${n > 1 ? "s" : ""}`}>★</button>
+        <button key={n} type="button" className={`text-xl leading-none ${n <= v ? "text-accent" : "text-line-strong hover:text-faint"}`} onClick={() => { const next = n === v ? 0 : n; setV(next); void onSave(next); }} aria-label={`${n} star${n > 1 ? "s" : ""}`}>★</button>
       ))}
     </span>
   );

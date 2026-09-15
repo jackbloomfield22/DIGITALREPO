@@ -19,6 +19,7 @@ import {
 } from "@/lib/actions/ingest";
 import { wordDiff } from "@/lib/word-diff";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 import { setIngestWorkspace } from "@/lib/actions/ingest";
 import { StatusPill } from "@/components/ui";
 import type { ApplyOutcome } from "@/lib/ingest/apply";
@@ -32,16 +33,13 @@ function WorkspaceSwitch({ item }: { item: ItemVM }) {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const isYouTube = item.workspace === "youtube";
 
   const move = async () => {
     const next = isYouTube ? null : "youtube";
     if (
-      !window.confirm(
-        next
-          ? "Read this as YouTube channels material? The current proposals are replaced."
-          : "Read this as general Repo material? The current proposals are replaced.",
-      )
+      !(await confirm({ title: next ? "Read this as YouTube channels material?" : "Read this as general Repo material?", message: "The current proposals are replaced.", action: "Re-read" }))
     )
       return;
     setBusy(true);
@@ -151,14 +149,14 @@ export type ChangeVM = {
 };
 
 const OP_BADGE: Record<string, string> = {
-  create: "bg-[#eef2ec] text-ok",
-  update: "bg-[#f5efdd] text-warn",
+  create: "bg-ok-wash text-ok",
+  update: "bg-warn-wash text-warn",
   link: "bg-accent-wash text-accent-deep",
   archive: "bg-ink text-paper",
   note: "bg-wash text-muted",
-  rename: "bg-[#f5efdd] text-warn",
-  unlink: "bg-[#f6e3e0] text-[#8a3a30]",
-  restore: "bg-[#eef2ec] text-ok",
+  rename: "bg-warn-wash text-warn",
+  unlink: "bg-danger-wash text-danger",
+  restore: "bg-ok-wash text-ok",
   convert: "bg-accent-wash text-accent-deep",
 };
 
@@ -324,7 +322,7 @@ function ChangeCard({
         )}
         {change.field && <span className="text-xs text-muted">· {change.field}</span>}
         {change.sensitive && (
-          <span className="rounded bg-ink px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-paper">
+          <span className="rounded bg-ink px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-paper">
             Sensitive
           </span>
         )}
@@ -339,7 +337,7 @@ function ChangeCard({
               segment.type === "same" ? (
                 <span key={i}>{segment.text}</span>
               ) : segment.type === "added" ? (
-                <span key={i} className="rounded bg-[#dcead9] text-ok">{segment.text}</span>
+                <span key={i} className="rounded bg-ok-wash text-ok">{segment.text}</span>
               ) : (
                 <span key={i} className="rounded bg-accent-wash text-accent-deep line-through">{segment.text}</span>
               ),
@@ -515,7 +513,7 @@ export function ReviewBoard({ item, changes, canEdit }: { item: ItemVM; changes:
         </div>
       )}
       {item.proposeInfo && item.proposeInfo.coveredChars < item.proposeInfo.totalChars && (
-        <div className="mb-4 rounded-md bg-[#f5efdd] px-4 py-2.5 text-sm text-warn">
+        <div className="mb-4 rounded-md bg-warn-wash px-4 py-2.5 text-sm text-warn">
           This document is long — proposals cover the first{" "}
           {(item.proposeInfo.coveredChars / 1000).toFixed(0)}k of {(item.proposeInfo.totalChars / 1000).toFixed(0)}k characters.
         </div>

@@ -53,7 +53,8 @@ export function parseCreatorFilters(params: SearchParams): CreatorFilters {
 }
 
 export function buildCreatorWhere(f: CreatorFilters): Prisma.CreatorWhereInput {
-  return { AND: [{ archived: false }, ...(f.q ? [creatorSearch(f.q)] : []), ...(filterWhere(TALENT_MAPS, f.state) as Prisma.CreatorWhereInput[])] };
+  const live = firstParam(f.params.archived) === "1" ? [] : [{ archived: false }];
+  return { AND: [...live, ...(f.q ? [creatorSearch(f.q)] : []), ...(filterWhere(TALENT_MAPS, f.state) as Prisma.CreatorWhereInput[])] };
 }
 
 const cardInclude = {

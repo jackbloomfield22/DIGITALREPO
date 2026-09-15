@@ -139,7 +139,7 @@ export function BulkUpload() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">BULK UPLOAD</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">BULK UPLOAD</h1>
       <p className="mb-6 max-w-2xl text-sm text-muted">
         Load a prepared knowledge bundle — a <code>.json</code> file of organizations, people,
         talent, projects, formats, and opportunities extracted from notes. The Repo takes a full
@@ -150,7 +150,7 @@ export function BulkUpload() {
 
       {done && (
         <div className="card mb-4 border-ok p-4">
-          <div className="font-display text-lg font-bold">Upload complete</div>
+          <div className="font-display text-xl font-bold">Upload complete</div>
           <p className="mt-1 text-sm text-muted">
             Added {done.created} new records · enriched {done.enriched} existing. Search and the
             AI assistant are already using them.
@@ -240,7 +240,7 @@ export function BulkUpload() {
       {staged && (
         <div className="card space-y-4 p-4">
           <div>
-            <div className="font-display text-lg font-bold">{staged.fileName || staged.sourceTitle}</div>
+            <div className="font-display text-xl font-bold">{staged.fileName || staged.sourceTitle}</div>
             <p className="text-sm text-muted">
               {staged.grandTotal} records ready · source &ldquo;{staged.sourceTitle}&rdquo;
             </p>
@@ -303,7 +303,7 @@ export function BulkUpload() {
 
       {imports.length > 0 && !staged && (
         <div className="mt-8">
-          <h2 className="mb-1 font-display text-lg font-bold tracking-tight">PREVIOUS UPLOADS</h2>
+          <h2 className="mb-1 font-display text-xl font-bold tracking-tight">PREVIOUS UPLOADS</h2>
           <p className="mb-3 max-w-2xl text-sm text-muted">
             Each upload keeps a list of the records it created, so it can be taken back out
             cleanly. Removing an upload deletes only what it added — anything that was already

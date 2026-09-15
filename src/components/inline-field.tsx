@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { setField } from "@/lib/actions/inline";
 import { displayValue, isEmptyValue, sameValue, type DetailField } from "@/lib/record-fields";
 import { useToast } from "@/components/toast";
+import { announce } from "@/components/live-region";
 
 // --- Version store -----------------------------------------------------------
 // Every editor on a page shares the record's version, so a save from the
@@ -114,6 +115,7 @@ export function InlineField({ type, id, field, canEdit, heading, className, plac
       setSave("saved");
       savedTimer.current = window.setTimeout(() => setSave("idle"), 1500);
       onSaved?.(res.value);
+      if (res.changed) announce(`Saved ${field.label}`);
       if (res.changed && !opts.quiet) {
         toast(`Saved ${field.label.toLowerCase()}`, { undo: () => commit(toRaw(prev), { undoOf: res.value, quiet: true }) });
       }
@@ -146,7 +148,7 @@ export function InlineField({ type, id, field, canEdit, heading, className, plac
 
   // --- Read-only ---------------------------------------------------------------
   if (!editing) {
-    const status = save === "saving" ? <span className="ml-1.5 text-[11px] text-faint">Saving…</span> : save === "saved" ? <span className="ml-1.5 text-[11px] text-ok" aria-label="Saved">✓</span> : null;
+    const status = save === "saving" ? <span className="ml-1.5 text-xs text-faint">Saving…</span> : save === "saved" ? <span className="ml-1.5 text-xs text-ok" aria-label="Saved">✓</span> : null;
     if (!canEdit) {
       return empty ? <span className={`text-faint ${className ?? ""}`}>—</span> : <span className={`${heading ? "" : "whitespace-pre-line"} ${className ?? ""}`}>{shown}</span>;
     }
@@ -171,8 +173,8 @@ export function InlineField({ type, id, field, canEdit, heading, className, plac
     const rows = Math.min(14, Math.max(3, draft.split("\n").length + 1));
     return (
       <div className={className}>
-        <textarea ref={inputRef as never} className={`${base} text-[15px] leading-relaxed`} rows={rows} value={draft} aria-label={field.label} maxLength={field.maxLength} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} onBlur={onBlur} />
-        <div className="mt-1 text-[11px] text-faint">⌘↩ to save · Esc to cancel</div>
+        <textarea ref={inputRef as never} className={`${base} text-sm leading-relaxed`} rows={rows} value={draft} aria-label={field.label} maxLength={field.maxLength} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} onBlur={onBlur} />
+        <div className="mt-1 text-xs text-faint">⌘↩ to save · Esc to cancel</div>
       </div>
     );
   }
@@ -209,7 +211,7 @@ export function InlineField({ type, id, field, canEdit, heading, className, plac
       ref={inputRef as never}
       type={inputType}
       inputMode={field.kind === "number" || field.kind === "year" ? "numeric" : undefined}
-      className={`${base} ${heading ? "font-display text-3xl font-bold tracking-tight sm:text-4xl" : "text-sm"} ${className ?? ""}`}
+      className={`${base} ${heading ? "font-display text-2xl font-bold tracking-tight" : "text-sm"} ${className ?? ""}`}
       value={draft}
       aria-label={field.label}
       maxLength={field.maxLength}

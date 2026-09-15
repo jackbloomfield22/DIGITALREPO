@@ -53,7 +53,7 @@ export default async function PipelineCardPage({ params }: { params: Promise<{ i
     <HqFrame active="/hq/pipeline">
       <div className="mb-3 flex items-baseline justify-between text-xs text-muted">
         <Link href="/hq/pipeline" className="hover:text-accent">← Pipeline</Link>
-        <span>Momentum <span className={`font-semibold ${momentum.label === "moving" ? "text-ok" : momentum.label === "stalled" ? "text-[#8a3a30]" : "text-charcoal"}`}>{momentum.label}</span> · {momentum.score}/100 · {momentum.why}</span>
+        <span>Momentum <span className={`font-semibold ${momentum.label === "moving" ? "text-ok" : momentum.label === "stalled" ? "text-danger" : "text-charcoal"}`}>{momentum.label}</span> · {momentum.score}/100 · {momentum.why}</span>
       </div>
       <PipelineCardEditor card={vm} />
       <div className="mt-6"><Connections ownerId={user.id} target={{ targetType: "pipeline", targetId: card.id }} source={{ type: "pipeline", id: card.id }} /></div>

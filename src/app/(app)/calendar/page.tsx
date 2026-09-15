@@ -64,7 +64,7 @@ export default async function CalendarPage({
   return (
     <div className="max-w-4xl">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl font-bold tracking-tight">SPORTS CALENDAR</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">SPORTS CALENDAR</h1>
         {canEdit && (
           <div className="flex gap-2">
             {events.length > 0 && <ImportCalendarButton compact />}
@@ -129,7 +129,7 @@ export default async function CalendarPage({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{e.title}</span>
                       {ongoing && (
-                        <span className="rounded bg-[#eef2ec] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ok">
+                        <span className="rounded bg-ok-wash px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-ok">
                           Live
                         </span>
                       )}

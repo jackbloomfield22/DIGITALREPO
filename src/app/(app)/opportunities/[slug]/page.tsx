@@ -124,7 +124,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
             <Highlights type="opportunity" id={opp.id} fields={highlights} canEdit={canEdit} />
             <UpdatePanel user={user} targetType="opportunity" targetId={opp.id} name={opp.title} path={path} recordType="opportunity" />
             <Section title="Brief">
-              <InlineField type="opportunity" id={opp.id} field={fieldNamed(all, "description")} canEdit={canEdit} className="text-[15px] leading-relaxed" placeholder="What is this opportunity? Add the brief…" />
+              <InlineField type="opportunity" id={opp.id} field={fieldNamed(all, "description")} canEdit={canEdit} className="text-sm leading-relaxed" placeholder="What is this opportunity? Add the brief…" />
             </Section>
             {matches.length > 0 && (
               <Section title="Suggested matches">

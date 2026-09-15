@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { mergeEntities, mergeOrganizations, setArchived } from "@/lib/actions/admin";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 
 export function MergeButtons({
   kind,
@@ -16,6 +17,7 @@ export function MergeButtons({
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
@@ -36,7 +38,7 @@ export function MergeButtons({
         onClick={async () => {
           const sources = items.filter((i) => i.id !== target);
           if (!sources.length) return;
-          if (!window.confirm(`Merge ${sources.map((s) => s.label).join(", ")} into ${items.find((i) => i.id === target)?.label}? All relationships move to the kept record.`)) return;
+          if (!(await confirm({ title: `Merge ${sources.map((s) => s.label).join(", ")} into ${items.find((i) => i.id === target)?.label}? All relationships move to the kept record.`, tone: "default", action: "Merge" }))) return;
           setBusy(true);
           for (const source of sources) {
             const res =

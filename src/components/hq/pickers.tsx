@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Combobox, type ComboItem } from "@/components/combobox";
 
 // Name pickers backed by /api/hq/lookup. Choosing a Repo person or talent who
 // is not yet in HQ hands back their Repo identity; the caller turns that into
@@ -8,63 +8,66 @@ import { useEffect, useState } from "react";
 
 export type PersonPick = { relationshipId?: string; personType?: "person" | "creator"; personId?: string; name: string };
 
+type HqLookup = {
+  relationships: { id: string; name: string; tier: string }[];
+  people: { id: string; name: string; title: string | null }[];
+  creators: { id: string; name: string; headline: string | null }[];
+  pipelines: { id: string; title: string; stage: string }[];
+};
+
+async function hqLookup(q: string, signal: AbortSignal): Promise<HqLookup | null> {
+  const res = await fetch(`/api/hq/lookup?q=${encodeURIComponent(q)}`, { signal });
+  return res.ok ? ((await res.json()) as HqLookup) : null;
+}
+
+const peopleItems = async (q: string, signal: AbortSignal): Promise<ComboItem[]> => {
+  const r = await hqLookup(q, signal);
+  if (!r) return [];
+  return [
+    ...r.relationships.map((x) => ({ id: `rel:${x.id}`, name: x.name })),
+    ...r.people.map((x) => ({ id: `person:${x.id}`, name: x.name, sub: x.title ?? "from the Repo" })),
+    ...r.creators.map((x) => ({ id: `creator:${x.id}`, name: x.name, sub: x.headline ?? "talent, from the Repo" })),
+  ];
+};
+
 export function PersonPicker({ onPick, placeholder = "Find a person…", autoFocus }: { onPick: (p: PersonPick) => void; placeholder?: string; autoFocus?: boolean }) {
-  const [q, setQ] = useState("");
-  const [rows, setRows] = useState<PersonPick[]>([]);
-  useEffect(() => {
-    if (q.trim().length < 2) return;
-    const t = setTimeout(async () => {
-      const r = await fetch(`/api/hq/lookup?q=${encodeURIComponent(q.trim())}`).then((x) => x.json()).catch(() => null);
-      if (!r) return;
-      setRows([
-        ...r.relationships.map((x: { id: string; name: string; tier: string }) => ({ relationshipId: x.id, name: `${x.name}`, })),
-        ...r.people.map((x: { id: string; name: string; title: string | null }) => ({ personType: "person" as const, personId: x.id, name: x.name + (x.title ? ` — ${x.title}` : "") })),
-        ...r.creators.map((x: { id: string; name: string; headline: string | null }) => ({ personType: "creator" as const, personId: x.id, name: x.name + (x.headline ? ` — ${x.headline}` : "") })),
-      ]);
-    }, 180);
-    return () => clearTimeout(t);
-  }, [q]);
-  const shown = q.trim().length >= 2 ? rows : [];
   return (
-    <div className="relative">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className="w-full text-sm" autoFocus={autoFocus} />
-      {shown.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-line bg-surface py-1 shadow-lg">
-          {shown.map((r, i) => (
-            <li key={i}>
-              <button type="button" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-wash" onClick={() => { onPick(r); setQ(""); setRows([]); }}>
-                {r.name} {r.relationshipId ? "" : <span className="text-xs text-faint">· from the Repo</span>}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <Combobox
+      aria-label={placeholder}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      minChars={2}
+      fetchItems={peopleItems}
+      inputClassName="text-sm"
+      listClassName="absolute z-20 w-full rounded-md border border-line bg-surface p-1 shadow-pop empty:hidden"
+      className="relative"
+      emptyHint="Type at least two letters."
+      onPick={(item) => {
+        const [kind, id] = item.id.split(":", 2);
+        if (kind === "rel") onPick({ relationshipId: id, name: item.name });
+        else onPick({ personType: kind as "person" | "creator", personId: id, name: item.name });
+      }}
+    />
   );
 }
 
+const cardItems = async (q: string, signal: AbortSignal): Promise<ComboItem[]> => {
+  const r = await hqLookup(q, signal);
+  return r ? r.pipelines.map((x) => ({ id: x.id, name: x.title, sub: x.stage.replace(/_/g, " ") })) : [];
+};
+
 export function CardPicker({ onPick, placeholder = "Find a pipeline card…" }: { onPick: (p: { id: string; title: string }) => void; placeholder?: string }) {
-  const [q, setQ] = useState("");
-  const [rows, setRows] = useState<{ id: string; title: string; stage: string }[]>([]);
-  useEffect(() => {
-    if (q.trim().length < 2) return;
-    const t = setTimeout(async () => {
-      const r = await fetch(`/api/hq/lookup?q=${encodeURIComponent(q.trim())}`).then((x) => x.json()).catch(() => null);
-      if (r) setRows(r.pipelines);
-    }, 180);
-    return () => clearTimeout(t);
-  }, [q]);
-  const shown = q.trim().length >= 2 ? rows : [];
   return (
-    <div className="relative">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className="w-full text-sm" />
-      {shown.length > 0 && (
-        <ul className="absolute z-20 mt-1 w-full rounded-md border border-line bg-surface py-1 shadow-lg">
-          {shown.map((r) => (
-            <li key={r.id}><button type="button" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-wash" onClick={() => { onPick(r); setQ(""); setRows([]); }}>{r.title} <span className="text-xs text-faint">{r.stage.replace(/_/g, " ")}</span></button></li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <Combobox
+      aria-label={placeholder}
+      placeholder={placeholder}
+      minChars={2}
+      fetchItems={cardItems}
+      inputClassName="text-sm"
+      listClassName="absolute z-20 w-full rounded-md border border-line bg-surface p-1 shadow-pop empty:hidden"
+      className="relative"
+      emptyHint="Type at least two letters."
+      onPick={(item) => onPick({ id: item.id, title: item.name })}
+    />
   );
 }

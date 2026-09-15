@@ -65,7 +65,7 @@ export default async function ReviewPage() {
               <ul className="divide-y divide-line">
                 {overdue.map((t) => (
                   <li key={t.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                    <span className="min-w-0 flex-1">{t.title}{t.relationship && <span className="text-xs text-faint"> · {t.relationship.name}</span>} <span className="text-xs text-[#8a3a30]">{Math.floor((now.getTime() - t.dueAt!.getTime()) / 86_400_000)}d</span></span>
+                    <span className="min-w-0 flex-1">{t.title}{t.relationship && <span className="text-xs text-faint"> · {t.relationship.name}</span>} <span className="text-xs text-danger">{Math.floor((now.getTime() - t.dueAt!.getTime()) / 86_400_000)}d</span></span>
                     <OverdueTaskActions id={t.id} />
                   </li>
                 ))}

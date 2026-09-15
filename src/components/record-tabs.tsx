@@ -18,7 +18,7 @@ export function RecordTabs({ path, tabs, current }: { path: string; tabs: Record
             className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors ${active ? "border-ink font-semibold text-ink" : "border-transparent text-muted hover:border-line hover:text-ink"}`}
           >
             {t.label}
-            {t.count != null && <span className={`rounded-full px-1.5 text-[11px] tabular-nums ${active ? "bg-ink text-paper" : "bg-wash text-muted"}`}>{t.count}</span>}
+            {t.count != null && <span className={`rounded-full px-1.5 text-xs tabular-nums ${active ? "bg-ink text-paper" : "bg-wash text-muted"}`}>{t.count}</span>}
           </Link>
         );
       })}

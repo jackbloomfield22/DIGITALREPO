@@ -4,22 +4,21 @@
 // actions, and a way to widen the selection to everything the filters match.
 // Every action is undoable from the toast as one batch.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { Combobox, lookupItems } from "@/components/combobox";
 import { useRouter } from "next/navigation";
 import { bulkApply, undoBatch, type BulkOp } from "@/lib/actions/bulk";
 import { useToast } from "@/components/toast";
 import type { LabeledValue } from "@/lib/filters";
 import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
 
-type LookupItem = { id: string; name: string; sub?: string };
+const tagLookup = lookupItems("entity");
 
 export function BulkBar({ type, selected, matching, onClear, onSelectAll, statuses, taggable }: {
   type: string; selected: string[]; matching: string[]; onClear: () => void; onSelectAll: () => void; statuses?: LabeledValue[]; taggable?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
-  const [tagQ, setTagQ] = useState("");
   const [tagOpen, setTagOpen] = useState(false);
-  const [tags, setTags] = useState<LookupItem[]>([]);
   const [fieldName, setFieldName] = useState("");
   const [fieldValue, setFieldValue] = useState("");
   const spec = RECORD_REGISTRY[type as IngestTargetType];
@@ -27,14 +26,6 @@ export function BulkBar({ type, selected, matching, onClear, onSelectAll, status
   const field = bulkFields.find((f) => f.name === fieldName);
   const { toast } = useToast();
   const router = useRouter();
-  useEffect(() => {
-    if (!tagOpen) return;
-    const controller = new AbortController();
-    const t = setTimeout(async () => {
-      try { const res = await fetch(`/api/lookup?type=entity&q=${encodeURIComponent(tagQ)}`, { signal: controller.signal }); if (res.ok) setTags((await res.json()) as LookupItem[]); } catch { /* typed on */ }
-    }, 150);
-    return () => { clearTimeout(t); controller.abort(); };
-  }, [tagQ, tagOpen]);
   if (!selected.length) return null;
   const run = async (op: BulkOp) => {
     setBusy(true);
@@ -62,8 +53,7 @@ export function BulkBar({ type, selected, matching, onClear, onSelectAll, status
             <button type="button" className="rounded border border-paper/30 px-2 py-0.5 hover:bg-paper/10" disabled={busy} onClick={() => setTagOpen(!tagOpen)} aria-expanded={tagOpen}>Add tag…</button>
             {tagOpen && (
               <div className="absolute bottom-full left-0 mb-2 w-64 rounded-md border border-line bg-surface p-2 text-ink shadow-pop">
-                <input autoFocus type="search" className="!min-h-8" placeholder="Find a tag…" aria-label="Find a tag" value={tagQ} onChange={(e) => setTagQ(e.target.value)} />
-                <div className="mt-1 max-h-48 overflow-y-auto">{tags.map((t) => <button type="button" key={t.id} className="filter-option" onClick={() => { setTagOpen(false); void run({ kind: "tag", entityId: t.id, entityName: t.name }); }}><span className="truncate">{t.name}</span>{t.sub && <span className="ml-auto text-xs text-muted">{t.sub}</span>}</button>)}</div>
+                <Combobox autoFocus aria-label="Find a tag" placeholder="Find a tag…" inputClassName="!min-h-8" fetchItems={tagLookup} onEscape={() => setTagOpen(false)} onPick={(t) => { setTagOpen(false); void run({ kind: "tag", entityId: t.id, entityName: t.name }); }} />
               </div>
             )}
           </div>

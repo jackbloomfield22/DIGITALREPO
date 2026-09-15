@@ -27,13 +27,16 @@ function viewQuery(params: URLSearchParams): string {
 }
 const normalise = (query: string) => { const p = new URLSearchParams(query); p.delete("page"); p.delete("v"); p.delete("all"); p.sort(); return p.toString(); };
 
-export function DirectoryControls({ title, total, createHref, createLabel, searchPlaceholder, fields, state, names, sorts, canEdit, viewToggle, section, savedViews = [], defaultViews = [], headingLevel = 1, layouts }: {
+export function DirectoryControls({ title, total, createHref, createLabel, searchPlaceholder, fields, state, names, sorts, canEdit, viewToggle, section, savedViews = [], defaultViews = [], headingLevel = 1, layouts, showArchived, archivedCount }: {
   title: string; total: number; createHref?: string; createLabel?: string;
   searchPlaceholder: string; fields: FilterField[]; state: FilterState; names?: Record<string, string>;
   sorts: LabeledValue[]; canEdit: boolean; viewToggle?: boolean; section?: string;
   savedViews?: SavedViewVM[]; defaultViews?: DefaultView[]; headingLevel?: 1 | 2;
   /** Custom layouts instead of table/cards (e.g. a pipeline board). */
   layouts?: LabeledValue[];
+  /** Whether archived records are in the list right now (`archived=1`). */
+  showArchived?: boolean;
+  archivedCount?: number;
 }) {
   const { q, onSearch, update, searchParams, pending, pathname } = useDirectoryQuery();
   const { toast } = useToast();
@@ -100,7 +103,7 @@ export function DirectoryControls({ title, total, createHref, createLabel, searc
           <Heading className="font-display text-2xl font-bold tracking-tight">{title}</Heading>
           <span className="rounded-full bg-wash px-2.5 py-1 text-sm tabular-nums text-muted" role="status" aria-live="polite">{pending ? "Updating…" : `${total.toLocaleString()} ${total === 1 ? "result" : "results"}`}</span>
         </div>
-        {canEdit && createHref && <Link href={createHref} className="btn btn-accent">{createLabel ?? "+ Create"} <span className="ml-1 text-[11px] opacity-70">C</span></Link>}
+        {canEdit && createHref && <Link href={createHref} className="btn btn-accent">{createLabel ?? "+ Create"} <span className="ml-1 text-xs opacity-70">C</span></Link>}
       </div>
 
       {(defaultViews.length > 0 || savedViews.length > 0) && (
@@ -123,7 +126,7 @@ export function DirectoryControls({ title, total, createHref, createLabel, searc
           <form role="search" className="min-w-48 flex-1" onSubmit={(e) => { e.preventDefault(); update(() => {}, true); }}>
             <input type="search" placeholder={searchPlaceholder} value={q} aria-label={searchPlaceholder} onChange={(e) => onSearch(e.target.value)} className="!min-h-10" />
           </form>
-          {fields.length > 0 && <button type="button" className="btn btn-secondary min-h-10" onClick={() => { setPickerField(null); setPickerOpen(true); }}>Filter{count ? ` (${count})` : ""} <kbd className="ml-1 rounded border border-line px-1 text-[11px] text-faint">F</kbd></button>}
+          {fields.length > 0 && <button type="button" className="btn btn-secondary min-h-10" onClick={() => { setPickerField(null); setPickerOpen(true); }}>Filter{count ? ` (${count})` : ""} <kbd className="ml-1 rounded border border-line px-1 text-xs text-faint">F</kbd></button>}
           {sorts.length > 0 && <select aria-label="Sort results" className="!min-h-10 !w-auto max-w-full" value={sort} onChange={(e) => update((p) => p.set("sort", e.target.value))}>
             {!sorts.some((s) => s.value === sort) && <option value={sort}>Column: {sort?.replace(/-desc$/, " ↓")}</option>}
             {sorts.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -131,6 +134,12 @@ export function DirectoryControls({ title, total, createHref, createLabel, searc
           {(viewToggle || layouts) && <div className="flex overflow-hidden rounded-md border border-line-strong" role="group" aria-label="Layout">
             {modes.map((v) => <button type="button" key={v.value} className={`min-h-10 px-3 text-sm ${view === v.value ? "bg-ink text-paper" : "text-muted hover:bg-wash"}`} aria-pressed={view === v.value} onClick={() => { if (section && !layouts) setLayout(section, v.value as "table" | "cards"); update((p) => p.set("view", v.value)); }}>{v.label}</button>)}
           </div>}
+          {showArchived !== undefined && (
+            <label className={`chip !min-h-10 cursor-pointer ${showArchived ? "!border-ink !bg-ink !text-paper" : ""}`}>
+              <input type="checkbox" className="!w-auto" checked={showArchived} onChange={(e) => update((p) => { if (e.target.checked) p.set("archived", "1"); else p.delete("archived"); })} />
+              Show archived{archivedCount ? ` (${archivedCount})` : ""}
+            </label>
+          )}
           {view === "table" && <select aria-label="Row density" className="!min-h-10 !w-auto" value={density} onChange={(e) => setDensity(e.target.value as Density)}>
             <option value="compact">Compact</option><option value="regular">Regular</option><option value="relaxed">Relaxed</option>
           </select>}

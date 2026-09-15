@@ -91,7 +91,7 @@ export default async function FormatPage({ params, searchParams }: { params: Pro
         archived={format.archived} archivedReason={format.archivedReason} mergedInto={chrome.merged} duplicates={chrome.duplicates}
         status={{ type: "format", value: format.status }} editHref={`${path}/edit`}
         badges={<KindBadge kind="format" />}
-        subtitle={<p className="mt-2 max-w-2xl text-[15px] italic text-charcoal"><InlineField type="format" id={format.id} field={fieldNamed(all, "logline")} canEdit={canEdit} placeholder="Add a logline…" /></p>}
+        subtitle={<p className="mt-2 max-w-2xl text-sm italic text-charcoal"><InlineField type="format" id={format.id} field={fieldNamed(all, "logline")} canEdit={canEdit} placeholder="Add a logline…" /></p>}
         nav={<><RecordContext type="format" id={format.id} name={format.title} slug={format.slug} path={path} canEdit={canEdit} status={format.status} /><RecordStepper type="format" fallback={neighbors} /></>}
         actions={<AddToCollectionButton targetType="format" targetId={format.id} targetLabel={format.title} />}
         linkTargets={[{ key: "talent", label: "Talent" }, { key: "people", label: "People" }, { key: "companies", label: "Companies" }, { key: "topics", label: "Topics" }]}
@@ -111,7 +111,7 @@ export default async function FormatPage({ params, searchParams }: { params: Pro
             <Highlights type="format" id={format.id} fields={highlights} canEdit={canEdit} />
             <UpdatePanel user={user} targetType="format" targetId={format.id} name={format.title} path={path} recordType="format in development" />
             <Section title="Description">
-              <InlineField type="format" id={format.id} field={fieldNamed(all, "description")} canEdit={canEdit} className="text-[15px] leading-relaxed" placeholder="What is this format? Add a description…" />
+              <InlineField type="format" id={format.id} field={fieldNamed(all, "description")} canEdit={canEdit} className="text-sm leading-relaxed" placeholder="What is this format? Add a description…" />
             </Section>
             {(format.episodeStructure || canEdit) && (
               <Section title="Episode Structure">
@@ -140,7 +140,7 @@ export default async function FormatPage({ params, searchParams }: { params: Pro
             canEdit={canEdit} autoOpen={autoLink} title="Talent" columns={{ sub: "Headline", extra: "" }}
             rows={format.creators.map((cf) => ({
               id: cf.id, name: cf.creator.name, href: `/talent/${cf.creator.slug}`, sub: cf.creator.headline ?? undefined,
-              extra: cf.isPrimary ? <span className="text-[11px] font-semibold uppercase tracking-wide text-accent-deep">Primary</span> : null,
+              extra: cf.isPrimary ? <span className="text-xs font-semibold uppercase tracking-wide text-accent-deep">Primary</span> : null,
               removePayload: { kind: "creator_format", creatorId: cf.creatorId, formatId: format.id },
             }))}
             addConfig={{ template: { kind: "creator_format", formatId: format.id }, idField: "creatorId", lookupType: "creator", buttonLabel: "+ Attach talent" }}

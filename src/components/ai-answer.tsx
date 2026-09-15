@@ -69,7 +69,7 @@ export function AiAnswer({ text, cards }: { text: string; cards: ResultCard[] })
   const blocks = text.trim().split(/\n{2,}/);
 
   return (
-    <div className="space-y-3 text-[15px] leading-relaxed text-charcoal">
+    <div className="space-y-3 text-sm leading-relaxed text-charcoal">
       {blocks.map((block, bi) => {
         const lines = block.split("\n").filter((l) => l.trim());
         const bulleted = lines.length > 0 && lines.every((l) => BULLET.test(l));

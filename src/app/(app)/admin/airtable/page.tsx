@@ -34,7 +34,7 @@ export default async function AirtableAdminPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-2 font-display text-3xl font-bold tracking-tight">AIRTABLE</h1>
+      <h1 className="mb-2 font-display text-2xl font-bold tracking-tight">AIRTABLE</h1>
       <p className="mb-6 max-w-2xl text-sm text-muted">
         Every format and project is mirrored to a row in the company Airtable base, with its files. The Repo is the
         source of truth and pushes one way: edit here, and Airtable follows within seconds. Details in{" "}
@@ -45,7 +45,7 @@ export default async function AirtableAdminPage() {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[["Token", tokenPresent ? "set" : "missing"], ["Base", cfg.baseId || "not set"], ["Rows in Airtable", synced], ["Waiting to push", queued]].map(([label, n]) => (
             <div key={String(label)} className="card px-3 py-2.5 text-center">
-              <div className="truncate font-display text-lg font-bold" title={String(n)}>{String(n)}</div>
+              <div className="truncate font-display text-xl font-bold" title={String(n)}>{String(n)}</div>
               <div className="text-xs text-muted">{label}</div>
             </div>
           ))}

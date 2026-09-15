@@ -85,7 +85,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
               {list.map(({ r, s: st }) => {
                 const s = since(r.lastContactAt);
                 return (
-                  <tr key={r.id} className={cold(r) ? "bg-[#fbf3ee]/60" : ""}>
+                  <tr key={r.id} className={cold(r) ? "bg-accent-wash/60" : ""}>
                     <td className="px-3 py-2"><Link href={`/hq/people/${r.id}`} className="font-medium hover:text-accent">{r.name}</Link>{r.personType === "creator" && <span className="ml-1 text-xs text-faint">talent</span>}</td>
                     <td className="px-3 py-2 text-muted">{hqLabel(TIERS, r.tier)}</td>
                     <td className="px-3 py-2" title={st.why}>
@@ -94,7 +94,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                         <span className="text-muted">{st.label}</span>
                       </span>
                     </td>
-                    <td className={`px-3 py-2 ${cold(r) ? "text-[#8a3a30]" : "text-muted"}`}>{s === null ? "never" : s === 0 ? "today" : `${s}d ago`}</td>
+                    <td className={`px-3 py-2 ${cold(r) ? "text-danger" : "text-muted"}`}>{s === null ? "never" : s === 0 ? "today" : `${s}d ago`}</td>
                     <td className="px-3 py-2 text-muted">{r.nextTouchAt ? r.nextTouchAt.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}</td>
                     <td className="px-3 py-2 text-xs text-muted">{r.pipelines.map((p) => p.pipeline.title).join(", ")}{r._count.pipelines > 3 ? ` +${r._count.pipelines - 3}` : ""}</td>
                     <td className="px-3 py-2 text-xs text-faint">{r.interests.slice(0, 4).join(", ")}</td>

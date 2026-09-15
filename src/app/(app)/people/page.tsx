@@ -14,7 +14,7 @@ import { Pagination } from "@/components/pagination";
 import { RowArchive } from "@/components/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
-import { directoryUser, layoutFor, matchingIds, paging } from "@/lib/directory";
+import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 
 export const metadata = { title: "Industry People" };
 
@@ -48,7 +48,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const view = layoutFor(params, prefs, "people");
   const canEdit = hasRole(user, "EDITOR");
 
-  const where: Prisma.IndustryPersonWhereInput = { AND: [{ archived: false }, ...(q ? [personSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.IndustryPersonWhereInput[])] };
+  const where: Prisma.IndustryPersonWhereInput = { AND: [...liveOnly(params), ...(q ? [personSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.IndustryPersonWhereInput[])] };
   const total = await db.industryPerson.count({ where });
   const pg = paging(params, total);
   if (!pg.all && pg.requested > pg.pages) redirect(directoryPageUrl("/people", params, pg.pages));
@@ -64,7 +64,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
 
   return (
     <div>
-      <DirectoryControls
+      <DirectoryControls showArchived={showArchived(params)}
         title="Industry people" total={total} createHref="/people/new" createLabel="+ Add Person" searchPlaceholder="Search names, roles, companies, email…"
         canEdit={canEdit} viewToggle section="people" fields={FIELDS} state={state} names={Object.fromEntries(names)} savedViews={views} defaultViews={DEFAULT_VIEWS}
         sorts={[{ value: "name", label: "Alphabetical" }, { value: "title", label: "Job title" }, { value: "role", label: "Role" }, { value: "updated-desc", label: "Recently updated" }]}
@@ -84,7 +84,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
             { key: "actions", label: "", align: "right" },
           ]}
           rows={people.map((p) => ({
-            id: p.id, href: `/people/${p.slug}`, peek: { type: "person", id: p.id },
+            id: p.id, href: `/people/${p.slug}`, archived: p.archived, peek: { type: "person", id: p.id },
             cells: [
               <span key="n">{p.name}</span>,
               <span key="t" className="line-clamp-1 text-muted">{p.title ?? <span className="text-faint">—</span>}</span>,

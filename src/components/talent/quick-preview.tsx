@@ -54,7 +54,7 @@ export function QuickPreviewDrawer({
               textClass="text-xl"
             />
             <div className="min-w-0">
-              <div className="text-lg font-semibold leading-tight">{data.name}</div>
+              <div className="text-xl font-semibold leading-tight">{data.name}</div>
               {data.headline && (
                 <div className="mt-0.5 text-sm text-muted">{data.headline}</div>
               )}

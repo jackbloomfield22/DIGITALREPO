@@ -16,7 +16,7 @@ const SORTS = [
   { value: "projects", label: "Most projects" },
   { value: "connections", label: "Most connections" },
 ];
-export function CreatorDirectoryControls({ total, canEdit, fields, state, names, savedViews, defaultViews }: { total: number; canEdit: boolean; fields: FilterField[]; state: FilterState; names: Record<string, string>; savedViews: SavedViewVM[]; defaultViews: DefaultView[] }) {
-  return <DirectoryControls title="Talent" total={total} createHref="/talent/new" createLabel="+ Add Talent" searchPlaceholder="Search names, interests, bios, companies…" canEdit={canEdit} viewToggle section="talent" fields={fields} state={state} names={names} sorts={SORTS} savedViews={savedViews} defaultViews={defaultViews} />;
+export function CreatorDirectoryControls({ total, canEdit, fields, state, names, savedViews, defaultViews, showArchived }: { total: number; canEdit: boolean; fields: FilterField[]; state: FilterState; names: Record<string, string>; savedViews: SavedViewVM[]; defaultViews: DefaultView[]; showArchived?: boolean }) {
+  return <DirectoryControls showArchived={showArchived} title="Talent" total={total} createHref="/talent/new" createLabel="+ Add Talent" searchPlaceholder="Search names, interests, bios, companies…" canEdit={canEdit} viewToggle section="talent" fields={fields} state={state} names={names} sorts={SORTS} savedViews={savedViews} defaultViews={defaultViews} />;
 }
 export function sortLabel(value: string): string { return SORTS.find((s) => s.value === value)?.label ?? labelFor(value); }

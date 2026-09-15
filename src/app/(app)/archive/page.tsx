@@ -172,7 +172,7 @@ export default async function ArchivePage({
     <div>
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex items-baseline gap-3">
-          <h1 className="font-display text-3xl font-bold tracking-tight">ARCHIVE</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">ARCHIVE</h1>
           <span className="text-sm text-muted">{total}</span>
         </div>
       </div>

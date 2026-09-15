@@ -98,7 +98,7 @@ export default async function DigitalPage({
   return (
     <div>
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-display text-3xl font-bold tracking-tight">DIGITAL</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">DIGITAL</h1>
         <div className="flex gap-2">
           <Link href="/talent?sort=audience" className="btn btn-secondary btn-sm">All Talent</Link>
           <Link href="/formats" className="btn btn-secondary btn-sm">All Formats</Link>

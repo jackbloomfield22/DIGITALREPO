@@ -44,7 +44,7 @@ export default async function ExplorePage() {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">EXPLORE</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">EXPLORE</h1>
       <p className="mb-8 text-sm text-muted">
         Every structured entity is a doorway — click anything to see who and what connects to it.
       </p>

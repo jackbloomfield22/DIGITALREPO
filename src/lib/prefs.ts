@@ -16,8 +16,9 @@ export type UserPrefs = {
   columns?: Record<string, ColumnPrefs>;
   /** Filter-panel open state per section. */
   filtersOpen?: Record<string, boolean>;
-  /** Width of the record-page side column, in pixels. */
+  /** Width of the record-page Details column, in pixels, and whether it is folded away. */
   asideWidth?: number;
+  detailsHidden?: boolean;
   /** Quick-create templates per record type: a name and the values it fills in. */
   templates?: Record<string, RecordTemplate[]>;
 };

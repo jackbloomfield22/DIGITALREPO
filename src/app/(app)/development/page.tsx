@@ -60,7 +60,7 @@ export default async function DevelopmentPage() {
   return (
     <div>
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-display text-3xl font-bold tracking-tight">DEVELOPMENT</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">DEVELOPMENT</h1>
         <div className="flex gap-2 text-sm">
           <Link href="/formats" className="btn btn-secondary btn-sm">All Formats</Link>
           <Link href="/opportunities" className="btn btn-secondary btn-sm">All Opportunities</Link>
@@ -91,7 +91,7 @@ export default async function DevelopmentPage() {
                     <Link href={`/formats/${f.slug}`} className="block">
                       <div className="truncate text-sm font-semibold hover:text-accent">{f.title}</div>
                       {f.logline && <div className="mt-0.5 line-clamp-2 text-xs text-muted">{f.logline}</div>}
-                      <div className="mt-1 truncate text-[11px] text-faint">
+                      <div className="mt-1 truncate text-xs text-faint">
                         {[
                           f.creators.length ? f.creators.map((c) => c.creator.name).join(", ") : null,
                           f.targetPlatform,
@@ -103,7 +103,7 @@ export default async function DevelopmentPage() {
                     </Link>
                     <div className="mt-1.5 flex items-center justify-between gap-2">
                       <RowStatus type="format" id={f.id} status={f.status} name={f.title} canEdit={canEdit} />
-                      <span className="text-[11px] text-faint">{relativeTime(f.updatedAt)}</span>
+                      <span className="text-xs text-faint">{relativeTime(f.updatedAt)}</span>
                     </div>
                   </div>
                 ))}

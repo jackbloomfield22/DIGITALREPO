@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 import { StatusPill } from "@/components/ui";
 import { CHANNEL_IDEA_STATUSES, labelFor } from "@/lib/taxonomy";
 import { addChannelIdea, removeChannelIdea, setChannelIdea } from "@/lib/actions/channels";
@@ -84,6 +85,7 @@ export function ChannelIdeas({
 export function ChannelIdeaRow({ idea, canEdit }: { idea: IdeaVM; canEdit: boolean }) {
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   return (
     <li className="card flex flex-wrap items-center gap-2 px-3 py-2">
@@ -91,7 +93,7 @@ export function ChannelIdeaRow({ idea, canEdit }: { idea: IdeaVM; canEdit: boole
       {canEdit ? (
         <span className="relative inline-flex items-center">
           <StatusPill status={idea.status} label={labelFor(idea.status)} />
-          <span aria-hidden className="ml-0.5 text-[9px] text-faint">▾</span>
+          <span aria-hidden className="ml-0.5 text-xs text-faint">▾</span>
           <select
             aria-label={`Status for ${idea.title}`}
             className="absolute inset-0 cursor-pointer opacity-0"
@@ -115,7 +117,7 @@ export function ChannelIdeaRow({ idea, canEdit }: { idea: IdeaVM; canEdit: boole
           aria-label={`Remove ${idea.title}`}
           className="text-muted hover:text-accent"
           onClick={async () => {
-            if (!window.confirm(`Remove "${idea.title}" from the queue?`)) return;
+            if (!(await confirm({ title: `Remove "${idea.title}" from the queue?`, tone: "danger", action: "Remove" }))) return;
             const res = await removeChannelIdea(idea.id);
             if (!res.ok) return toast(res.error ?? "Could not remove.", { tone: "error" });
             router.refresh();

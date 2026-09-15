@@ -37,7 +37,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Pipeline</h1>
           <p className="text-sm text-muted">
-            {inPlay.length} in play · {hot} hot · {noNext ? <span className="text-[#8a3a30]">{noNext} with no next step</span> : "every card has a next step"}
+            {inPlay.length} in play · {hot} hot · {noNext ? <span className="text-danger">{noNext} with no next step</span> : "every card has a next step"}
             {show === "all" ? ` · ${passed} passed shown` : ""}
           </p>
         </div>

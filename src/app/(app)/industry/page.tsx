@@ -61,7 +61,7 @@ export default async function IndustryPage() {
   return (
     <div className="max-w-4xl">
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-display text-3xl font-bold tracking-tight">INDUSTRY</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">INDUSTRY</h1>
         <div className="flex gap-2">
           <Link href="/organizations" className="btn btn-secondary btn-sm">All Organizations</Link>
           <Link href="/people" className="btn btn-secondary btn-sm">All People</Link>

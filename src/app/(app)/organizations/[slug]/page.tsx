@@ -135,7 +135,7 @@ export default async function OrganizationPage({ params, searchParams }: { param
             <Highlights type="organization" id={org.id} fields={highlights} canEdit={canEdit} />
             <UpdatePanel user={user} targetType="organization" targetId={org.id} name={org.name} path={path} recordType="organization" />
             <Section title="Overview">
-              <InlineField type="organization" id={org.id} field={fieldNamed(all, "description")} canEdit={canEdit} className="text-[15px] leading-relaxed" placeholder="What does this company do, and why does it matter to us?" />
+              <InlineField type="organization" id={org.id} field={fieldNamed(all, "description")} canEdit={canEdit} className="text-sm leading-relaxed" placeholder="What does this company do, and why does it matter to us?" />
             </Section>
             <Section title="Sources">
               <SourceList canEdit={canEdit} targetType="organization" targetId={org.id} sources={recordSources.map((rs) => ({ recordSourceId: rs.id, title: rs.source.title, url: rs.source.url, sourceType: rs.source.sourceType }))} />

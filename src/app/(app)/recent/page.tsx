@@ -19,7 +19,7 @@ export default async function RecentPage() {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">RECENTLY VIEWED</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">RECENTLY VIEWED</h1>
       <p className="mb-6 text-sm text-muted">Retrace your research path.</p>
       <div className="max-w-2xl space-y-1.5">
         {recents.map((recent) => {
@@ -32,7 +32,7 @@ export default async function RecentPage() {
               className="card flex items-center gap-3 px-4 py-2.5 transition-shadow hover:shadow-pop"
             >
               {recent.targetType === "creator" ? (
-                <Portrait name={r.label} imageUrl={r.imageUrl} className="h-8 w-8 shrink-0 rounded" textClass="text-[11px]" />
+                <Portrait name={r.label} imageUrl={r.imageUrl} className="h-8 w-8 shrink-0 rounded" textClass="text-xs" />
               ) : (
                 <span className="kind-badge kind-project w-20 shrink-0 text-center">{targetTypeLabel(recent.targetType)}</span>
               )}

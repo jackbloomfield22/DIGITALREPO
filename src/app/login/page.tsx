@@ -18,7 +18,7 @@ export default async function LoginPage({
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="font-display text-3xl font-bold tracking-tight">
+          <div className="font-display text-2xl font-bold tracking-tight">
             4.4.FORTY
           </div>
           <div className="overline mt-2">The Repo</div>

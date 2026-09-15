@@ -8,7 +8,7 @@ import { CardPicker, PersonPicker } from "@/components/hq/pickers";
 import { STYLE_KINDS, hqLabel } from "@/lib/hq/vocab";
 
 export function StyleGuideEditor({ value }: { value: string }) {
-  return <AutoText value={value} multiline rows={18} onSave={(v) => saveStyleGuide(v)} className="[&_textarea]:font-mono [&_textarea]:text-[13px] [&_textarea]:leading-relaxed" />;
+  return <AutoText value={value} multiline rows={18} onSave={(v) => saveStyleGuide(v)} className="[&_textarea]:font-mono [&_textarea]:text-sm [&_textarea]:leading-relaxed" />;
 }
 
 export function ExamplesLibrary({ examples }: { examples: { id: string; kind: string; title: string; body: string; notes: string | null; createdAt: string }[] }) {
@@ -67,7 +67,7 @@ export function ExamplesLibrary({ examples }: { examples: { id: string; kind: st
                 <span className="w-28 shrink-0 text-xs uppercase tracking-wide text-faint">{hqLabel(STYLE_KINDS, e.kind)}</span>
                 <button className="font-medium hover:text-accent" onClick={() => setExpanded((x) => (x === e.id ? null : e.id))}>{e.title}</button>
                 <span className="text-xs text-faint">{e.body.length.toLocaleString()} chars</span>
-                <button className="ml-auto text-xs text-faint hover:text-[#8a3a30]" onClick={() => start(async () => { await deleteStyleExample(e.id); router.refresh(); })}>×</button>
+                <button aria-label="Remove" title="Remove" className="ml-auto text-xs text-faint hover:text-danger" onClick={() => start(async () => { await deleteStyleExample(e.id); router.refresh(); })}>×</button>
               </div>
               {expanded === e.id && <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-wash p-3 text-xs">{e.body}</pre>}
               {e.notes && <div className="pl-[7.5rem] text-xs text-muted">{e.notes}</div>}
@@ -109,10 +109,10 @@ export function BriefBuilder({ outputs, aiOn }: { outputs: { value: string; labe
           <select value={output} onChange={(e) => setOutput(e.target.value)} className="w-full text-sm">{outputs.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
         </label>
         <div><span className="overline mb-1 block">For which project</span>
-          {card ? <div className="text-sm">{card.title} <button className="text-xs text-faint hover:text-[#8a3a30]" onClick={() => setCard(null)}>×</button></div> : <CardPicker onPick={setCard} placeholder="Pipeline card (optional)" />}
+          {card ? <div className="text-sm">{card.title} <button aria-label="Remove" title="Remove" className="text-xs text-faint hover:text-danger" onClick={() => setCard(null)}>×</button></div> : <CardPicker onPick={setCard} placeholder="Pipeline card (optional)" />}
         </div>
         <div><span className="overline mb-1 block">To whom</span>
-          {person ? <div className="text-sm">{person.name} <button className="text-xs text-faint hover:text-[#8a3a30]" onClick={() => setPerson(null)}>×</button></div> : <PersonPicker onPick={(p) => { if (p.relationshipId) setPerson({ id: p.relationshipId, name: p.name }); }} placeholder="Person (for emails, optional)" />}
+          {person ? <div className="text-sm">{person.name} <button aria-label="Remove" title="Remove" className="text-xs text-faint hover:text-danger" onClick={() => setPerson(null)}>×</button></div> : <PersonPicker onPick={(p) => { if (p.relationshipId) setPerson({ id: p.relationshipId, name: p.name }); }} placeholder="Person (for emails, optional)" />}
         </div>
         <label className="block"><span className="overline mb-1 block">Anything else</span>
           <textarea rows={3} value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="Angle, length, what to avoid, what they said last time…" className="w-full text-sm" />

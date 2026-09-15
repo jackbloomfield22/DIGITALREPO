@@ -23,7 +23,7 @@ export default async function FavoritesPage() {
 
   return (
     <div>
-      <h1 className="mb-6 font-display text-3xl font-bold tracking-tight">FAVORITES</h1>
+      <h1 className="mb-6 font-display text-2xl font-bold tracking-tight">FAVORITES</h1>
       {favorites.length === 0 && (
         <p className="text-sm text-faint">
           Nothing favorited yet — use the ☆ on any talent profile, format, project, or organization.

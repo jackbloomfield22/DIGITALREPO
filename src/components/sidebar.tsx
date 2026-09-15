@@ -24,14 +24,14 @@ function NavLinks(props: Props & { onNavigate?: () => void }) {
     <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={isNavActive(pathname, item.href) ? "page" : undefined}
       className={`flex items-center justify-between rounded-md px-3 py-1.5 text-sm transition-colors ${isNavActive(pathname, item.href) ? "bg-surface font-semibold text-accent-deep shadow-card" : "text-charcoal hover:bg-surface/70 hover:text-ink"}`}>
       <span>{item.label}</span>
-      {item.shortcut && <span aria-hidden className="text-[11px] text-faint">{item.shortcut}</span>}
+      {item.shortcut && <span aria-hidden className="text-xs text-faint">{item.shortcut}</span>}
     </Link>
   );
   const recordRow = (r: SidebarRef) => (
     <Link key={`${r.type}:${r.id}`} href={r.href} onClick={onNavigate} aria-current={pathname === r.href ? "page" : undefined}
       className={`flex items-center gap-2 rounded-md px-3 py-1 text-sm ${pathname === r.href ? "bg-surface font-semibold text-accent-deep" : "text-charcoal hover:bg-surface/70"}`} title={r.sub ? `${r.name} — ${r.sub}` : r.name}>
       <span className="truncate">{r.name}</span>
-      <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-faint">{typeLabel(r.type)}</span>
+      <span className="ml-auto shrink-0 text-xs uppercase tracking-wide text-faint">{typeLabel(r.type)}</span>
     </Link>
   );
   return (
@@ -40,11 +40,11 @@ function NavLinks(props: Props & { onNavigate?: () => void }) {
         <Link href="/" onClick={onNavigate} className="mb-3 block px-2"><div className="font-display text-xl font-bold leading-none">4.4.FORTY</div><div className="overline mt-1">The Repo</div></Link>
         <button type="button" className="mb-2 flex w-full items-center justify-between rounded-md border border-line-strong bg-surface px-3 py-2 text-left text-sm text-muted hover:border-accent hover:text-ink"
           onClick={() => { onNavigate?.(); window.dispatchEvent(new CustomEvent("open-command-bar")); }}>
-          <span>Search or jump to…</span><kbd className="rounded border border-line px-1.5 text-[11px] text-faint">⌘K</kbd>
+          <span>Search or jump to…</span><kbd className="rounded border border-line px-1.5 text-xs text-faint">⌘K</kbd>
         </button>
         {props.isEditor && (
           <div className="relative" onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setCreateOpen(false); } }} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setCreateOpen(false); }}>
-            <button type="button" className="btn btn-accent w-full" onClick={() => setCreateOpen(!createOpen)} aria-expanded={createOpen}>+ Add new <span className="ml-1 text-[11px] opacity-70">C</span></button>
+            <button type="button" className="btn btn-accent w-full" onClick={() => setCreateOpen(!createOpen)} aria-expanded={createOpen}>+ Add new <span className="ml-1 text-xs opacity-70">C</span></button>
             {createOpen && <><div className="fixed inset-0 z-10" aria-hidden onClick={() => setCreateOpen(false)} /><div className="absolute inset-x-0 z-20 mt-1 rounded-md border border-line bg-surface p-1 shadow-pop">{allowedNav(CREATE_ITEMS, props).map((item) => <Link key={item.href} href={item.href} className="block rounded px-3 py-2 text-sm hover:bg-wash" onClick={() => { setCreateOpen(false); onNavigate?.(); }}>{item.label}</Link>)}</div></>}
           </div>
         )}
@@ -88,6 +88,12 @@ export function Sidebar(props: Props) {
       <Link href="/" className="font-display text-sm font-bold">4.4.FORTY REPO</Link>
       <button className="btn btn-ghost min-h-10" onClick={() => window.dispatchEvent(new CustomEvent("open-command-bar"))}>Search</button>
     </div>
+    <nav aria-label="Sections" className="no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden">
+      {[{ href: "/", label: "Home" }, { href: "/talent", label: "Talent" }, { href: "/projects", label: "Projects" }, { href: "/formats", label: "Formats" }].map((t) => (
+        <Link key={t.href} href={t.href} aria-current={isNavActive(pathname, t.href) ? "page" : undefined} className={`flex min-h-12 items-center justify-center text-xs font-medium ${isNavActive(pathname, t.href) ? "text-accent-deep" : "text-muted"}`}>{t.label}</Link>
+      ))}
+      <button type="button" className="flex min-h-12 items-center justify-center text-xs font-medium text-muted" aria-label="More sections" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>More</button>
+    </nav>
     {mobileOpen && <div className="fixed inset-0 z-50 lg:hidden"><div className="absolute inset-0 bg-ink/30" aria-hidden onClick={() => setMobileOpen(false)} /><div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Navigation" tabIndex={-1} className="absolute inset-y-0 left-0 w-72 max-w-[90vw] bg-wash shadow-pop"><button className="absolute right-3 top-3 z-10 min-h-10 min-w-10 px-3 py-2" aria-label="Close navigation" onClick={() => setMobileOpen(false)}>×</button><NavLinks {...props} onNavigate={() => setMobileOpen(false)} /></div></div>}
   </>;
 }

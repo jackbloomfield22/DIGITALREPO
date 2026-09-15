@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateCollection, deleteCollection } from "@/lib/actions/misc";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 
 export function CollectionHeader({
   collection,
@@ -19,6 +20,7 @@ export function CollectionHeader({
   const [description, setDescription] = useState(collection.description ?? "");
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   return (
     <div className="mb-8">
@@ -26,7 +28,7 @@ export function CollectionHeader({
       {!editing ? (
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight">{collection.name}</h1>
+            <h1 className="font-display text-2xl font-bold tracking-tight">{collection.name}</h1>
             {collection.description && <p className="mt-1 max-w-2xl text-sm text-muted">{collection.description}</p>}
             <p className="mt-1 text-xs text-faint">{meta}</p>
           </div>
@@ -36,7 +38,7 @@ export function CollectionHeader({
               <button
                 className="btn btn-ghost btn-sm text-accent"
                 onClick={async () => {
-                  if (!window.confirm(`Delete collection “${collection.name}”? Items themselves are not deleted.`)) return;
+                  if (!(await confirm({ title: `Delete collection “${collection.name}”? Items themselves are not deleted.`, tone: "danger", action: "Delete" }))) return;
                   const res = await deleteCollection(collection.id);
                   if (res.ok) {
                     toast("Collection deleted");

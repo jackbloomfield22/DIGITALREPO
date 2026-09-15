@@ -15,7 +15,7 @@ import { Pagination } from "@/components/pagination";
 import { RowArchive } from "@/components/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
-import { directoryUser, layoutFor, matchingIds, paging } from "@/lib/directory";
+import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 
 export const metadata = { title: "Companies" };
 
@@ -49,7 +49,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
   const { prefs, views } = await directoryUser(user.id, "organizations");
   const view = layoutFor(params, prefs, "organizations");
 
-  const where = { AND: [{ archived: false }, ...(q ? [organizationSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.OrganizationWhereInput[])] };
+  const where = { AND: [...liveOnly(params), ...(q ? [organizationSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.OrganizationWhereInput[])] };
   const total = await db.organization.count({ where });
   const pg = paging(params, total);
   if (!pg.all && pg.requested > pg.pages) redirect(directoryPageUrl("/organizations", params, pg.pages));
@@ -63,7 +63,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
 
   return (
     <div>
-      <DirectoryControls
+      <DirectoryControls showArchived={showArchived(params)}
         title="Companies" total={total} createHref="/organizations/new" createLabel="+ Add Company" searchPlaceholder="Search companies…"
         canEdit={canEdit} viewToggle section="organizations" fields={FIELDS} state={state} names={Object.fromEntries(names)} savedViews={views} defaultViews={DEFAULT_VIEWS}
         sorts={[{ value: "name", label: "Alphabetical" }, { value: "location", label: "Location" }, { value: "updated-desc", label: "Recently updated" }, { value: "created-desc", label: "Recently added" }]}
@@ -83,7 +83,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
             { key: "actions", label: "", align: "right" },
           ]}
           rows={organizations.map((o) => ({
-            id: o.id, href: `/organizations/${o.slug}`, peek: { type: "organization", id: o.id },
+            id: o.id, href: `/organizations/${o.slug}`, archived: o.archived, peek: { type: "organization", id: o.id },
             cells: [
               <span key="n">{o.name}</span>,
               <span key="t" className="line-clamp-1 text-muted">{o.types.map(labelFor).join(", ") || "—"}</span>,

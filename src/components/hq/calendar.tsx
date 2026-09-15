@@ -60,7 +60,7 @@ export function EventList({ events }: { events: EventVM[] }) {
                   {e.source !== "manual" && <span> · {e.source === "google" ? "Google" : "imported"}</span>}
                 </span>
               </span>
-              <button className="text-xs text-faint hover:text-[#8a3a30]" onClick={() => start(async () => { await deleteEvent(e.id); router.refresh(); })} aria-label="Delete">×</button>
+              <button className="text-xs text-faint hover:text-danger" onClick={() => start(async () => { await deleteEvent(e.id); router.refresh(); })} aria-label="Delete">×</button>
             </div>
           </li>
         );
@@ -94,8 +94,8 @@ export function AddEvent() {
         <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="text-sm" />
       </div>
       <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Where (optional)" className="w-full text-sm" />
-      {person ? <div className="text-sm">With {person.name} <button className="text-xs text-faint" onClick={() => setPerson(null)}>×</button></div> : <PersonPicker placeholder="With whom (optional)" onPick={(p) => { if (p.relationshipId) setPerson({ id: p.relationshipId, name: p.name }); }} />}
-      {card ? <div className="text-sm">About {card.title} <button className="text-xs text-faint" onClick={() => setCard(null)}>×</button></div> : <CardPicker placeholder="About which card (optional)" onPick={setCard} />}
+      {person ? <div className="text-sm">With {person.name} <button aria-label="Remove" title="Remove" className="text-xs text-faint" onClick={() => setPerson(null)}>×</button></div> : <PersonPicker placeholder="With whom (optional)" onPick={(p) => { if (p.relationshipId) setPerson({ id: p.relationshipId, name: p.name }); }} />}
+      {card ? <div className="text-sm">About {card.title} <button aria-label="Remove" title="Remove" className="text-xs text-faint" onClick={() => setCard(null)}>×</button></div> : <CardPicker placeholder="About which card (optional)" onPick={setCard} />}
       <button className="btn btn-primary btn-sm w-full" disabled={pending || !title.trim()} onClick={add}>Add to calendar</button>
     </div>
   );

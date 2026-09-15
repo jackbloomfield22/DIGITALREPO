@@ -79,7 +79,7 @@ export function RecordHeader({
     <header className="mb-6">
       <RecordVersion type={type} id={id} version={version} />
       {archived && (
-        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-warn/40 bg-[#fbf6e6] px-4 py-2.5 text-sm">
+        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-warn/40 bg-warn-wash px-4 py-2.5 text-sm">
           <span>
             <span className="font-semibold">In the Archive.</span>{" "}
             {mergedInto ? (
@@ -109,7 +109,7 @@ export function RecordHeader({
             {status && <RowStatus type={status.type} id={id} status={status.value} name={displayName} canEdit={canEdit} archivable={false} />}
             {badges}
           </div>
-          <h1 className="mt-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight">
             <InlineField type={type} id={id} field={name} canEdit={canEdit} heading placeholder="Untitled" onSaved={(v) => setDisplayName(v == null ? "" : String(v))} />
           </h1>
           {subtitle}

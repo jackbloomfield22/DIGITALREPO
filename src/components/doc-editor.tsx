@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 import { restoreDocRevision, saveDoc, listDocRevisions, type RevisionVM } from "@/lib/actions/docs";
 
 /** Long enough not to save mid-word, short enough that closing the tab is safe. */
@@ -75,6 +76,7 @@ export function DocEditor({
   const [, force] = useState(0);
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   // Re-render the "saved 2 minutes ago" line without touching the document.
   useEffect(() => {
@@ -204,14 +206,12 @@ export function DocEditor({
                 type="file"
                 accept=".pdf,.docx,.txt,.md"
                 className="hidden"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   e.target.value = "";
                   if (!file) return;
                   if (
-                    !window.confirm(
-                      `Replace this document with ${file.name}? The version on screen now is kept in History, so this can be undone.`,
-                    )
+                    !(await confirm({ title: `Replace this document with ${file.name}?`, message: "The version on screen now is kept in History, so this can be undone.", action: "Replace" }))
                   )
                     return;
                   void importFile(file);
@@ -260,7 +260,7 @@ export function DocEditor({
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={async () => {
-                      if (!window.confirm("Put the document back to this version? The current one is kept too.")) return;
+                      if (!(await confirm({ title: "Put the document back to this version? The current one is kept too.", tone: "default", action: "Confirm" }))) return;
                       const res = await restoreDocRevision(r.id);
                       if (!res.ok) return toast(res.error ?? "Could not restore.", { tone: "error" });
                       toast("Restored — reloading");

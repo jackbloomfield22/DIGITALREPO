@@ -59,7 +59,7 @@ export default async function PrepPage({ params }: { params: Promise<{ id: strin
         {people.map((p) => (
           <section key={p.id} className="card p-4">
             <div className="mb-1 flex items-baseline justify-between">
-              <Link href={`/hq/people/${p.id}`} className="font-display text-lg font-bold hover:text-accent">{p.name}</Link>
+              <Link href={`/hq/people/${p.id}`} className="font-display text-xl font-bold hover:text-accent">{p.name}</Link>
               <span className="text-xs text-faint">{hqLabel(TIERS, p.tier)}{p.lastContactAt ? ` · last contact ${p.lastContactAt.toLocaleDateString()}` : " · no contact logged"}</span>
             </div>
             {p.interests.length > 0 && <div className="mb-1 text-sm"><span className="text-faint">Interests: </span>{p.interests.join(", ")}</div>}
@@ -84,7 +84,7 @@ export default async function PrepPage({ params }: { params: Promise<{ id: strin
         {ev.pipeline && (
           <section className="card p-4">
             <div className="mb-1 flex items-baseline justify-between">
-              <Link href={`/hq/pipeline/${ev.pipeline.id}`} className="font-display text-lg font-bold hover:text-accent">{ev.pipeline.title}</Link>
+              <Link href={`/hq/pipeline/${ev.pipeline.id}`} className="font-display text-xl font-bold hover:text-accent">{ev.pipeline.title}</Link>
               <span className="text-xs text-faint">{hqLabel(STAGES, ev.pipeline.stage)} · heat {ev.pipeline.heat}</span>
             </div>
             {ev.pipeline.whyItMatters && <p className="text-sm">{ev.pipeline.whyItMatters}</p>}

@@ -14,7 +14,7 @@ function dueLabel(iso: string | null): { text: string; tone: string } {
   if (!iso) return { text: "", tone: "text-faint" };
   const d = new Date(iso); const today = new Date(); today.setHours(0, 0, 0, 0);
   const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - today.getTime()) / 86_400_000);
-  if (diff < 0) return { text: `${-diff}d overdue`, tone: "text-[#8a3a30] font-medium" };
+  if (diff < 0) return { text: `${-diff}d overdue`, tone: "text-danger font-medium" };
   if (diff === 0) return { text: "today", tone: "text-accent-deep font-medium" };
   if (diff === 1) return { text: "tomorrow", tone: "text-charcoal" };
   if (diff < 7) return { text: d.toLocaleDateString(undefined, { weekday: "short" }), tone: "text-muted" };
@@ -53,7 +53,7 @@ export function TaskList({ tasks, emptyText = "Nothing here.", allowAdd, default
                   {t.title}
                 </div>
                 <div className="flex flex-wrap gap-x-2 text-xs text-faint">
-                  {t.status === "waiting" && <span className={nudge ? "font-medium text-[#8a3a30]" : "text-warn"}>⏳ waiting {waitingDays}d{nudge ? " — nudge" : ""}</span>}
+                  {t.status === "waiting" && <span className={nudge ? "font-medium text-danger" : "text-warn"}>⏳ waiting {waitingDays}d{nudge ? " — nudge" : ""}</span>}
                   {t.kind === "follow_up" && t.status !== "waiting" && <span className="text-muted">follow-up</span>}
                   {t.relationship && <Link href={`/hq/people/${t.relationship.id}`} className="hover:text-accent">{t.relationship.name}</Link>}
                   {t.pipeline && <Link href={`/hq/pipeline/${t.pipeline.id}`} className="hover:text-accent">#{t.pipeline.title}</Link>}
@@ -64,7 +64,7 @@ export function TaskList({ tasks, emptyText = "Nothing here.", allowAdd, default
               {t.status !== "done" && (
                 <button className="shrink-0 text-xs text-faint hover:text-accent" title={t.status === "waiting" ? "Ball is back in your court" : "Waiting on them"} onClick={() => start(async () => { await setTaskStatus(t.id, t.status === "waiting" ? "open" : "waiting"); router.refresh(); })}>{t.status === "waiting" ? "↩" : "⏳"}</button>
               )}
-              <button className="shrink-0 text-xs text-faint hover:text-[#8a3a30]" title="Delete" onClick={() => start(async () => { await deleteTask(t.id); router.refresh(); })}>×</button>
+              <button aria-label="Delete task" className="shrink-0 text-xs text-faint hover:text-danger" title="Delete" onClick={() => start(async () => { await deleteTask(t.id); router.refresh(); })}>×</button>
             </li>
           );
         })}

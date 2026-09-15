@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Suspense><CommandPalette {...permissions} recents={lists.recents} /></Suspense>
         <Suspense><Shortcuts isEditor={permissions.isEditor} /></Suspense>
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded focus:bg-surface focus:p-3">Skip to content</a>
-        <main id="main-content" className="min-h-screen pt-14 transition-[padding] lg:pl-60 lg:pt-0 peek-open:lg:pr-[28rem]">
+        <main id="main-content" className="min-h-screen pb-16 pt-14 transition-[padding] lg:pb-0 lg:pl-60 lg:pt-0 peek-open:lg:pr-[28rem]">
           <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8"><Suspense><PageTrail /><ListMemory /></Suspense>{children}</div>
         </main>
         <Suspense><PeekPanel canEdit={permissions.isEditor} /></Suspense>

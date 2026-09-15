@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Combobox, lookupItems } from "@/components/combobox";
 import { useRouter } from "next/navigation";
 import {
   createCreator,
@@ -12,6 +13,7 @@ import {
 import { CREATOR_STATUSES, SOCIAL_PLATFORMS } from "@/lib/taxonomy";
 import { createEntityInline } from "@/lib/actions/create-inline";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 import { Portrait } from "@/components/ui";
 import Link from "next/link";
 
@@ -46,34 +48,14 @@ function EntityMultiPick({
   setPicks: (p: EntityPick[]) => void;
   relationship?: string;
 }) {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<{ id: string; name: string }[]>([]);
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (!open) return;
-    const controller = new AbortController();
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/lookup?type=entity&kind=${kind}&q=${encodeURIComponent(q)}`,
-          { signal: controller.signal },
-        );
-        if (res.ok) setResults(await res.json());
-      } catch {}
-    }, 150);
-    return () => {
-      clearTimeout(t);
-      controller.abort();
-    };
-  }, [q, kind, open]);
+  const fetchItems = useMemo(() => lookupItems("entity", kind), [kind]);
 
   const add = (item: { id: string; name: string }) => {
     if (!picks.some((p) => p.id === item.id)) {
       setPicks([...picks, { ...item, relationship }]);
     }
-    setQ("");
     setOpen(false);
   };
 
@@ -99,6 +81,7 @@ function EntityMultiPick({
             type="button"
             className="chip border-dashed text-muted"
             onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
           >
             + Add
           </button>
@@ -106,42 +89,19 @@ function EntityMultiPick({
             <>
               <div className="fixed inset-0 z-20" aria-hidden onClick={() => setOpen(false)} />
               <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-md border border-line bg-surface p-2 shadow-pop">
-                <input
-                  type="text"
+                <Combobox
                   autoFocus
-                  placeholder="Search…"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
                   aria-label={`Search ${label}`}
+                  fetchItems={fetchItems}
+                  exclude={picks.map((p) => p.id)}
+                  onEscape={() => setOpen(false)}
+                  onPick={add}
+                  onCreate={async (name) => {
+                    const result = await createEntityInline(kind, name);
+                    if (result.ok) add({ id: result.id, name: result.name });
+                    else toast(result.error, { tone: "error" });
+                  }}
                 />
-                <div className="mt-1 max-h-44 overflow-y-auto">
-                  {results
-                    .filter((r) => !picks.some((p) => p.id === r.id))
-                    .map((r) => (
-                      <button
-                        type="button"
-                        key={r.id}
-                        className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-wash"
-                        onClick={() => add(r)}
-                      >
-                        {r.name}
-                      </button>
-                    ))}
-                  {q.trim() &&
-                    !results.some((r) => r.name.toLowerCase() === q.trim().toLowerCase()) && (
-                      <button
-                        type="button"
-                        className="mt-1 w-full rounded border-t border-line px-2 py-1.5 text-left text-sm text-accent-deep hover:bg-accent-wash"
-                        onClick={async () => {
-                          const result = await createEntityInline(kind, q.trim());
-                          if (result.ok) add({ id: result.id, name: result.name });
-                          else toast(result.error, { tone: "error" });
-                        }}
-                      >
-                        + Create “{q.trim()}”
-                      </button>
-                    )}
-                </div>
               </div>
             </>
           )}
@@ -174,6 +134,7 @@ export function CreatorForm({ initial, initialName }: { initial?: CreatorFormIni
   const isEdit = !!initial;
   const router = useRouter();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   const [name, setName] = useState(initial?.scalars.name ?? initialName ?? "");
   const [imageUrl, setImageUrl] = useState(initial?.scalars.imageUrl ?? "");
@@ -375,7 +336,7 @@ export function CreatorForm({ initial, initialName }: { initial?: CreatorFormIni
                   required
                 />
                 {duplicates.length > 0 && (
-                  <div className="mt-1.5 rounded bg-[#f5efdd] px-3 py-2 text-xs text-warn">
+                  <div className="mt-1.5 rounded bg-warn-wash px-3 py-2 text-xs text-warn">
                     Possible existing {duplicates.length === 1 ? "match" : "matches"}:{" "}
                     {duplicates.map((d, i) => (
                       <span key={d.slug}>
@@ -587,8 +548,8 @@ export function CreatorForm({ initial, initialName }: { initial?: CreatorFormIni
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => {
-                if (dirty && !window.confirm("Discard unsaved changes?")) return;
+              onClick={async () => {
+                if (dirty && !(await confirm({ title: "Discard unsaved changes?", tone: "danger", action: "Discard" }))) return;
                 setDirty(false);
                 router.push(isEdit ? `/talent/${initial!.slug}` : "/talent");
               }}

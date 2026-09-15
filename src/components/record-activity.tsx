@@ -37,7 +37,7 @@ export async function RecordActivity({ type, id, limit = 100 }: { type: string; 
                     {r.newValue && <span className="max-w-md truncate text-charcoal" title={r.newValue}>{r.newValue}</span>}
                   </div>
                 )}
-                <div className="text-[11px] text-faint" title={r.createdAt.toISOString()}>{relativeTime(r.createdAt)}</div>
+                <div className="text-xs text-faint" title={r.createdAt.toISOString()}>{relativeTime(r.createdAt)}</div>
               </li>
             ))}
           </ol>

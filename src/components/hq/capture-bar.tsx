@@ -62,7 +62,7 @@ export function CaptureBar() {
         <span>Enter to file. Shift+Enter for a new line; a blank line starts the notes.</span>
         <span>@Name links a person · #card links a pipeline card · “idea:”, “note:”, “call…”, “lunch w/… thu 1pm” pick where it goes.</span>
       </div>
-      {error && <div className="mt-2 rounded bg-[#f6e3e0] px-3 py-2 text-sm text-[#8a3a30]">{error}</div>}
+      {error && <div className="mt-2 rounded bg-danger-wash px-3 py-2 text-sm text-danger">{error}</div>}
       {last && !error && (
         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded bg-wash px-3 py-2 text-sm">
           <span>
@@ -70,7 +70,7 @@ export function CaptureBar() {
             <Link href={last.href} className="underline decoration-line-strong underline-offset-2 hover:text-accent">{last.title}</Link>
           </span>
           {[...last.resolved, ...last.reading].map((r, i) => <span key={i} className="text-xs text-muted">{r}</span>)}
-          <button className="ml-auto text-xs text-faint hover:text-accent" onClick={() => setLast(null)}>×</button>
+          <button aria-label="Remove" title="Remove" className="ml-auto text-xs text-faint hover:text-accent" onClick={() => setLast(null)}>×</button>
         </div>
       )}
     </div>

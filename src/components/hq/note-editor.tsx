@@ -30,13 +30,13 @@ export function NoteEditor({ note }: { note: NoteVM }) {
         <div className="card space-y-3 p-4">
           <div className="overline">About</div>
           <div className="text-sm">
-            {note.relationship ? <span>Person: <a href={`/hq/people/${note.relationship.id}`} className="font-medium hover:text-accent">{note.relationship.name}</a> <button className="text-xs text-faint hover:text-[#8a3a30]" onClick={() => void save({ relationshipId: null })}>×</button></span> : <PersonPicker placeholder="Link a person…" onPick={(p) => { if (p.relationshipId) void save({ relationshipId: p.relationshipId }); }} />}
+            {note.relationship ? <span>Person: <a href={`/hq/people/${note.relationship.id}`} className="font-medium hover:text-accent">{note.relationship.name}</a> <button aria-label="Remove" title="Remove" className="text-xs text-faint hover:text-danger" onClick={() => void save({ relationshipId: null })}>×</button></span> : <PersonPicker placeholder="Link a person…" onPick={(p) => { if (p.relationshipId) void save({ relationshipId: p.relationshipId }); }} />}
           </div>
           <div className="text-sm">
-            {note.pipeline ? <span>Card: <a href={`/hq/pipeline/${note.pipeline.id}`} className="font-medium hover:text-accent">{note.pipeline.title}</a> <button className="text-xs text-faint hover:text-[#8a3a30]" onClick={() => void save({ pipelineId: null })}>×</button></span> : <CardPicker placeholder="Link a pipeline card…" onPick={(c) => void save({ pipelineId: c.id })} />}
+            {note.pipeline ? <span>Card: <a href={`/hq/pipeline/${note.pipeline.id}`} className="font-medium hover:text-accent">{note.pipeline.title}</a> <button aria-label="Remove" title="Remove" className="text-xs text-faint hover:text-danger" onClick={() => void save({ pipelineId: null })}>×</button></span> : <CardPicker placeholder="Link a pipeline card…" onPick={(c) => void save({ pipelineId: c.id })} />}
           </div>
         </div>
-        <button className="text-xs text-faint hover:text-[#8a3a30]" disabled={pending} onClick={() => { if (confirm("Delete this note?")) start(async () => { await deleteNote(note.id); router.push("/hq/brain"); }); }}>Delete note</button>
+        <button className="text-xs text-faint hover:text-danger" disabled={pending} onClick={() => { if (confirm("Delete this note?")) start(async () => { await deleteNote(note.id); router.push("/hq/brain"); }); }}>Delete note</button>
       </div>
     </div>
   );

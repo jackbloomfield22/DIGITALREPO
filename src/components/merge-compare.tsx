@@ -52,7 +52,7 @@ export function MergeCompare({ type, a, b, rows }: { type: MergeableType; a: Sid
         <input type="radio" name="keep" className="mt-1" checked={keep === side} onChange={() => setKeep(side)} />
         <span>
           <span className="block font-semibold"><Link href={s.href} className="hover:underline">{s.name}</Link></span>
-          <span className="block text-[11px] font-normal text-muted">{keep === side ? "Kept" : "Archived as merged"} · {s.history} history entries{s.archived ? " · in the Archive" : ""}</span>
+          <span className="block text-xs font-normal text-muted">{keep === side ? "Kept" : "Archived as merged"} · {s.history} history entries{s.archived ? " · in the Archive" : ""}</span>
         </span>
       </label>
     </th>

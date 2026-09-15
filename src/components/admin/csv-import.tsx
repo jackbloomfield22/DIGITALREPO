@@ -79,7 +79,7 @@ export function CsvImport() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight">TALENT IMPORT</h1>
+      <h1 className="mb-1 font-display text-2xl font-bold tracking-tight">TALENT IMPORT</h1>
       <p className="mb-6 max-w-2xl text-sm text-muted">
         Bulk-add talent from a spreadsheet. Exports from creator tools (CreatorIQ and the like)
         work as-is — column names are matched loosely, <code>1.61M</code> and <code>646.95K</code>{" "}

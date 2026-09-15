@@ -106,7 +106,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         status={{ type: "project", value: project.status }} editHref={`${path}/edit`}
         badges={<KindBadge kind="project" />}
         media={<Portrait name={project.title} imageUrl={project.imageUrl} className="h-24 w-24 shrink-0 rounded-lg sm:h-28 sm:w-28" textClass="text-3xl" />}
-        subtitle={<p className="mt-2 max-w-2xl text-[15px] italic text-charcoal"><InlineField type="project" id={project.id} field={fieldNamed(all, "logline")} canEdit={canEdit} placeholder="Add a logline…" /></p>}
+        subtitle={<p className="mt-2 max-w-2xl text-sm italic text-charcoal"><InlineField type="project" id={project.id} field={fieldNamed(all, "logline")} canEdit={canEdit} placeholder="Add a logline…" /></p>}
         nav={<><RecordContext type="project" id={project.id} name={project.title} slug={project.slug} path={path} canEdit={canEdit} status={project.status} /><RecordStepper type="project" fallback={neighbors} /></>}
         actions={<AddToCollectionButton targetType="project" targetId={project.id} targetLabel={project.title} />}
         linkTargets={[{ key: "talent", label: "Talent" }, { key: "companies", label: "Companies" }, { key: "people", label: "People" }, { key: "topics", label: "Topics" }]}
@@ -141,7 +141,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <Highlights type="project" id={project.id} fields={highlights} canEdit={canEdit} />
             <UpdatePanel user={user} targetType="project" targetId={project.id} name={project.title} path={path} recordType="project" />
             <Section title="Description">
-              <InlineField type="project" id={project.id} field={fieldNamed(all, "description")} canEdit={canEdit} className="text-[15px] leading-relaxed" placeholder="What is this project? Add a description…" />
+              <InlineField type="project" id={project.id} field={fieldNamed(all, "description")} canEdit={canEdit} className="text-sm leading-relaxed" placeholder="What is this project? Add a description…" />
             </Section>
             {links.length > 0 && (
               <Section title="Links">

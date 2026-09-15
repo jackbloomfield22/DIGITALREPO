@@ -8,32 +8,13 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { matchSorter } from "match-sorter";
 import { Modal } from "@/components/overlay";
+import { Combobox, lookupItems } from "@/components/combobox";
 import { OPERATORS, conditionLabel, type Condition, type FilterField, type FilterOp, type FilterState } from "@/lib/filters";
-
-type LookupItem = { id: string; name: string; sub?: string };
-
-function useLookup(type: string | undefined, kind: string | undefined, q: string) {
-  const [result, setResult] = useState<{ q: string; items: LookupItem[] } | null>(null);
-  useEffect(() => {
-    if (!type) return;
-    const controller = new AbortController();
-    const t = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({ type, q });
-        if (kind) params.set("kind", kind);
-        const res = await fetch(`/api/lookup?${params}`, { signal: controller.signal });
-        if (res.ok) setResult({ q, items: (await res.json()) as LookupItem[] });
-      } catch { /* typed on */ }
-    }, 150);
-    return () => { clearTimeout(t); controller.abort(); };
-  }, [type, kind, q]);
-  return result?.q === q ? result.items : null;
-}
 
 function ValueEditor({ field, op, values, onChange, names }: { field: FilterField; op: FilterOp; values: string[]; onChange: (v: string[]) => void; names: Map<string, string> }) {
   const arity = OPERATORS[field.kind].find((o) => o.value === op)?.arity ?? 1;
   const [q, setQ] = useState("");
-  const items = useLookup(field.kind === "lookup" ? field.lookupType : undefined, field.lookupKind, q);
+  const fetchItems = useMemo(() => lookupItems(field.lookupType ?? "entity", field.lookupKind), [field.lookupType, field.lookupKind]);
   if (arity === 0) return null;
   if (field.kind === "select" || field.kind === "multiselect" || field.kind === "boolean") {
     const options = field.kind === "boolean" ? [{ value: "true", label: "Yes" }, { value: "false", label: "No" }] : field.options ?? [];
@@ -55,14 +36,18 @@ function ValueEditor({ field, op, values, onChange, names }: { field: FilterFiel
   if (field.kind === "lookup") {
     return (
       <div>
-        <input type="search" className="!min-h-9" placeholder={`Find ${field.label.toLowerCase()}…`} aria-label={`Find ${field.label.toLowerCase()}`} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-        {values.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{values.map((v) => <button type="button" key={v} className="chip !min-h-8" onClick={() => onChange(values.filter((x) => x !== v))} aria-label={`Remove ${names.get(v) ?? v}`}>{names.get(v) ?? v} <span aria-hidden>×</span></button>)}</div>}
-        <div className="mt-2 max-h-48 overflow-y-auto rounded-md border border-line">
-          {items === null ? <p className="p-2 text-sm text-muted" role="status">Loading…</p> : items.filter((i) => !values.includes(i.id)).map((i) => (
-            <button type="button" key={i.id} className="filter-option" onClick={() => { names.set(i.id, i.name); onChange([...values, i.id]); setQ(""); }}><span className="truncate">{i.name}</span>{i.sub && <span className="ml-auto truncate text-xs text-muted">{i.sub}</span>}</button>
-          ))}
-          {items && !items.length && <p className="p-2 text-sm text-muted">No matches.</p>}
-        </div>
+        {values.length > 0 && <div className="mb-2 flex flex-wrap gap-1">{values.map((v) => <button type="button" key={v} className="chip !min-h-8" onClick={() => onChange(values.filter((x) => x !== v))} aria-label={`Remove ${names.get(v) ?? v}`}>{names.get(v) ?? v} <span aria-hidden>×</span></button>)}</div>}
+        <Combobox
+          key={values.length}
+          autoFocus
+          aria-label={`Find ${field.label.toLowerCase()}`}
+          placeholder={`Find ${field.label.toLowerCase()}…`}
+          inputClassName="!min-h-9"
+          fetchItems={fetchItems}
+          exclude={values}
+          listClassName="rounded-md border border-line p-1"
+          onPick={(i) => { names.set(i.id, i.name); onChange([...values, i.id]); }}
+        />
       </div>
     );
   }

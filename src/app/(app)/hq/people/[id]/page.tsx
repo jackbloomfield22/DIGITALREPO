@@ -53,7 +53,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           </p>
         </div>
         <div className="text-right text-xs text-faint">
-          <div><span className={`font-semibold ${strength.label === "strong" ? "text-ok" : strength.label === "fading" || strength.label === "dormant" ? "text-[#8a3a30]" : "text-charcoal"}`}>{strength.label}</span> · {strength.score}/100</div>
+          <div><span className={`font-semibold ${strength.label === "strong" ? "text-ok" : strength.label === "fading" || strength.label === "dormant" ? "text-danger" : "text-charcoal"}`}>{strength.label}</span> · {strength.score}/100</div>
           <div>{strength.why}</div>
         </div>
       </div>

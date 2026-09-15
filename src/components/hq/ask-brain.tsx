@@ -39,7 +39,7 @@ export function AskBrain({ initial, capCents, spentCents }: { initial?: string; 
           </div>
         ))}
       </div>
-      {error && <div className="mt-2 text-sm text-[#8a3a30]">{error}</div>}
+      {error && <div className="mt-2 text-sm text-danger">{error}</div>}
       <div className="mt-2 flex gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask()} placeholder="A question only the live brain can answer — who, what, when, across everything." className="flex-1 text-sm" />
         <button className="btn btn-primary btn-sm" disabled={busy || !q.trim()} onClick={ask}>{busy ? "Thinking…" : "Ask"}</button>

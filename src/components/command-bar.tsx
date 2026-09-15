@@ -83,7 +83,8 @@ export function CommandPalette({ isEditor, isAdmin, isOwner, recents: initialRec
       list.push({ id: "copy", label: "Copy link to this record", run: async () => { await navigator.clipboard.writeText(window.location.origin + record.path); toast("Link copied."); } });
       list.push({ id: "fav", label: "Star / unstar this record", run: async () => { const r = await toggleFavorite(record.type, record.id); toast(r && "ok" in r && !r.ok ? "Could not update favorites." : "Favorites updated."); router.refresh(); } });
       if (record.canEdit) {
-        list.push({ id: "edit", label: "Edit this record", shortcut: "E", run: () => go(`${record.path}/edit`) });
+        list.push({ id: "edit", label: "Edit the name", shortcut: "E", run: () => { const name = document.querySelector<HTMLButtonElement>("h1 [data-inline-field]"); if (name) name.click(); else go(`${record.path}/edit`); } });
+        list.push({ id: "form", label: "Open the full form", run: () => go(`${record.path}/edit`) });
         if ((STATUS_TYPES as readonly string[]).includes(record.type)) list.push({ id: "status", label: "Change status…", shortcut: "S", keep: true, run: () => { setPage("status"); setQ(""); } });
         list.push({ id: "archive", label: "Archive this record", hint: "Restorable from the Archive", run: async () => { const r = await archiveRecord(record.type as ArchiveType, record.id); if (!r.ok) return toast(r.error ?? "Could not archive.", { tone: "error" }); toast(`${record.name} moved to the Archive.`); router.refresh(); } });
       }
@@ -122,7 +123,7 @@ export function CommandPalette({ isEditor, isAdmin, isOwner, recents: initialRec
           }}>
           <div className="flex items-center border-b border-line px-2">
             {page !== "root" && <span className="ml-2 rounded bg-wash px-2 py-0.5 text-xs text-muted">Status</span>}
-            <Command.Input autoFocus value={q} onValueChange={setQ} placeholder={page === "status" ? "Pick a status…" : "Search the Repo, or type a command…"} className="!border-0 !px-3 !py-4 !text-base focus:!outline-none" maxLength={200} />
+            <Command.Input autoFocus value={q} onValueChange={setQ} placeholder={page === "status" ? "Pick a status…" : "Search the Repo, or type a command…"} className="!border-0 !px-3 !py-4 !text-sm focus:!outline-none" maxLength={200} />
             <button className="btn btn-ghost px-3" aria-label="Close" onClick={() => setOpen(false)}>×</button>
           </div>
           <Command.List className="max-h-[60dvh] overflow-y-auto py-2">
@@ -141,7 +142,7 @@ export function CommandPalette({ isEditor, isAdmin, isOwner, recents: initialRec
                 <Command.Group heading="Recent" className="cmdk-group">
                   {recents.slice(0, 8).map((r) => { const v = `recent:${r.type}:${r.id}`; hrefByValue.set(v, r.href); return (
                     <Command.Item key={v} value={v} className="cmdk-item" onSelect={() => go(r.href)}>
-                      <span className="w-16 shrink-0 text-[11px] uppercase tracking-wide text-faint">{typeLabel(r.type)}</span><span className="truncate font-medium">{r.name}</span>{r.sub && <span className="ml-auto max-w-[40%] truncate text-xs text-muted">{r.sub}</span>}
+                      <span className="w-16 shrink-0 text-xs uppercase tracking-wide text-faint">{typeLabel(r.type)}</span><span className="truncate font-medium">{r.name}</span>{r.sub && <span className="ml-auto max-w-[40%] truncate text-xs text-muted">{r.sub}</span>}
                     </Command.Item>); })}
                 </Command.Group>
               )}
@@ -149,7 +150,7 @@ export function CommandPalette({ isEditor, isAdmin, isOwner, recents: initialRec
                 <Command.Group heading="Actions" className="cmdk-group">
                   {filteredActions.map((a) => (
                     <Command.Item key={a.id} value={`action:${a.id}`} className="cmdk-item" onSelect={async () => { if (!a.keep) setOpen(false); await a.run(); }}>
-                      <span className="truncate">{a.label}</span>{a.hint && <span className="truncate text-xs text-muted">{a.hint}</span>}{a.shortcut && <kbd className="ml-auto rounded border border-line px-1.5 text-[11px] text-faint">{a.shortcut}</kbd>}
+                      <span className="truncate">{a.label}</span>{a.hint && <span className="truncate text-xs text-muted">{a.hint}</span>}{a.shortcut && <kbd className="ml-auto rounded border border-line px-1.5 text-xs text-faint">{a.shortcut}</kbd>}
                     </Command.Item>
                   ))}
                 </Command.Group>
@@ -158,7 +159,7 @@ export function CommandPalette({ isEditor, isAdmin, isOwner, recents: initialRec
                 <Command.Group heading="Navigation" className="cmdk-group">
                   {filteredNav.map((n) => (
                     <Command.Item key={n.href} value={`nav:${n.href}`} className="cmdk-item" onSelect={() => go(n.href)}>
-                      <span className="truncate">Go to {n.label}</span>{n.sub && <span className="truncate text-xs text-muted">{n.sub}</span>}{n.shortcut && <kbd className="ml-auto rounded border border-line px-1.5 text-[11px] text-faint">{n.shortcut}</kbd>}
+                      <span className="truncate">Go to {n.label}</span>{n.sub && <span className="truncate text-xs text-muted">{n.sub}</span>}{n.shortcut && <kbd className="ml-auto rounded border border-line px-1.5 text-xs text-faint">{n.shortcut}</kbd>}
                     </Command.Item>
                   ))}
                   {filteredCreates.map((c) => (
@@ -172,7 +173,7 @@ export function CommandPalette({ isEditor, isAdmin, isOwner, recents: initialRec
                 <Command.Group key={g.type} heading={g.group} className="cmdk-group">
                   {g.items.map((r) => { const v = `rec:${r.type}:${r.id}`; hrefByValue.set(v, r.href); return (
                     <Command.Item key={v} value={v} className="cmdk-item" onSelect={() => go(r.href)}>
-                      <span className="w-16 shrink-0 text-[11px] uppercase tracking-wide text-faint">{typeLabel(r.type)}</span><span className="truncate font-medium">{r.label}</span><span className="ml-auto max-w-[45%] truncate text-xs text-muted">{r.archived ? "Archived" : r.sub}</span>
+                      <span className="w-16 shrink-0 text-xs uppercase tracking-wide text-faint">{typeLabel(r.type)}</span><span className="truncate font-medium">{r.label}</span><span className="ml-auto max-w-[45%] truncate text-xs text-muted">{r.archived ? "Archived" : r.sub}</span>
                     </Command.Item>); })}
                 </Command.Group>
               ))}
@@ -180,7 +181,7 @@ export function CommandPalette({ isEditor, isAdmin, isOwner, recents: initialRec
                 <Command.Item value="see-all" className="cmdk-item" onSelect={() => go(`/search?q=${encodeURIComponent(query)}`)}><span>No records match “{query}” — search everything, including the Archive</span></Command.Item>
               )}
               {query && results.length > 0 && (
-                <Command.Item value="see-all" className="cmdk-item text-accent-deep" onSelect={() => go(`/search?q=${encodeURIComponent(query)}`)}><span>See all results for “{query}”</span><kbd className="ml-auto rounded border border-line px-1.5 text-[11px] text-faint">/search</kbd></Command.Item>
+                <Command.Item value="see-all" className="cmdk-item text-accent-deep" onSelect={() => go(`/search?q=${encodeURIComponent(query)}`)}><span>See all results for “{query}”</span><kbd className="ml-auto rounded border border-line px-1.5 text-xs text-faint">/search</kbd></Command.Item>
               )}
             </>)}
           </Command.List>

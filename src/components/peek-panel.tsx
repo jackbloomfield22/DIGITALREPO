@@ -101,7 +101,7 @@ export function PeekPanel({ canEdit }: { canEdit: boolean }) {
         {!loading && data?.error && <p className="text-sm text-accent-deep">{data.error}</p>}
         {!loading && current && (
           <div>
-            <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-faint"><span>{current.typeLabel}</span>{current.archived && <span className="rounded bg-wash px-1.5 py-0.5 text-muted normal-case tracking-normal">Archived</span>}</div>
+            <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-wide text-faint"><span>{current.typeLabel}</span>{current.archived && <span className="rounded bg-wash px-1.5 py-0.5 text-muted normal-case tracking-normal">Archived</span>}</div>
             <h2 className="font-display text-2xl font-bold leading-tight"><Link href={current.href} className="hover:text-accent-deep">{current.name}</Link></h2>
             {current.status && <div className="mt-2"><StatusPill status={current.status} label={labelFor(current.status)} /></div>}
             {current.fields.length > 0 && (

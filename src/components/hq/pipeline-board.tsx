@@ -31,10 +31,10 @@ function Card({ card, onDrag }: { card: CardVM; onDrag: (id: string) => void }) 
       {card.nextStep ? (
         <div className="mt-1 text-xs text-charcoal">
           → {card.nextStep}
-          {dueSoon !== null && <span className={`ml-1 ${dueSoon < 0 ? "text-[#8a3a30] font-medium" : dueSoon <= 2 ? "text-accent-deep" : "text-faint"}`}>{dueSoon < 0 ? `${-dueSoon}d late` : dueSoon === 0 ? "today" : `${dueSoon}d`}</span>}
+          {dueSoon !== null && <span className={`ml-1 ${dueSoon < 0 ? "text-danger font-medium" : dueSoon <= 2 ? "text-accent-deep" : "text-faint"}`}>{dueSoon < 0 ? `${-dueSoon}d late` : dueSoon === 0 ? "today" : `${dueSoon}d`}</span>}
         </div>
       ) : (
-        <div className="mt-1 text-xs text-[#8a3a30]">no next step</div>
+        <div className="mt-1 text-xs text-danger">no next step</div>
       )}
       <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-faint">
         {decision.length > 0 && <span className="text-muted">{decision.map((c) => c.name).join(", ")}</span>}

@@ -37,6 +37,8 @@ export function Shortcuts({ isEditor }: { isEditor: boolean }) {
       if ((key === "c" || key === "C") && isEditor) { const section = "/" + (pathname.split("/")[1] ?? ""); if (CREATE_FOR_SECTION[section] || section === "/") { e.preventDefault(); window.dispatchEvent(new CustomEvent("open-create", { detail: { section } })); } return; }
       if ((key === "n" || key === "N") && isEditor && document.querySelector("[data-inline-field]")) { e.preventDefault(); window.dispatchEvent(new CustomEvent("open-quick-capture")); return; }
       if ((key === "e" || key === "E") && isEditor) { const name = document.querySelector<HTMLButtonElement>('h1 [data-inline-field]'); if (name) { e.preventDefault(); name.click(); } return; }
+      if ((key === "s" || key === "S") && isEditor) { const sel = document.querySelector<HTMLSelectElement>("h1 ~ * [data-status-select], header [data-status-select]"); if (sel) { e.preventDefault(); sel.focus(); (sel as HTMLSelectElement & { showPicker?: () => void }).showPicker?.(); } return; }
+      if (key === "[" && document.querySelector("[data-inline-field], .record-grid")) { e.preventDefault(); window.dispatchEvent(new CustomEvent("toggle-details")); return; }
       if ((key === "l" || key === "L") && isEditor) { const add = document.querySelector<HTMLButtonElement>("[data-add-link]"); if (add) { e.preventDefault(); add.click(); add.scrollIntoView({ block: "center" }); } return; }
       if (key === "f" || key === "F") { window.dispatchEvent(new CustomEvent("open-filters")); return; }
     };
@@ -51,12 +53,12 @@ export function Shortcuts({ isEditor }: { isEditor: boolean }) {
     ["G then T / P / C / F / O", "Go to Talent / Projects / Companies / Formats / Opportunities"], ["G then H / I / A", "Go Home / Ingest / Archive"],
     ["↑ ↓ (side panel)", "Previous / next record"], ["← →", "Previous / next record on a record page"], ["F", "Open filters on a list"],
     ["J / K", "Move down / up a list row"], ["X", "Select the focused row"], ["Space", "Peek at the focused row"], ["Enter", "Open the focused row"],
-    ["E", "Edit the name of the record you are on"], ["N", "New note on this record"], ["L", "Link a record (opens the add box on the current tab)"], ["S", "Change status on a record page"], ["Esc", "Cancel an editor, then close the palette, then the side panel, then clear a selection"],
+    ["E", "Edit the name of the record you are on"], ["N", "New note on this record"], ["L", "Link a record (opens the add box on the current tab)"], ["S", "Change status on a record page"], ["[", "Hide or show the Details column"], ["Esc", "Cancel an editor, then close the palette, then the side panel, then clear a selection"],
   ];
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4"><div className="absolute inset-0 bg-ink/40" aria-hidden onClick={() => setHelp(false)} />
       <div ref={panel} role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" tabIndex={-1} className="relative max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-lg bg-surface p-5 shadow-pop">
-        <div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold">Keyboard shortcuts</h2><button className="btn btn-ghost btn-sm" onClick={() => setHelp(false)} aria-label="Close">×</button></div>
+        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Keyboard shortcuts</h2><button className="btn btn-ghost btn-sm" onClick={() => setHelp(false)} aria-label="Close">×</button></div>
         <dl className="grid grid-cols-[minmax(9rem,auto)_1fr] gap-x-4 gap-y-2 text-sm">{rows.map(([k, v]) => <div key={k} className="contents"><dt><kbd className="rounded border border-line bg-wash px-1.5 py-0.5 text-xs">{k}</kbd></dt><dd className="text-charcoal">{v}</dd></div>)}</dl>
       </div>
     </div>, document.body);
