@@ -131,13 +131,54 @@ fields, verification and history work.
 
 ### What is waiting on you
 
-1. **Take a Neon branch before Phase 3 ships.** In the Neon console, open the
+1. **Check whether the Phase 3 migration has already reached production, and
+   tell me.** This is the one thing I could not settle from here. Vercel builds
+   a preview for every push to the branch, and that preview runs the same build
+   script production does, which runs `prisma migrate deploy` before anything
+   else. So each preview of this branch has run the Phase 3 migration against
+   whatever database the Preview environment is pointed at. If Preview and
+   Production share one `DATABASE_URL` — which is the default for the Vercel
+   Neon integration unless database branching is turned on — then production
+   already has the Phase 3 schema, applied before the snapshot the rule asks
+   for. I cannot reach Vercel or Neon from where I work, so I cannot tell which
+   it is.
+
+   Nothing is lost either way. The migration only adds: new tables, new
+   nullable columns, and rows in those new tables. It does not change or remove
+   a single existing record, field value or relationship, and the code running
+   on production does not read the new columns, so the app behaves exactly as
+   it did. But you should know, and you should check.
+
+   In the Neon console, open the production database's SQL editor and run:
+
+   ```sql
+   select migration_name, finished_at, rolled_back_at
+   from "_prisma_migrations"
+   order by started_at desc
+   limit 5;
+   ```
+
+   If `20260915192543_refresh_options_fields_verification` is in that list with
+   a `finished_at` and no `rolled_back_at`, it is already applied. Then also run
+   `select count(*) from "Option";` and `select count(*) from
+   "FieldDefinition";` — 245 and 26 are the expected numbers.
+
+   Two things worth doing in Vercel regardless: check whether Preview and
+   Production point at the same database (Settings → Environment Variables,
+   look at which environments `DATABASE_URL` is set for), and if they do,
+   either give Preview its own database or turn off preview deploys for
+   branches. A preview build should never be able to migrate production.
+
+2. **Take a Neon branch before Phase 3 ships.** In the Neon console, open the
    production project → Branches → Create branch from `main`, and name it
    something like `before-refresh-phase-3`. Then say so, and the branch merges
    to `main`; the deploy applies
    `prisma/migrations/20260915192543_refresh_options_fields_verification`,
-   which is additive only and ships with a `down.sql`.
-2. **Rotate the Neon `neondb_owner` password.** It was shared in chat during
+   which is additive only and ships with a `down.sql`. The preview builds of
+   that branch were failing on a build-script problem; that is found, fixed and
+   covered by a test, and the whole production build now runs clean against a
+   database built from nothing by the migrations.
+3. **Rotate the Neon `neondb_owner` password.** It was shared in chat during
    this work, and this repository is public.
 
 ### A short list for a follow-up pass
@@ -348,6 +389,17 @@ branch.
   by option id (see the summary at the top); `AuditLog` remains the history,
   with no Postgres audit trigger; quick-create still shows only the essentials,
   so custom fields do not appear there yet.
+- **A build break the preview deploys caught.** The Vercel build runs several
+  scripts through `tsx` in plain Node, outside Next's module resolution. Phase 3
+  made the digest rebuild reach the custom-fields module, which carried an
+  `import "server-only"` — a guard Next resolves and Node cannot. Every preview
+  build of this branch failed on it, and the production build would have failed
+  the same way on merge. The guard came off the two modules in that path (the
+  database import already keeps them off the client, as it does for the digest
+  module beside them), and `tests/build-scripts.test.ts` now walks the import
+  graph of every script the build runs and fails if any of them reaches a
+  guarded module again. The whole build script was then run end to end against
+  a database built from nothing by the migrations: clean.
 
 ### Phase 4 — shipped
 
