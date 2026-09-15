@@ -28,7 +28,9 @@ export type BulkOp =
   | { kind: "status"; status: string }
   | { kind: "archive" }
   | { kind: "tag"; entityId: string; entityName?: string }
-  | { kind: "field"; field: string; value: unknown };
+  | { kind: "field"; field: string; value: unknown }
+  | { kind: "verify" }
+  | { kind: "owner"; userId: string; userName?: string };
 export type BulkResult = { ok: true; changed: number; batchId: string; label: string } | { ok: false; error: string };
 type Undo = { type: string; id: string; before: Record<string, unknown>; link?: LinkPayload };
 
@@ -78,6 +80,16 @@ export async function bulkApply(type: string, ids: string[], op: BulkOp): Promis
         await table.update({ where: { id }, data: { [fieldSpec.name]: fieldValue.value, ...(spec.hasVersion ? { version: { increment: 1 } } : {}) } });
         await logAudit(user, { targetType: type, targetId: id, targetLabel: label, action: "updated", field: fieldSpec.name, oldValue: displayValue(view, before).slice(0, 300) || null, newValue: displayValue(view, fieldValue.plain).slice(0, 300) || null });
         undo.push({ type, id, before: { [fieldSpec.name]: row[fieldSpec.name] ?? null } });
+      } else if (op.kind === "verify") {
+        const now = new Date();
+        await table.update({ where: { id }, data: { verifiedAt: now, verifiedBy: user.name, ...(type === "creator" || type === "project" ? { lastVerifiedAt: now } : {}) } });
+        await logAudit(user, { targetType: type, targetId: id, targetLabel: label, action: "verified", newValue: now.toISOString() });
+        undo.push({ type, id, before: { verifiedAt: row.verifiedAt ?? null, verifiedBy: row.verifiedBy ?? null } });
+      } else if (op.kind === "owner") {
+        if (row.ownerId === op.userId) continue;
+        await table.update({ where: { id }, data: { ownerId: op.userId } });
+        await logAudit(user, { targetType: type, targetId: id, targetLabel: label, action: "updated", field: "owner", newValue: op.userName ?? op.userId });
+        undo.push({ type, id, before: { ownerId: row.ownerId ?? null } });
       } else if (op.kind === "tag") {
         const payload = { kind: TAG_KIND[type], [`${type}Id`]: id, entityId: op.entityId } as unknown as LinkPayload;
         await upsertLink(payload);
@@ -95,6 +107,8 @@ export async function bulkApply(type: string, ids: string[], op: BulkOp): Promis
     const statusLabel = wanted ? (statusOptionsFor(type as StatusType).find((s) => s.value === wanted)?.label ?? wanted) : "";
     const label = op.kind === "status" ? `status → ${statusLabel}`
       : op.kind === "archive" ? "moved to the Archive"
+      : op.kind === "verify" ? "verified"
+      : op.kind === "owner" ? `owner → ${op.userName ?? "set"}`
       : op.kind === "field" ? `${fieldSpec?.label.toLowerCase() ?? op.field} → ${fieldValue ? displayValue({ kind: fieldSpec!.kind, options: fieldSpec!.vocab?.() }, fieldValue.plain) || "empty" : ""}`
       : `tagged ${op.entityName ?? ""}`.trim();
     return { ok: true, changed, batchId, label };

@@ -2,6 +2,8 @@
 // strings in the database; labels are how they render in the UI. Adding a new
 // value here is all that's needed to extend the vocabulary — no migration.
 
+import { optionLabel } from "@/lib/option-cache";
+
 export type LabeledValue = { value: string; label: string };
 
 const label = (value: string) =>
@@ -14,7 +16,7 @@ const mk = (values: string[]): LabeledValue[] =>
   values.map((value) => ({ value, label: label(value) }));
 
 export const labelFor = (value: string | null | undefined): string =>
-  value ? label(value) : "";
+  value ? optionLabel(value) ?? label(value) : "";
 
 // --- Entity taxonomy kinds ---------------------------------------------------
 

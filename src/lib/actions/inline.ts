@@ -14,6 +14,9 @@ import { logAudit } from "@/lib/audit";
 import { queueAirtableSync } from "@/lib/airtable/sync";
 import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
 import { coerceField, displayValue, plainValue, sameValue, type DetailField } from "@/lib/record-fields";
+import { coerceCustom, customDetailField, fieldDefinitions, isCustomFieldName } from "@/lib/custom-fields";
+import type { RecordSpec } from "@/lib/ingest/registry";
+import type { SessionUser } from "@/lib/roles";
 
 export type SetFieldResult =
   | { ok: true; version: number | null; value: DetailField["value"]; changed: boolean }
@@ -38,6 +41,7 @@ export async function setField(input: {
     const user = await requireRole("EDITOR");
     const spec = RECORD_REGISTRY[input.type as IngestTargetType];
     if (!spec) return { ok: false, error: "Unknown record type." };
+    if (isCustomFieldName(input.field)) return setCustomField(user, spec, input);
     const isName = input.field === spec.nameField;
     const field = isName
       ? { name: spec.nameField, label: "Name", kind: "text" as const, maxLength: 300 }
@@ -83,4 +87,33 @@ export async function setField(input: {
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not save that." };
   }
+}
+
+/** A value under Settings → Fields: validated by its definition, written into `custom`. */
+async function setCustomField(user: SessionUser, spec: RecordSpec, input: { type: string; id: string; field: string; value: unknown; expectedVersion?: number | null }): Promise<SetFieldResult> {
+  const key = input.field.slice("custom.".length);
+  const def = (await fieldDefinitions(input.type)).find((d) => d.key === key);
+  if (!def) return { ok: false, error: "That field no longer exists." };
+  const coerced = await coerceCustom(def, input.value);
+  if (!coerced.ok) return { ok: false, error: coerced.error };
+  const model = modelFor(spec.prismaModel);
+  const current = await model.findUnique({ where: { id: input.id } });
+  if (!current) return { ok: false, error: "That record is no longer here." };
+  const version: number | null = spec.hasVersion ? Number(current.version) : null;
+  if (spec.hasVersion && input.expectedVersion != null && version !== input.expectedVersion) {
+    return { ok: false, error: "This record changed since you opened it.", conflict: { editedBy: await lastEditor(input.type, input.id), version: version! } };
+  }
+  const custom = { ...((current.custom ?? {}) as Record<string, unknown>) };
+  const view = await customDetailField(def, custom);
+  const before = view.value;
+  if (sameValue(before, coerced.plain)) return { ok: true, version, value: before, changed: false };
+  if (coerced.value == null) delete custom[key]; else custom[key] = coerced.value;
+  const updated = await model.update({ where: { id: input.id }, data: { custom, ...(spec.hasVersion ? { version: { increment: 1 } } : {}) } });
+  await logAudit(user, {
+    targetType: input.type, targetId: input.id, targetLabel: String(updated[spec.nameField] ?? ""), action: "updated", field: def.name,
+    oldValue: displayValue(view, before).slice(0, 300) || null, newValue: displayValue(view, coerced.plain).slice(0, 300) || null,
+  });
+  await queueAirtableSync(input.type, input.id);
+  revalidatePath("/", "layout");
+  return { ok: true, version: spec.hasVersion ? Number(updated.version) : null, value: coerced.plain, changed: true };
 }

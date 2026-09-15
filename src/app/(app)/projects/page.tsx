@@ -16,16 +16,18 @@ import { Pagination } from "@/components/pagination";
 import { RowStatus } from "@/components/row-status";
 import { statusOptionsFor } from "@/lib/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
+import { customCells, customColumns, customFieldMaps, customFilterFields } from "@/lib/custom-fields";
+import { optionList } from "@/lib/option-cache";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
 import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 
 export const metadata = { title: "Projects" };
 
-const FIELDS: FilterField[] = [
-  { key: "status", label: "Status", kind: "select", options: PROJECT_STATUSES, legacy: "status" },
-  { key: "type", label: "Project type", kind: "select", options: PROJECT_TYPES, legacy: "type" },
+const baseFields = (): FilterField[] => [
+  { key: "status", label: "Status", kind: "select", options: optionList("project_status", PROJECT_STATUSES), legacy: "status" },
+  { key: "type", label: "Project type", kind: "select", options: optionList("project_type", PROJECT_TYPES), legacy: "type" },
   { key: "talent", label: "Talent", kind: "lookup", lookupType: "creator", legacy: "creator" },
-  { key: "role", label: "Talent role", kind: "select", options: PROJECT_ROLES, legacy: "role" },
+  { key: "role", label: "Talent role", kind: "select", options: optionList("project_role", PROJECT_ROLES), legacy: "role" },
   { key: "company", label: "Company / network / brand", kind: "lookup", lookupType: "organization", legacy: "org" },
   { key: "person", label: "Industry person", kind: "lookup", lookupType: "person" },
   { key: "topic", label: "Genre / topic", kind: "lookup", lookupType: "entity", legacy: "entity" },
@@ -33,7 +35,7 @@ const FIELDS: FilterField[] = [
   { key: "activity", label: "Last activity", kind: "date" },
   { key: "updated", label: "Updated", kind: "date" },
 ];
-const MAPS: Record<string, FieldMap> = {
+const BASE_MAPS: Record<string, FieldMap> = {
   status: { column: "status" }, type: { column: "projectType" }, year: { column: "premiereYear", kind: "number" },
   talent: { relation: "credits", idField: "creatorId" }, role: { custom: (c) => c.op === "is" ? { credits: { some: { role: c.values[0] } } } : c.op === "any" ? { credits: { some: { role: { in: c.values } } } } : c.op === "is_not" ? { credits: { none: { role: c.values[0] } } } : c.op === "none" ? { credits: { none: { role: { in: c.values } } } } : null },
   company: { relation: "organizations", idField: "organizationId" }, person: { relation: "people", idField: "personId" }, topic: { relation: "entityLinks", idField: "entityId" },
@@ -50,6 +52,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   await sweepQuietRecordsThrottled();
   const user = await requireUser();
   const params = await searchParams;
+  const FIELDS = [...baseFields(), ...(await customFilterFields("project"))];
+  const MAPS = { ...BASE_MAPS, ...(await customFieldMaps("project")) };
+  const customCols = await customColumns("project");
   const q = firstParam(params.q)?.trim();
   const sort = parseSort(firstParam(params.sort), "date-desc");
   const state = parseFilterParams(params, FIELDS);
@@ -75,6 +80,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   ]);
   const canEdit = hasRole(user, "EDITOR");
 
+  const customByRow = await Promise.all(projects.map((r) => customCells("project", r.custom)));
   return (
     <div>
       <DirectoryControls showArchived={showArchived(params)}
@@ -95,6 +101,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         <RecordTable
           sort={sort} view="projects" recordType="project" selectable={canEdit} matchingIds={ids} statuses={statusOptionsFor("project")} taggable
           columns={[
+            ...customCols,
             { key: "title", label: "Project", sortKey: "title" },
             { key: "status", label: "Status", sortKey: "status", filterKey: "status" },
             { key: "activity", label: "Last activity", sortKey: "date", filterKey: "activity" },
@@ -104,7 +111,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             { key: "companies", label: "Companies", filterKey: "company", showAt: "hidden lg:table-cell" },
             { key: "updated", label: "Updated", sortKey: "updated", filterKey: "updated", showAt: "hidden xl:table-cell" },
           ]}
-          rows={projects.map((p) => ({
+          rows={projects.map((p, i) => ({
             id: p.id, href: `/projects/${p.slug}`, archived: p.archived, peek: { type: "project", id: p.id },
             cells: [
               <span key="t">{p.title}{p.logline && <span className="block text-xs font-normal text-muted line-clamp-1">{p.logline}</span>}</span>,
@@ -115,6 +122,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               <span key="c" className="line-clamp-1 text-muted">{[...new Set(p.credits.map((c) => c.creator.name))].join(", ")}</span>,
               <span key="o" className="line-clamp-1 text-muted">{[...new Set(p.organizations.map((o) => o.organization.name))].join(", ")}</span>,
               <span key="u" className="whitespace-nowrap text-muted">{relativeTime(p.updatedAt)}</span>,
+              ...customByRow[i].map((v, j) => <span key={`c${j}`} className="text-muted">{v || <span className="text-faint">—</span>}</span>),
             ],
           }))}
         />

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OPTION_COLOR_CLASS, optionColor, type OptionColor } from "@/lib/option-cache";
 import type { ReactNode } from "react";
 
 /** Interactive relational chip — links into the knowledge graph. */
@@ -186,7 +187,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function StatusPill({ status, label }: { status: string; label: string }) {
-  const cls = STATUS_COLORS[status] ?? "bg-wash text-muted";
+  const color = optionColor(status) as OptionColor | null;
+  const cls = (color && OPTION_COLOR_CLASS[color]) ?? STATUS_COLORS[status] ?? "bg-wash text-muted";
   return (
     <span
       className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${cls}`}

@@ -15,14 +15,16 @@ import { Pagination } from "@/components/pagination";
 import { RowStatus } from "@/components/row-status";
 import { statusOptionsFor } from "@/lib/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
+import { customCells, customColumns, customFieldMaps, customFilterFields } from "@/lib/custom-fields";
+import { optionList } from "@/lib/option-cache";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
 import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 
 export const metadata = { title: "Opportunities" };
 
-const FIELDS: FilterField[] = [
-  { key: "status", label: "Status", kind: "select", options: OPPORTUNITY_STATUSES, legacy: "status" },
-  { key: "type", label: "Type", kind: "select", options: OPPORTUNITY_TYPES, legacy: "type" },
+const baseFields = (): FilterField[] => [
+  { key: "status", label: "Status", kind: "select", options: optionList("opportunity_status", OPPORTUNITY_STATUSES), legacy: "status" },
+  { key: "type", label: "Type", kind: "select", options: optionList("opportunity_type", OPPORTUNITY_TYPES), legacy: "type" },
   { key: "talent", label: "Talent", kind: "lookup", lookupType: "creator" },
   { key: "company", label: "Company", kind: "lookup", lookupType: "organization" },
   { key: "topic", label: "Topic", kind: "lookup", lookupType: "entity" },
@@ -30,7 +32,7 @@ const FIELDS: FilterField[] = [
   { key: "activity", label: "Last activity", kind: "date" },
   { key: "updated", label: "Updated", kind: "date" },
 ];
-const MAPS: Record<string, FieldMap> = {
+const BASE_MAPS: Record<string, FieldMap> = {
   status: { column: "status" }, type: { column: "type" }, deadline: { column: "deadline", kind: "date" },
   talent: { relation: "creators", idField: "creatorId" }, company: { relation: "organizations", idField: "organizationId" }, topic: { relation: "entityLinks", idField: "entityId" },
   activity: { column: "lastActivityAt", kind: "date" }, updated: { column: "updatedAt", kind: "date" },
@@ -45,6 +47,9 @@ const DEFAULT_VIEWS = [
 export default async function OpportunitiesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requireUser();
   const params = await searchParams;
+  const FIELDS = [...baseFields(), ...(await customFilterFields("opportunity"))];
+  const MAPS = { ...BASE_MAPS, ...(await customFieldMaps("opportunity")) };
+  const customCols = await customColumns("opportunity");
   const q = firstParam(params.q)?.trim();
   const sort = parseSort(firstParam(params.sort), "date-desc");
   const state = parseFilterParams(params, FIELDS);
@@ -66,6 +71,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   ]);
   const canEdit = hasRole(user, "EDITOR");
 
+  const customByRow = await Promise.all(opportunities.map((r) => customCells("opportunity", r.custom)));
   return (
     <div>
       <DirectoryControls showArchived={showArchived(params)}
@@ -78,6 +84,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
           sort={sort} view="opportunities" recordType="opportunity" selectable={canEdit} matchingIds={ids} statuses={statusOptionsFor("opportunity")} taggable
           empty={q || state.and.length || state.or.length ? "No opportunities match these filters." : "No opportunities yet. Briefs, asks and open doors live here."}
           columns={[
+            ...customCols,
             { key: "title", label: "Opportunity", sortKey: "title" },
             { key: "status", label: "Status", sortKey: "status", filterKey: "status" },
             { key: "activity", label: "Last activity", sortKey: "date", filterKey: "activity" },
@@ -86,7 +93,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
             { key: "topics", label: "Topics", filterKey: "topic", showAt: "hidden lg:table-cell" },
             { key: "updated", label: "Updated", sortKey: "updated", filterKey: "updated", showAt: "hidden xl:table-cell" },
           ]}
-          rows={opportunities.map((o) => ({
+          rows={opportunities.map((o, i) => ({
             id: o.id, href: `/opportunities/${o.slug}`, archived: o.archived, peek: { type: "opportunity", id: o.id },
             cells: [
               <span key="t">{o.title}{o.description && <span className="block text-xs font-normal text-muted line-clamp-1">{o.description}</span>}</span>,
@@ -96,6 +103,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
               <span key="due" className="whitespace-nowrap text-muted">{o.deadline ? formatDate(o.deadline) : <span className="text-faint">—</span>}</span>,
               <span key="e" className="line-clamp-1 text-muted">{o.entityLinks.map((l) => l.entity.name).join(", ")}</span>,
               <span key="u" className="whitespace-nowrap text-muted">{relativeTime(o.updatedAt)}</span>,
+              ...customByRow[i].map((v, j) => <span key={`c${j}`} className="text-muted">{v || <span className="text-faint">—</span>}</span>),
             ],
           }))}
         />

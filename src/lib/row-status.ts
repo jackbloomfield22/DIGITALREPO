@@ -11,12 +11,13 @@ import {
   PROJECT_STATUSES,
   type LabeledValue,
 } from "@/lib/taxonomy";
+import { optionList } from "@/lib/option-cache";
 
 export const STATUS_TYPES = ["project", "format", "opportunity", "creator", "channel"] as const;
 export type StatusType = (typeof STATUS_TYPES)[number];
 export type ArchiveType = StatusType | "organization" | "person";
 
-const ALL: Record<StatusType, LabeledValue[]> = {
+const FALLBACK: Record<StatusType, LabeledValue[]> = {
   project: PROJECT_STATUSES,
   format: FORMAT_STATUSES,
   opportunity: OPPORTUNITY_STATUSES,
@@ -24,10 +25,15 @@ const ALL: Record<StatusType, LabeledValue[]> = {
   channel: CHANNEL_STATUSES,
 };
 
+/** The option set each status column reads from. */
+export const STATUS_SET: Record<StatusType, string> = {
+  project: "project_status", format: "format_status", opportunity: "opportunity_status", creator: "creator_status", channel: "channel_status",
+};
+
 export function allStatuses(type: StatusType): LabeledValue[] {
-  return ALL[type];
+  return optionList(STATUS_SET[type], FALLBACK[type]);
 }
 
 export function statusOptionsFor(type: StatusType): LabeledValue[] {
-  return ALL[type].filter((s) => s.value !== "archived");
+  return allStatuses(type).filter((s) => s.value !== "archived");
 }

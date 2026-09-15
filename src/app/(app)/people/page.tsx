@@ -13,20 +13,22 @@ import { orderForPeople, parseSort } from "@/lib/directory-sort";
 import { Pagination } from "@/components/pagination";
 import { RowArchive } from "@/components/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
+import { customCells, customColumns, customFieldMaps, customFilterFields } from "@/lib/custom-fields";
+import { optionList } from "@/lib/option-cache";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
 import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 
 export const metadata = { title: "Industry People" };
 
-const FIELDS: FilterField[] = [
-  { key: "role", label: "Role", kind: "select", options: PERSON_ROLE_TYPES, legacy: "role" },
+const baseFields = (): FilterField[] => [
+  { key: "role", label: "Role", kind: "select", options: optionList("person_role_type", PERSON_ROLE_TYPES), legacy: "role" },
   { key: "company", label: "Company", kind: "lookup", lookupType: "organization", legacy: "org" },
   { key: "talent", label: "Represents / works with", kind: "lookup", lookupType: "creator" },
   { key: "title", label: "Job title", kind: "text" },
   { key: "email", label: "Email", kind: "text" },
   { key: "updated", label: "Updated", kind: "date" },
 ];
-const MAPS: Record<string, FieldMap> = {
+const BASE_MAPS: Record<string, FieldMap> = {
   role: { column: "roleType" }, title: { column: "title" }, email: { column: "email" },
   company: { relation: "organizations", idField: "organizationId" }, talent: { relation: "creators", idField: "creatorId" },
   updated: { column: "updatedAt", kind: "date" },
@@ -41,6 +43,9 @@ const DEFAULT_VIEWS = [
 export default async function PeoplePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requireUser();
   const params = await searchParams;
+  const FIELDS = [...baseFields(), ...(await customFilterFields("person"))];
+  const MAPS = { ...BASE_MAPS, ...(await customFieldMaps("person")) };
+  const customCols = await customColumns("person");
   const q = firstParam(params.q)?.trim();
   const sort = parseSort(firstParam(params.sort), "name");
   const state = parseFilterParams(params, FIELDS);
@@ -62,6 +67,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     filterNames(FIELDS, state),
   ]);
 
+  const customByRow = await Promise.all(people.map((r) => customCells("person", r.custom)));
   return (
     <div>
       <DirectoryControls showArchived={showArchived(params)}
@@ -74,6 +80,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
           sort={sort} view="people" recordType="person" selectable={canEdit} matchingIds={ids}
           empty={q || state.and.length || state.or.length ? "No people match these filters." : "No industry people yet. Agents, managers, executives and contacts live here."}
           columns={[
+            ...customCols,
             { key: "name", label: "Name", sortKey: "name" },
             { key: "title", label: "Title", sortKey: "title", filterKey: "title" },
             { key: "role", label: "Role", sortKey: "role", filterKey: "role", showAt: "hidden sm:table-cell" },
@@ -83,7 +90,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
             { key: "updated", label: "Updated", sortKey: "updated", filterKey: "updated", showAt: "hidden xl:table-cell" },
             { key: "actions", label: "", align: "right" },
           ]}
-          rows={people.map((p) => ({
+          rows={people.map((p, i) => ({
             id: p.id, href: `/people/${p.slug}`, archived: p.archived, peek: { type: "person", id: p.id },
             cells: [
               <span key="n">{p.name}</span>,
@@ -94,6 +101,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
               <span key="p" className="tabular-nums text-muted">{p._count.projects || <span className="text-faint">—</span>}</span>,
               <span key="u" className="whitespace-nowrap text-muted">{relativeTime(p.updatedAt)}</span>,
               <RowArchive key="a" type="person" id={p.id} name={p.name} canEdit={canEdit} />,
+              ...customByRow[i].map((v, j) => <span key={`c${j}`} className="text-muted">{v || <span className="text-faint">—</span>}</span>),
             ],
           }))}
         />

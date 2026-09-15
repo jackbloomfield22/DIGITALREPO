@@ -15,15 +15,17 @@ import { orderForFormats, parseSort } from "@/lib/directory-sort";
 import { Pagination } from "@/components/pagination";
 import { RowStatus } from "@/components/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
+import { customCells, customColumns, customFieldMaps, customFilterFields } from "@/lib/custom-fields";
+import { optionList } from "@/lib/option-cache";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
 import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 import { statusOptionsFor } from "@/lib/row-status";
 
 export const metadata = { title: "Formats" };
 
-const FIELDS: FilterField[] = [
-  { key: "status", label: "Status", kind: "select", options: FORMAT_STATUSES, legacy: "status" },
-  { key: "type", label: "Format type", kind: "select", options: FORMAT_TYPES, legacy: "type" },
+const baseFields = (): FilterField[] => [
+  { key: "status", label: "Status", kind: "select", options: optionList("format_status", FORMAT_STATUSES), legacy: "status" },
+  { key: "type", label: "Format type", kind: "select", options: optionList("format_type", FORMAT_TYPES), legacy: "type" },
   { key: "talent", label: "Talent", kind: "lookup", lookupType: "creator", legacy: "creator" },
   { key: "company", label: "Company / brand", kind: "lookup", lookupType: "organization", legacy: "org" },
   { key: "person", label: "Industry person", kind: "lookup", lookupType: "person" },
@@ -33,7 +35,7 @@ const FIELDS: FilterField[] = [
   { key: "activity", label: "Last activity", kind: "date" },
   { key: "updated", label: "Updated", kind: "date" },
 ];
-const MAPS: Record<string, FieldMap> = {
+const BASE_MAPS: Record<string, FieldMap> = {
   status: { column: "status" }, type: { column: "formatType" }, platform: { column: "targetPlatform" }, location: { column: "location" },
   talent: { relation: "creators", idField: "creatorId" }, company: { relation: "organizations", idField: "organizationId" },
   person: { relation: "people", idField: "personId" }, topic: { relation: "entityLinks", idField: "entityId" },
@@ -50,6 +52,9 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
   await sweepQuietRecordsThrottled();
   const user = await requireUser();
   const params = await searchParams;
+  const FIELDS = [...baseFields(), ...(await customFilterFields("format"))];
+  const MAPS = { ...BASE_MAPS, ...(await customFieldMaps("format")) };
+  const customCols = await customColumns("format");
   const q = firstParam(params.q)?.trim();
   const sort = parseSort(firstParam(params.sort), "date-desc");
   const state = parseFilterParams(params, FIELDS);
@@ -74,6 +79,7 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
   ]);
   const canEdit = hasRole(user, "EDITOR");
 
+  const customByRow = await Promise.all(formats.map((r) => customCells("format", r.custom)));
   return (
     <div>
       <DirectoryControls showArchived={showArchived(params)} archivedCount={archivedCount}
@@ -94,6 +100,7 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
         <RecordTable
           sort={sort} view="formats" recordType="format" selectable={canEdit} matchingIds={ids} statuses={statusOptionsFor("format")} taggable
           columns={[
+            ...customCols,
             { key: "title", label: "Format", sortKey: "title" },
             { key: "status", label: "Status", sortKey: "status", filterKey: "status" },
             { key: "activity", label: "Last activity", sortKey: "date", filterKey: "activity" },
@@ -102,7 +109,7 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
             { key: "topics", label: "Topics", filterKey: "topic", showAt: "hidden lg:table-cell" },
             { key: "updated", label: "Updated", sortKey: "updated", filterKey: "updated", showAt: "hidden xl:table-cell" },
           ]}
-          rows={formats.map((f) => ({
+          rows={formats.map((f, i) => ({
             id: f.id, href: `/formats/${f.slug}`, archived: f.archived, peek: { type: "format", id: f.id },
             cells: [
               <span key="t">{f.title}{f.logline && <span className="block text-xs font-normal text-muted line-clamp-1">{f.logline}</span>}</span>,
@@ -112,6 +119,7 @@ export default async function FormatsPage({ searchParams }: { searchParams: Prom
               <span key="c" className="line-clamp-1 text-muted">{f.creators.map((c) => c.creator.name).join(", ")}</span>,
               <span key="e" className="line-clamp-1 text-muted">{f.entityLinks.map((l) => l.entity.name).join(", ")}</span>,
               <span key="u" className="whitespace-nowrap text-muted">{relativeTime(f.updatedAt)}</span>,
+              ...customByRow[i].map((v, j) => <span key={`c${j}`} className="text-muted">{v || <span className="text-faint">—</span>}</span>),
             ],
           }))}
         />

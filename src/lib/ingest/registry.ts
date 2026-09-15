@@ -25,6 +25,22 @@ import {
   type LabeledValue,
 } from "@/lib/taxonomy";
 import { LINK_KINDS, type LinkPayload } from "@/lib/link-schema";
+import { optionList } from "@/lib/option-cache";
+
+// Link-role vocabularies that lived only here; the option sets of the same
+// name are seeded from these and win once they exist.
+export const FORMAT_ORG_RELATIONSHIPS: LabeledValue[] = [
+  { value: "target", label: "Target Buyer" }, { value: "sponsor_target", label: "Sponsor Target" }, { value: "partner", label: "Partner" }, { value: "associated", label: "Associated" },
+];
+export const CHANNEL_ORG_RELATIONSHIPS: LabeledValue[] = [
+  { value: "production_partner", label: "Production Partner" }, { value: "management", label: "Management" }, { value: "network", label: "MCN / Network" }, { value: "brand", label: "Brand Partner" }, { value: "platform", label: "Platform" }, { value: "partner", label: "Partner" },
+];
+export const CHANNEL_PERSON_RELATIONSHIPS: LabeledValue[] = [
+  { value: "contact", label: "Contact" }, { value: "manager", label: "Manager" }, { value: "agent", label: "Agent" }, { value: "producer", label: "Producer" }, { value: "editor", label: "Editor" }, { value: "partner_manager", label: "Platform Partner Manager" },
+];
+export const OPPORTUNITY_CANDIDATE_STATUSES: LabeledValue[] = [
+  { value: "candidate", label: "Candidate" }, { value: "shortlist", label: "Shortlist" }, { value: "contacted", label: "Contacted" }, { value: "passed", label: "Passed" },
+];
 
 export type IngestTargetType =
   | "creator"
@@ -43,6 +59,8 @@ export type EditableField = {
   kind: "text" | "longtext" | "number" | "year" | "date" | "vocab" | "list" | "vocablist";
   maxLength?: number;
   vocab?: () => LabeledValue[];
+  /** The option set behind a vocabulary field (Settings → Options). */
+  set?: string;
   description?: string;
 };
 
@@ -67,14 +85,14 @@ const text = (name: string, label: string, maxLength: number): EditableField => 
 const longtext = (name: string, label: string): EditableField => ({
   name, label, kind: "longtext", maxLength: 8000,
 });
-const vocab = (name: string, label: string, source: () => LabeledValue[]): EditableField => ({
-  name, label, kind: "vocab", vocab: source,
+const vocab = (name: string, label: string, set: string, fallback: LabeledValue[]): EditableField => ({
+  name, label, kind: "vocab", set, vocab: () => optionList(set, fallback),
 });
 /** A free list — aliases — stored as an array, spoken as "a, b, c". */
 const list = (name: string, label: string): EditableField => ({ name, label, kind: "list" });
 /** A list drawn from a vocabulary — an organization's types. */
-const vocablist = (name: string, label: string, source: () => LabeledValue[]): EditableField => ({
-  name, label, kind: "vocablist", vocab: source,
+const vocablist = (name: string, label: string, set: string, fallback: LabeledValue[]): EditableField => ({
+  name, label, kind: "vocablist", set, vocab: () => optionList(set, fallback),
 });
 
 export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
@@ -94,7 +112,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       longtext("opportunityNotes", "Opportunity Notes"),
       longtext("internalNotes", "Internal Notes"),
       { name: "age", label: "Age", kind: "number" },
-      vocab("status", "Status", () => CREATOR_STATUSES),
+      vocab("status", "Status", "creator_status", CREATOR_STATUSES),
       list("aliases", "Also known as"),
       text("imageUrl", "Image URL", 500),
       { name: "birthday", label: "Birthday", kind: "date" },
@@ -113,8 +131,8 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       text("logline", "Logline", 500),
       longtext("description", "Description"),
       longtext("internalNotes", "Internal Notes"),
-      vocab("projectType", "Project Type", () => PROJECT_TYPES),
-      vocab("status", "Status", () => PROJECT_STATUSES),
+      vocab("projectType", "Project Type", "project_type", PROJECT_TYPES),
+      vocab("status", "Status", "project_status", PROJECT_STATUSES),
       { name: "lastActivityAt", label: "Last Activity", kind: "date" },
       { name: "premiereYear", label: "Premiere Year", kind: "year" },
       { name: "endYear", label: "End Year", kind: "year" },
@@ -144,7 +162,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       text("website", "Website", 500),
       text("location", "Location", 120),
       longtext("internalNotes", "Internal Notes"),
-      vocablist("types", "Types", () => ORG_TYPES),
+      vocablist("types", "Types", "org_type", ORG_TYPES),
       list("aliases", "Also known as"),
       text("imageUrl", "Image URL", 500),
     ],
@@ -161,8 +179,8 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
     fields: [
       text("logline", "Logline", 500),
       longtext("description", "Description"),
-      vocab("status", "Status", () => FORMAT_STATUSES),
-      vocab("formatType", "Format Type", () => FORMAT_TYPES),
+      vocab("status", "Status", "format_status", FORMAT_STATUSES),
+      vocab("formatType", "Format Type", "format_type", FORMAT_TYPES),
       text("targetPlatform", "Target Platform", 120),
       { name: "lastActivityAt", label: "Last Activity", kind: "date" },
       text("episodeLength", "Episode Length", 80),
@@ -184,7 +202,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
     createFields: ["title", "roleType", "email", "phone"],
     fields: [
       text("title", "Title", 200),
-      vocab("roleType", "Role Type", () => PERSON_ROLE_TYPES),
+      vocab("roleType", "Role Type", "person_role_type", PERSON_ROLE_TYPES),
       text("email", "Email", 200),
       text("phone", "Phone", 60),
       text("contactUrl", "LinkedIn / Contact URL", 400),
@@ -204,8 +222,8 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
     createFields: ["type", "description"],
     fields: [
       longtext("description", "Description / Brief"),
-      vocab("status", "Status", () => OPPORTUNITY_STATUSES),
-      vocab("type", "Type", () => OPPORTUNITY_TYPES),
+      vocab("status", "Status", "opportunity_status", OPPORTUNITY_STATUSES),
+      vocab("type", "Type", "opportunity_type", OPPORTUNITY_TYPES),
       { name: "lastActivityAt", label: "Last Activity", kind: "date" },
       text("audienceRequirements", "Audience Requirements", 2000),
       text("platformRequirements", "Platform Requirements", 2000),
@@ -227,7 +245,7 @@ export const RECORD_REGISTRY: Record<IngestTargetType, RecordSpec> = {
       text("handle", "Handle", 120),
       text("url", "Channel URL", 500),
       longtext("premise", "What the channel is"),
-      vocab("status", "Status", () => CHANNEL_STATUSES),
+      vocab("status", "Status", "channel_status", CHANNEL_STATUSES),
       text("cadence", "Upload Cadence", 120),
       longtext("revenueModel", "How it makes money"),
       longtext("notes", "Notes"),
@@ -296,7 +314,7 @@ export const LINK_SPECS: Record<LinkPayload["kind"], LinkSpec> = {
     a: { targetType: "creator", idField: "creatorId" },
     b: { targetType: "entity", idField: "entityId" },
     roleField: "relationship",
-    roleVocab: () => [{ value: "", label: "(none)" }, ...LOCATION_RELATIONSHIPS],
+    roleVocab: () => [{ value: "", label: "(none)" }, ...optionList("location_relationship", LOCATION_RELATIONSHIPS)],
     note: "Attach a taxonomy entity (interest, sport, location, talent category, tag). relationship only applies to locations (based_in etc.); otherwise omit.",
   },
   creator_format: {
@@ -309,35 +327,35 @@ export const LINK_SPECS: Record<LinkPayload["kind"], LinkSpec> = {
     a: { targetType: "creator", idField: "creatorId" },
     b: { targetType: "project", idField: "projectId" },
     roleField: "role",
-    roleVocab: () => PROJECT_ROLES,
+    roleVocab: () => optionList("project_role", PROJECT_ROLES),
   },
   creator_org: {
     kind: "creator_org", ingest: true,
     a: { targetType: "creator", idField: "creatorId" },
     b: { targetType: "organization", idField: "organizationId" },
     roleField: "relationship",
-    roleVocab: () => CREATOR_ORG_RELATIONSHIPS,
+    roleVocab: () => optionList("creator_org_relationship", CREATOR_ORG_RELATIONSHIPS),
   },
   creator_person: {
     kind: "creator_person", ingest: true,
     a: { targetType: "creator", idField: "creatorId" },
     b: { targetType: "person", idField: "personId" },
     roleField: "relationship",
-    roleVocab: () => CREATOR_PERSON_RELATIONSHIPS,
+    roleVocab: () => optionList("creator_person_relationship", CREATOR_PERSON_RELATIONSHIPS),
   },
   creator_creator: {
     kind: "creator_creator", ingest: true,
     a: { targetType: "creator", idField: "creatorAId" },
     b: { targetType: "creator", idField: "creatorBId" },
     roleField: "relationship",
-    roleVocab: () => CREATOR_RELATIONSHIPS,
+    roleVocab: () => optionList("creator_relationship", CREATOR_RELATIONSHIPS),
   },
   project_org: {
     kind: "project_org", ingest: true,
     a: { targetType: "project", idField: "projectId" },
     b: { targetType: "organization", idField: "organizationId" },
     roleField: "relationship",
-    roleVocab: () => PROJECT_ORG_RELATIONSHIPS,
+    roleVocab: () => optionList("project_org_relationship", PROJECT_ORG_RELATIONSHIPS),
   },
   project_entity: {
     kind: "project_entity", ingest: true,
@@ -349,14 +367,14 @@ export const LINK_SPECS: Record<LinkPayload["kind"], LinkSpec> = {
     a: { targetType: "project", idField: "projectId" },
     b: { targetType: "person", idField: "personId" },
     roleField: "role",
-    roleVocab: () => PERSON_PROJECT_ROLES,
+    roleVocab: () => optionList("person_project_role", PERSON_PROJECT_ROLES),
   },
   format_person: {
     kind: "format_person", ingest: true,
     a: { targetType: "format", idField: "formatId" },
     b: { targetType: "person", idField: "personId" },
     roleField: "role",
-    roleVocab: () => PERSON_PROJECT_ROLES,
+    roleVocab: () => optionList("person_project_role", PERSON_PROJECT_ROLES),
     note: "An industry person involved in a format in development — an exec, a producer, a rep.",
   },
   format_entity: {
@@ -369,19 +387,14 @@ export const LINK_SPECS: Record<LinkPayload["kind"], LinkSpec> = {
     a: { targetType: "format", idField: "formatId" },
     b: { targetType: "organization", idField: "organizationId" },
     roleField: "relationship",
-    roleVocab: () => [
-      { value: "target", label: "Target Buyer" },
-      { value: "sponsor_target", label: "Sponsor Target" },
-      { value: "partner", label: "Partner" },
-      { value: "associated", label: "Associated" },
-    ],
+    roleVocab: () => optionList("format_org_relationship", FORMAT_ORG_RELATIONSHIPS),
   },
   person_org: {
     kind: "person_org", ingest: true,
     a: { targetType: "person", idField: "personId" },
     b: { targetType: "organization", idField: "organizationId" },
     roleField: "role",
-    roleVocab: () => PERSON_ROLE_TYPES,
+    roleVocab: () => optionList("person_role_type", PERSON_ROLE_TYPES),
     note: "Where an industry person works, and what they do there.",
   },
   channel_creator: {
@@ -395,40 +408,21 @@ export const LINK_SPECS: Record<LinkPayload["kind"], LinkSpec> = {
     a: { targetType: "channel", idField: "channelId" },
     b: { targetType: "organization", idField: "organizationId" },
     roleField: "relationship",
-    roleVocab: () => [
-      { value: "production_partner", label: "Production Partner" },
-      { value: "management", label: "Management" },
-      { value: "network", label: "MCN / Network" },
-      { value: "brand", label: "Brand Partner" },
-      { value: "platform", label: "Platform" },
-      { value: "partner", label: "Partner" },
-    ],
+    roleVocab: () => optionList("channel_org_relationship", CHANNEL_ORG_RELATIONSHIPS),
   },
   channel_person: {
     kind: "channel_person", ingest: true,
     a: { targetType: "channel", idField: "channelId" },
     b: { targetType: "person", idField: "personId" },
     roleField: "relationship",
-    roleVocab: () => [
-      { value: "contact", label: "Contact" },
-      { value: "manager", label: "Manager" },
-      { value: "agent", label: "Agent" },
-      { value: "producer", label: "Producer" },
-      { value: "editor", label: "Editor" },
-      { value: "partner_manager", label: "Platform Partner Manager" },
-    ],
+    roleVocab: () => optionList("channel_person_relationship", CHANNEL_PERSON_RELATIONSHIPS),
   },
   opportunity_creator: {
     kind: "opportunity_creator", ingest: true,
     a: { targetType: "opportunity", idField: "opportunityId" },
     b: { targetType: "creator", idField: "creatorId" },
     roleField: "status",
-    roleVocab: () => [
-      { value: "candidate", label: "Candidate" },
-      { value: "shortlist", label: "Shortlist" },
-      { value: "contacted", label: "Contacted" },
-      { value: "passed", label: "Passed" },
-    ],
+    roleVocab: () => optionList("opportunity_candidate_status", OPPORTUNITY_CANDIDATE_STATUSES),
   },
   opportunity_format: {
     kind: "opportunity_format", ingest: true,

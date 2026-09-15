@@ -16,11 +16,13 @@ import { compactNumber, formatDate, relativeTime, isStale } from "@/lib/format";
 import { CHANNEL_STATUSES, labelFor } from "@/lib/taxonomy";
 import { YouTubeHeader } from "@/components/youtube-nav";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
+import { customCells, customColumns, customFieldMaps, customFilterFields } from "@/lib/custom-fields";
+import { optionList } from "@/lib/option-cache";
 import { filterWhere, type FieldMap } from "@/lib/filter-where";
 import { directoryUser, liveOnly, showArchived } from "@/lib/directory";
 
-const FIELDS: FilterField[] = [{ key: "status", label: "Channel status", kind: "select", options: CHANNEL_STATUSES.filter((s) => s.value !== "archived"), legacy: "status" }];
-const MAPS: Record<string, FieldMap> = { status: { column: "status" } };
+const baseFields = (): FilterField[] => [{ key: "status", label: "Channel status", kind: "select", options: optionList("channel_status", CHANNEL_STATUSES).filter((s) => s.value !== "archived"), legacy: "status" }];
+const BASE_MAPS: Record<string, FieldMap> = { status: { column: "status" } };
 
 export const metadata = { title: "Channels" };
 
@@ -43,6 +45,9 @@ export default async function ChannelsPage({
 }) {
   const user = await requireUser();
   const params = await searchParams;
+  const FIELDS = [...baseFields(), ...(await customFilterFields("channel"))];
+  const MAPS = { ...BASE_MAPS, ...(await customFieldMaps("channel")) };
+  const customCols = await customColumns("channel");
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const q = one(params.q)?.trim();
   const state = parseFilterParams(params, FIELDS);
@@ -93,6 +98,7 @@ export default async function ChannelsPage({
   const columns = PIPELINE.filter((s) => (byStatus.get(s)?.length ?? 0) > 0);
   const ideasInFlight = board.reduce((n, c) => n + c._count.ideas, 0);
 
+  const customByRow = await Promise.all(channels.map((r) => customCells("channel", r.custom)));
   return (
     <div>
       <YouTubeHeader
@@ -151,6 +157,7 @@ export default async function ChannelsPage({
             sort={sort}
             empty={q ? "No channels match." : "No channels yet."}
             columns={[
+            ...customCols,
               { label: "Channel", sortKey: "name" },
               { label: "Status", sortKey: "status" },
               { label: "Athlete", showAt: "hidden sm:table-cell" },
@@ -160,7 +167,7 @@ export default async function ChannelsPage({
               { label: "Ideas", align: "right", showAt: "hidden md:table-cell" },
               { label: "Last activity", sortKey: "date", showAt: "hidden lg:table-cell" },
             ]}
-            rows={channels.map((c) => ({
+            rows={channels.map((c, i) => ({
               id: c.id,
               href: `/youtube/${c.slug}`,
               archived: c.archived,
@@ -190,6 +197,7 @@ export default async function ChannelsPage({
                 <span key="d" className="whitespace-nowrap text-muted">
                   {c.lastActivityAt ? formatDate(c.lastActivityAt) : <span className="text-faint">—</span>}
                 </span>,
+                ...customByRow[i].map((v, j) => <span key={`c${j}`} className="text-muted">{v || <span className="text-faint">—</span>}</span>),
               ],
             }))}
           />

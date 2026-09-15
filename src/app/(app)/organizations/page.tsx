@@ -14,20 +14,22 @@ import { orderForOrganizations, parseSort } from "@/lib/directory-sort";
 import { Pagination } from "@/components/pagination";
 import { RowArchive } from "@/components/row-status";
 import { parseFilterParams, type FilterField } from "@/lib/filters";
+import { customCells, customColumns, customFieldMaps, customFilterFields } from "@/lib/custom-fields";
+import { optionList } from "@/lib/option-cache";
 import { filterWhere, filterNames, type FieldMap } from "@/lib/filter-where";
 import { directoryUser, layoutFor, matchingIds, paging, liveOnly, showArchived } from "@/lib/directory";
 
 export const metadata = { title: "Companies" };
 
-const FIELDS: FilterField[] = [
-  { key: "type", label: "Company type", kind: "multiselect", options: ORG_TYPES, legacy: "type" },
+const baseFields = (): FilterField[] => [
+  { key: "type", label: "Company type", kind: "multiselect", options: optionList("org_type", ORG_TYPES), legacy: "type" },
   { key: "location", label: "Location", kind: "text" },
   { key: "talent", label: "Talent", kind: "lookup", lookupType: "creator" },
   { key: "person", label: "Industry person", kind: "lookup", lookupType: "person" },
   { key: "project", label: "Project", kind: "lookup", lookupType: "project" },
   { key: "updated", label: "Updated", kind: "date" },
 ];
-const MAPS: Record<string, FieldMap> = {
+const BASE_MAPS: Record<string, FieldMap> = {
   type: { column: "types", kind: "array" }, location: { column: "location" },
   talent: { relation: "creators", idField: "creatorId" }, person: { relation: "people", idField: "personId" }, project: { relation: "projects", idField: "projectId" },
   updated: { column: "updatedAt", kind: "date" },
@@ -43,6 +45,9 @@ const DEFAULT_VIEWS = [
 export default async function OrganizationsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requireUser();
   const params = await searchParams;
+  const FIELDS = [...baseFields(), ...(await customFilterFields("organization"))];
+  const MAPS = { ...BASE_MAPS, ...(await customFieldMaps("organization")) };
+  const customCols = await customColumns("organization");
   const q = firstParam(params.q)?.trim();
   const sort = parseSort(firstParam(params.sort), "name");
   const state = parseFilterParams(params, FIELDS);
@@ -61,6 +66,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
   ]);
   const canEdit = hasRole(user, "EDITOR");
 
+  const customByRow = await Promise.all(organizations.map((r) => customCells("organization", r.custom)));
   return (
     <div>
       <DirectoryControls showArchived={showArchived(params)}
@@ -73,6 +79,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
           sort={sort} view="organizations" recordType="organization" selectable={canEdit} matchingIds={ids}
           empty={q || state.and.length || state.or.length ? "No companies match these filters." : "No companies yet. Buyers, brands, agencies and production companies live here."}
           columns={[
+            ...customCols,
             { key: "name", label: "Company", sortKey: "name" },
             { key: "types", label: "Types", filterKey: "type" },
             { key: "location", label: "Location", sortKey: "location", filterKey: "location", showAt: "hidden sm:table-cell" },
@@ -82,7 +89,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
             { key: "updated", label: "Updated", sortKey: "updated", filterKey: "updated", showAt: "hidden xl:table-cell" },
             { key: "actions", label: "", align: "right" },
           ]}
-          rows={organizations.map((o) => ({
+          rows={organizations.map((o, i) => ({
             id: o.id, href: `/organizations/${o.slug}`, archived: o.archived, peek: { type: "organization", id: o.id },
             cells: [
               <span key="n">{o.name}</span>,
@@ -93,6 +100,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
               <span key="pe" className="tabular-nums text-muted">{o._count.people || <span className="text-faint">—</span>}</span>,
               <span key="u" className="whitespace-nowrap text-muted">{relativeTime(o.updatedAt)}</span>,
               <RowArchive key="a" type="organization" id={o.id} name={o.name} canEdit={canEdit} />,
+              ...customByRow[i].map((v, j) => <span key={`c${j}`} className="text-muted">{v || <span className="text-faint">—</span>}</span>),
             ],
           }))}
         />

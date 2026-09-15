@@ -75,7 +75,7 @@ export async function createProject(input: ProjectInput): Promise<RecordResult> 
       (s) => db.project.findMany({ where: { slug: { startsWith: s } }, select: { slug: true } }),
       data.title,
     );
-    const project = await db.project.create({ data: { ...data, slug, status: data.status || "released" } });
+    const project = await db.project.create({ data: { ...data, slug, status: data.status || "released", ownerId: user.id } });
     await logAudit(user, { targetType: "project", targetId: project.id, targetLabel: project.title, action: "created" });
     await queueAirtableSync("project", project.id);
     revalidatePath("/", "layout");
@@ -130,7 +130,7 @@ export async function createOrganization(input: OrganizationInput): Promise<Reco
       data.name,
     );
     const organization = await db.organization.create({
-      data: { ...data, types: data.types ?? [], aliases: data.aliases ?? [], slug },
+      data: { ...data, types: data.types ?? [], aliases: data.aliases ?? [], slug, ownerId: user.id },
     });
     await logAudit(user, { targetType: "organization", targetId: organization.id, targetLabel: organization.name, action: "created" });
     revalidatePath("/", "layout");
@@ -301,7 +301,7 @@ export async function createPerson(input: PersonInput): Promise<RecordResult> {
       (s) => db.industryPerson.findMany({ where: { slug: { startsWith: s } }, select: { slug: true } }),
       data.name,
     );
-    const person = await db.industryPerson.create({ data: { ...data, slug } });
+    const person = await db.industryPerson.create({ data: { ...data, slug, ownerId: user.id } });
     await logAudit(user, { targetType: "person", targetId: person.id, targetLabel: person.name, action: "created" });
     revalidatePath("/", "layout");
     return { ok: true, slug: person.slug, id: person.id };

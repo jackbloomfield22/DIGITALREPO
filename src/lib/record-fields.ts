@@ -5,17 +5,27 @@
 import { RECORD_REGISTRY, type EditableField, type IngestTargetType } from "@/lib/ingest/registry";
 import type { LabeledValue } from "@/lib/taxonomy";
 
-export type FieldKind = EditableField["kind"];
+export type FieldKind = EditableField["kind"] | "boolean" | "url" | "relation";
+
+export type RelationValue = { id: string; name: string };
+export type PlainValue = string | number | boolean | string[] | RelationValue | null;
 
 export type DetailField = {
   name: string;
   label: string;
   kind: FieldKind;
   options?: LabeledValue[];
+  /** The option set a vocabulary field draws from — lets a picker offer "Create". */
+  set?: string;
+  /** For relation fields: the record type to look up. */
+  lookupType?: string;
   maxLength?: number;
   description?: string;
-  /** Plain value: string, number, string[] or null. Dates are "YYYY-MM-DD". */
-  value: string | number | string[] | null;
+  required?: boolean;
+  /** True for a field defined under Settings → Fields (stored in `custom`). */
+  custom?: boolean;
+  /** Plain value: string, number, boolean, string[], {id,name} or null. Dates are "YYYY-MM-DD". */
+  value: PlainValue;
 };
 
 /** The record types the quick-create sheet can make. */
@@ -38,6 +48,7 @@ export function detailFields(type: IngestTargetType, record: Record<string, unkn
       label: f.label,
       kind: f.kind,
       options: f.vocab ? f.vocab().filter((o) => o.value !== "") : undefined,
+      set: f.set,
       maxLength: f.maxLength,
       description: f.description,
       value: plainValue(f.kind, record[f.name]),
@@ -50,8 +61,13 @@ export function nameField(type: IngestTargetType, record: Record<string, unknown
   return { name: spec.nameField, label: NAME_LABEL[spec.nameField] ?? "Name", kind: "text", maxLength: 300, value: plainValue("text", record[spec.nameField]) };
 }
 
-export function plainValue(kind: FieldKind, v: unknown): DetailField["value"] {
+export function plainValue(kind: FieldKind, v: unknown): PlainValue {
   if (v == null) return null;
+  if (kind === "boolean") return v === true || v === "true" || v === 1;
+  if (kind === "relation") {
+    if (typeof v === "object" && v && "id" in v) return { id: String((v as RelationValue).id), name: String((v as RelationValue).name ?? "") };
+    return null;
+  }
   if (kind === "date") {
     const d = v instanceof Date ? v : new Date(String(v));
     return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
@@ -61,29 +77,51 @@ export function plainValue(kind: FieldKind, v: unknown): DetailField["value"] {
   return String(v);
 }
 
-export function isEmptyValue(v: DetailField["value"]): boolean {
-  return v == null || v === "" || (Array.isArray(v) && v.length === 0);
+export function isEmptyValue(v: PlainValue): boolean {
+  return v == null || v === "" || v === false || (Array.isArray(v) && v.length === 0);
 }
 
 /** Two plain values mean the same thing. */
-export function sameValue(a: DetailField["value"], b: DetailField["value"]): boolean {
+export function sameValue(a: PlainValue, b: PlainValue): boolean {
   if (isEmptyValue(a) && isEmptyValue(b)) return true;
   if (Array.isArray(a) || Array.isArray(b)) return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+  if (typeof a === "object" && a || typeof b === "object" && b) return JSON.stringify(a) === JSON.stringify(b);
   return String(a) === String(b);
 }
 
-export type Coerced = { ok: true; value: unknown; plain: DetailField["value"] } | { ok: false; error: string };
+export type Coerced = { ok: true; value: unknown; plain: PlainValue } | { ok: false; error: string };
 
 /**
  * Turn what an editor typed into what the column takes. Empty means null for
  * every optional field; a vocabulary field must name one of its values.
  */
-export function coerceField(field: EditableField | DetailField, raw: unknown): Coerced {
+export function coerceField(field: Pick<DetailField, "kind" | "label" | "maxLength" | "options"> | EditableField, raw: unknown): Coerced {
   const kind = field.kind;
   const options = "options" in field ? field.options : "vocab" in field && field.vocab ? field.vocab() : undefined;
-  const str = raw == null ? "" : Array.isArray(raw) ? raw.join(", ") : String(raw);
+  const str = raw == null ? "" : Array.isArray(raw) ? raw.join(", ") : typeof raw === "object" ? "" : String(raw);
   const trimmed = str.trim();
   switch (kind) {
+    case "boolean": {
+      const on = raw === true || trimmed === "true" || trimmed === "1" || trimmed === "yes";
+      return { ok: true, value: on, plain: on };
+    }
+    case "url": {
+      if (!trimmed) return { ok: true, value: null, plain: null };
+      const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+      try { new URL(withScheme); } catch { return { ok: false, error: `${field.label} must be a web address.` }; }
+      if (withScheme.length > 1000) return { ok: false, error: `${field.label} is too long.` };
+      return { ok: true, value: withScheme, plain: withScheme };
+    }
+    case "relation": {
+      if (raw && typeof raw === "object" && "id" in raw) {
+        const r = raw as RelationValue;
+        if (!r.id) return { ok: true, value: null, plain: null };
+        const v = { id: String(r.id), name: String(r.name ?? "") };
+        return { ok: true, value: v, plain: v };
+      }
+      if (!trimmed) return { ok: true, value: null, plain: null };
+      return { ok: false, error: `${field.label} needs a record, not text.` };
+    }
     case "text":
     case "longtext": {
       const max = field.maxLength ?? (kind === "text" ? 500 : 8000);
@@ -123,8 +161,10 @@ export function coerceField(field: EditableField | DetailField, raw: unknown): C
 }
 
 /** Human-readable form of a plain value for audit rows and read-only display. */
-export function displayValue(field: Pick<DetailField, "kind" | "options">, v: DetailField["value"]): string {
+export function displayValue(field: Pick<DetailField, "kind" | "options">, v: PlainValue): string {
   if (isEmptyValue(v)) return "";
+  if (v === true) return "Yes";
+  if (typeof v === "object" && v && !Array.isArray(v)) return v.name || v.id;
   if (Array.isArray(v)) return v.map((x) => field.options?.find((o) => o.value === x)?.label ?? x).join(", ");
   if (field.kind === "vocab") return field.options?.find((o) => o.value === String(v))?.label ?? String(v);
   if (field.kind === "number") return typeof v === "number" ? v.toLocaleString("en-US") : String(v);
@@ -141,4 +181,10 @@ export function fieldNamed(fields: DetailField[], name: string): DetailField {
   const f = fields.find((x) => x.name === name);
   if (!f) throw new Error(`No field named ${name}`);
   return f;
+}
+
+/** A vocabulary field's options as the registry sees them right now. */
+export function fieldOptions(type: IngestTargetType, name: string): LabeledValue[] {
+  const f = RECORD_REGISTRY[type].fields.find((x) => x.name === name);
+  return f?.vocab ? f.vocab().filter((o) => o.value !== "") : [];
 }

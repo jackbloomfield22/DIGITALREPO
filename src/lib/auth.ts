@@ -1,3 +1,4 @@
+import { primeOptions } from "@/lib/options";
 import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -93,6 +94,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 export async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  await primeOptions();
   return user;
 }
 
@@ -102,6 +104,7 @@ export async function requireUser(): Promise<SessionUser> {
  */
 export async function requireRole(role: UserRole): Promise<SessionUser> {
   const user = await getSessionUser();
+  await primeOptions();
   if (!user || !hasRole(user, role)) {
     throw new Error(
       role === "ADMIN"

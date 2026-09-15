@@ -132,7 +132,7 @@ export async function mergeRecordsCore(input: MergeInput, user: SessionUser | nu
     await t[spec.prismaModel].update({ where: { id: winnerId }, data });
     await t[spec.prismaModel].update({
       where: { id: loserId },
-      data: { archived: true, archivedReason: `Merged into ${winnerName}`, archivedAt: new Date(), ...(spec.hasVersion ? { version: { increment: 1 } } : {}) },
+      data: { archived: true, archivedReason: `Merged into ${winnerName}`, archivedAt: new Date(), mergedInto: winnerId, ...(spec.hasVersion ? { version: { increment: 1 } } : {}) },
     });
     await t.appSetting.upsert({
       where: { key: `merged:${type}:${loserId}` },
@@ -163,12 +163,17 @@ export type MergedInto = { into: string; name: string; when: string; by: string 
 
 /** Where an archived record went, if it was merged. */
 export async function mergedInto(type: string, id: string): Promise<MergedInto | null> {
-  const row = await db.appSetting.findUnique({ where: { key: `merged:${type}:${id}` } });
-  const value = row?.value as Omit<MergedInto, "href"> | null;
-  if (!value) return null;
   const spec = RECORD_REGISTRY[type as IngestTargetType];
-  const winner = spec ? await modelFor(spec.prismaModel).findUnique({ where: { id: value.into }, select: { slug: true } }) : null;
-  return { ...value, href: winner?.slug ? spec.path(String(winner.slug)) : null };
+  const row = await db.appSetting.findUnique({ where: { key: `merged:${type}:${id}` } });
+  const value = (row?.value as Omit<MergedInto, "href"> | null) ?? null;
+  let into = value?.into ?? null;
+  if (!into && spec) {
+    const self = await modelFor(spec.prismaModel).findUnique({ where: { id }, select: { mergedInto: true } });
+    into = self?.mergedInto ? String(self.mergedInto) : null;
+  }
+  if (!into || !spec) return null;
+  const winner = await modelFor(spec.prismaModel).findUnique({ where: { id: into }, select: { slug: true, [spec.nameField]: true } });
+  return { into, name: value?.name ?? String(winner?.[spec.nameField] ?? ""), when: value?.when ?? "", by: value?.by ?? null, href: winner?.slug ? spec.path(String(winner.slug)) : null };
 }
 
 export type Duplicate = { id: string; name: string; slug: string; sim: number };

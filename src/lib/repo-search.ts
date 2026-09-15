@@ -24,7 +24,7 @@ export const SEARCH_SECTIONS = [
   { type: "doc", label: "Documents", href: "/dev-slate", create: null },
 ] as const;
 export type SearchType = typeof SEARCH_SECTIONS[number]["type"];
-export type SearchItem = { id: string; type: SearchType; label: string; href: string; sub?: string; detail?: string; archived?: boolean; updatedAt?: string };
+export type SearchItem = { id: string; type: SearchType; label: string; href: string; sub?: string; detail?: string; archived?: boolean; unverified?: boolean; updatedAt?: string };
 export type SearchGroup = { type: SearchType; label: string; href: string; create: string | null; count: number; items: SearchItem[] };
 export const SEARCH_PAGE_SIZE = 24;
 /** The most a single type will return, ranked; "view all" on a list is separate. */
@@ -156,7 +156,7 @@ export async function searchRepo(query: string, options: { type?: string; page?:
       }
       const ref = refMap.get(`${s.type}:${c.id}`);
       if (!ref) continue;
-      items.push({ id: c.id, type: s.type, label: ref.name, href: ref.href, sub: ref.sub, detail: cand.detail, archived: ref.archived, updatedAt: cand.updatedAt?.toISOString() });
+      items.push({ id: c.id, type: s.type, label: ref.name, href: ref.href, sub: ref.sub, detail: cand.detail, archived: ref.archived, unverified: ref.unverified, updatedAt: cand.updatedAt?.toISOString() });
     }
     return { ...s, count: list.length, items };
   });

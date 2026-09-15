@@ -39,6 +39,7 @@ export async function createRecord(type: CreateType, values: Record<string, unkn
       if (!c.ok) return { ok: false, error: c.error };
       data[field.name] = c.value;
     }
+    data.ownerId = user.id;
     const base = slugify(name);
     const taken = await model.findMany({ where: { slug: { startsWith: base } }, select: { slug: true } });
     data.slug = uniqueSlug(name, new Set(taken.map((r) => String(r.slug))));

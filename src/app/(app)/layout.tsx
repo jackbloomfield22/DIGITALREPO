@@ -13,13 +13,16 @@ import { CreateSheet } from "@/components/create-sheet";
 import { isOwner } from "@/lib/hq/owner";
 import { readPrefs } from "@/lib/prefs";
 import { sidebarLists } from "@/lib/record-refs";
+import { optionRowsForClient } from "@/lib/options";
+import { OptionsProvider } from "@/components/options-provider";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const [prefs, lists] = await Promise.all([readPrefs(user.id), sidebarLists(user.id)]);
+  const [prefs, lists, optionRows] = await Promise.all([readPrefs(user.id), sidebarLists(user.id), optionRowsForClient()]);
   const permissions = { isAdmin: hasRole(user, "ADMIN"), isEditor: hasRole(user, "EDITOR"), isOwner: isOwner(user) };
   return (
     <NuqsAdapter>
+      <OptionsProvider rows={optionRows}>
       <PrefsProvider initial={prefs}>
         <Sidebar {...permissions} userName={user.name} favorites={lists.favorites} recents={lists.recents} />
         <Suspense><CommandPalette {...permissions} recents={lists.recents} /></Suspense>
@@ -32,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {permissions.isEditor && <QuickCapture />}
         {permissions.isEditor && <CreateSheet isEditor />}
       </PrefsProvider>
+      </OptionsProvider>
     </NuqsAdapter>
   );
 }

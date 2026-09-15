@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { labelFor, socialLabel } from "@/lib/taxonomy";
 import { compactNumber, totalAudience } from "@/lib/format";
 import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
+import { customSearchText } from "@/lib/custom-fields";
 
 // Knowledge Digest generator. Each canonical record gets one compact
 // plain-text dossier row so the model can reason with the context of what is
@@ -71,7 +72,7 @@ async function buildCreatorDigest(id: string): Promise<DigestData | null> {
       c.organizations.length ? `Orgs: ${c.organizations.map((o) => `${o.organization.name} (${labelFor(o.relationship)})`).join("; ")}` : null,
       c.people.length ? `Rep: ${c.people.map((p) => `${p.person.name} (${labelFor(p.relationship)}${p.current ? "" : ", past"})`).join("; ")}` : null,
     ],
-    [
+    [...customSearchText(c.custom), 
       c.name, ...c.aliases,
       ...c.socialProfiles.flatMap((s) => [s.handle ?? "", `${socialLabel(s.platform)} ${s.handle ?? ""}`]),
       ...c.entityLinks.map((l) => l.entity.name),
@@ -109,7 +110,7 @@ async function buildProjectDigest(id: string): Promise<DigestData | null> {
       p.people.length ? `Credits: ${p.people.map((x) => `${x.person.name} (${labelFor(x.role)})`).join("; ")}` : null,
       p.entityLinks.length ? `Topics: ${p.entityLinks.map((l) => l.entity.name).join(", ")}` : null,
     ],
-    [
+    [...customSearchText(p.custom), 
       p.title, ...p.aliases,
       ...[...talent.keys()],
       ...p.organizations.map((o) => o.organization.name),
@@ -141,7 +142,7 @@ async function buildOrganizationDigest(id: string): Promise<DigestData | null> {
       o.people.length ? `People: ${o.people.map((p) => p.person.name).join(", ")}` : null,
       o.formats.length ? `Formats: ${o.formats.map((f) => f.format.title).join(", ")}` : null,
     ],
-    [
+    [...customSearchText(o.custom), 
       o.name, ...o.aliases, o.website ?? "",
       ...o.projects.map((p) => p.project.title),
       ...o.creators.map((c) => c.creator.name),
@@ -169,7 +170,7 @@ async function buildFormatDigest(id: string): Promise<DigestData | null> {
       f.entityLinks.length ? `Topics: ${f.entityLinks.map((l) => l.entity.name).join(", ")}` : null,
       f.organizations.length ? `Orgs: ${f.organizations.map((o) => `${o.organization.name} (${labelFor(o.relationship)})`).join("; ")}` : null,
     ],
-    [f.title, ...f.creators.map((c) => c.creator.name), ...f.entityLinks.map((l) => l.entity.name), ...f.organizations.map((o) => o.organization.name)],
+    [...customSearchText(f.custom), f.title, ...f.creators.map((c) => c.creator.name), ...f.entityLinks.map((l) => l.entity.name), ...f.organizations.map((o) => o.organization.name)],
   );
   return { slug: f.slug, name: f.title, aliases: [], archived: f.archived, summary, searchText, sourceVersion: f.version, path: `/formats/${f.slug}` };
 }
@@ -193,7 +194,7 @@ async function buildPersonDigest(id: string): Promise<DigestData | null> {
       p.creators.length ? `Represents/connected: ${p.creators.map((c) => `${c.creator.name} (${labelFor(c.relationship)}${c.current ? "" : ", past"})`).join("; ")}` : null,
       p.projects.length ? `Projects: ${p.projects.map((x) => `${x.project.title} (${labelFor(x.role)})`).join("; ")}` : null,
     ],
-    [p.name, p.email ?? "", p.phone ?? "", ...p.organizations.map((o) => o.organization.name), ...p.creators.map((c) => c.creator.name), ...p.projects.map((x) => x.project.title)],
+    [...customSearchText(p.custom), p.name, p.email ?? "", p.phone ?? "", ...p.organizations.map((o) => o.organization.name), ...p.creators.map((c) => c.creator.name), ...p.projects.map((x) => x.project.title)],
   );
   return { slug: p.slug, name: p.name, aliases: [], archived: p.archived, summary, searchText, sourceVersion: 0, path: `/people/${p.slug}` };
 }
@@ -217,7 +218,7 @@ async function buildOpportunityDigest(id: string): Promise<DigestData | null> {
       o.creators.length ? `Talent considered: ${o.creators.map((c) => c.creator.name).join(", ")}` : null,
       o.organizations.length ? `Orgs: ${o.organizations.map((x) => x.organization.name).join(", ")}` : null,
     ],
-    [o.title, ...o.entityLinks.map((l) => l.entity.name), ...o.creators.map((c) => c.creator.name), ...o.organizations.map((x) => x.organization.name)],
+    [...customSearchText(o.custom), o.title, ...o.entityLinks.map((l) => l.entity.name), ...o.creators.map((c) => c.creator.name), ...o.organizations.map((x) => x.organization.name)],
   );
   return { slug: o.slug, name: o.title, aliases: [], archived: o.archived, summary, searchText, sourceVersion: o.version, path: `/opportunities/${o.slug}` };
 }
@@ -279,7 +280,7 @@ async function buildChannelDigest(id: string): Promise<DigestData | null> {
       reach.length ? reach.join(" · ") : null,
       c.ideas.length ? `Planned: ${c.ideas.map((i) => `${i.title} (${labelFor(i.status)})`).join("; ")}` : null,
     ],
-    [c.name, c.handle ?? "", c.creator?.name ?? "", ...c.ideas.map((i) => i.title)],
+    [...customSearchText(c.custom), c.name, c.handle ?? "", c.creator?.name ?? "", ...c.ideas.map((i) => i.title)],
   );
   return {
     slug: c.slug, name: c.name, aliases: [], archived: c.archived,

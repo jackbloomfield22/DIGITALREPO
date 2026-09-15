@@ -81,6 +81,8 @@ export const TABLE_ORDER = [
   "storedFile",
   "attachment",
   "appSetting",
+  "option",
+  "fieldDefinition",
   "airtableSync",
   "airtableJob",
   "auditLog",

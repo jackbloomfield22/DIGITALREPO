@@ -1,3 +1,5 @@
+import { customFieldMaps, customFilterFields } from "@/lib/custom-fields";
+import { optionList } from "@/lib/option-cache";
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -12,14 +14,14 @@ import { CREATOR_STATUSES, PROJECT_ROLES, SOCIAL_PLATFORMS } from "@/lib/taxonom
 // The talent list: the shared filter model plus a few sorts that have to be
 // worked out in memory (audience, per-platform following, connections).
 
-export const TALENT_FIELDS: FilterField[] = [
+export const talentFields = (): FilterField[] => [
   { key: "topic", label: "Interests, sports & locations", kind: "lookup", lookupType: "entity", legacy: "entity" },
-  { key: "status", label: "Talent status", kind: "select", options: CREATOR_STATUSES, legacy: "status" },
+  { key: "status", label: "Talent status", kind: "select", options: optionList("creator_status", CREATOR_STATUSES), legacy: "status" },
   { key: "platform", label: "Social platform", kind: "select", options: SOCIAL_PLATFORMS.map((p) => ({ value: p.value, label: p.label })), legacy: "platform" },
   { key: "followers", label: "Followers on a platform", kind: "number", legacy: "min", placeholder: "e.g. 300000" },
   { key: "company", label: "Company / brand", kind: "lookup", lookupType: "organization", legacy: "org" },
   { key: "rep", label: "Representative", kind: "lookup", lookupType: "person", legacy: "rep" },
-  { key: "role", label: "Project role", kind: "select", options: PROJECT_ROLES, legacy: "role" },
+  { key: "role", label: "Project role", kind: "select", options: optionList("project_role", PROJECT_ROLES), legacy: "role" },
   { key: "format", label: "Format", kind: "lookup", lookupType: "format", legacy: "format", presets: [{ value: "any", label: "Has a format" }, { value: "none", label: "No format yet" }] },
   { key: "project", label: "Project", kind: "lookup", lookupType: "project" },
   { key: "location", label: "Location", kind: "text" },
@@ -46,15 +48,21 @@ export const TALENT_DEFAULT_VIEWS = [
   { name: "Recently updated", query: "sort=updated" },
 ];
 
-export type CreatorFilters = { q?: string; state: FilterState; sort: string; params: SearchParams };
+export type CreatorFilters = { q?: string; state: FilterState; sort: string; params: SearchParams; fields?: FilterField[]; maps?: Record<string, FieldMap> };
 
-export function parseCreatorFilters(params: SearchParams): CreatorFilters {
-  return { q: firstParam(params.q)?.trim() || undefined, state: parseFilterParams(params, TALENT_FIELDS), sort: firstParam(params.sort) || "name", params };
+/** The talent filters: the built-in ones plus any custom fields on talent. */
+export async function talentFilterSet(): Promise<{ fields: FilterField[]; maps: Record<string, FieldMap> }> {
+  return { fields: [...talentFields(), ...(await customFilterFields("creator"))], maps: { ...TALENT_MAPS, ...(await customFieldMaps("creator")) } };
+}
+
+export function parseCreatorFilters(params: SearchParams, set?: { fields: FilterField[]; maps: Record<string, FieldMap> }): CreatorFilters {
+  const fields = set?.fields ?? talentFields();
+  return { q: firstParam(params.q)?.trim() || undefined, state: parseFilterParams(params, fields), sort: firstParam(params.sort) || "name", params, fields, maps: set?.maps ?? TALENT_MAPS };
 }
 
 export function buildCreatorWhere(f: CreatorFilters): Prisma.CreatorWhereInput {
   const live = firstParam(f.params.archived) === "1" ? [] : [{ archived: false }];
-  return { AND: [...live, ...(f.q ? [creatorSearch(f.q)] : []), ...(filterWhere(TALENT_MAPS, f.state) as Prisma.CreatorWhereInput[])] };
+  return { AND: [...live, ...(f.q ? [creatorSearch(f.q)] : []), ...(filterWhere(f.maps ?? TALENT_MAPS, f.state) as Prisma.CreatorWhereInput[])] };
 }
 
 const cardInclude = {

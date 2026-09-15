@@ -82,6 +82,9 @@ export async function createCreator(input: {
         slug: uniqueSlug(scalars.name, taken),
         ...cleanScalars(scalars),
         lastVerifiedAt: new Date(),
+        verifiedAt: new Date(),
+        verifiedBy: user.name,
+        ownerId: user.id,
         entityLinks: input.entityIds?.length
           ? {
               create: input.entityIds.map((e) => ({

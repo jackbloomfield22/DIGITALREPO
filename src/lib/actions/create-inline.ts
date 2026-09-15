@@ -67,7 +67,7 @@ export async function createOrganizationInline(name: string, type?: string): Pro
     const exact = candidates.find((c) => normalizeName(c.name) === norm);
     if (exact) return { ok: true, id: exact.id, name: exact.name, existed: true };
     const orgRecord = await db.organization.create({
-      data: { slug: await freshSlug("organization", clean), name: clean, types: type ? [type] : [] },
+      data: { slug: await freshSlug("organization", clean), name: clean, types: type ? [type] : [], ownerId: user.id },
     });
     await logAudit(user, { targetType: "organization", targetId: orgRecord.id, targetLabel: orgRecord.name, action: "created" });
     revalidatePath("/", "layout");
@@ -87,7 +87,7 @@ export async function createProjectInline(title: string, projectType?: string): 
     const exact = candidates.find((c) => normalizeName(c.title) === norm);
     if (exact) return { ok: true, id: exact.id, name: exact.title, existed: true };
     const project = await db.project.create({
-      data: { slug: await freshSlug("project", clean), title: clean, projectType },
+      data: { slug: await freshSlug("project", clean), title: clean, projectType, ownerId: user.id },
     });
     await logAudit(user, { targetType: "project", targetId: project.id, targetLabel: project.title, action: "created" });
     revalidatePath("/", "layout");
@@ -107,7 +107,7 @@ export async function createPersonInline(name: string, roleType?: string): Promi
     const exact = candidates.find((c) => normalizeName(c.name) === norm);
     if (exact) return { ok: true, id: exact.id, name: exact.name, existed: true };
     const personRecord = await db.industryPerson.create({
-      data: { slug: await freshSlug("person", clean), name: clean, roleType },
+      data: { slug: await freshSlug("person", clean), name: clean, roleType, ownerId: user.id },
     });
     await logAudit(user, { targetType: "person", targetId: personRecord.id, targetLabel: personRecord.name, action: "created" });
     revalidatePath("/", "layout");
