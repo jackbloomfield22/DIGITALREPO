@@ -136,7 +136,10 @@ fields, verification and history work.
    something like `before-refresh-phase-3`. Then say so, and the branch merges
    to `main`; the deploy applies
    `prisma/migrations/20260915192543_refresh_options_fields_verification`,
-   which is additive only and ships with a `down.sql`.
+   which is additive only and ships with a `down.sql`. The preview builds of
+   that branch were failing on a build-script problem; that is found, fixed and
+   covered by a test, and the whole production build now runs clean against a
+   database built from nothing by the migrations.
 2. **Rotate the Neon `neondb_owner` password.** It was shared in chat during
    this work, and this repository is public.
 
@@ -348,6 +351,17 @@ branch.
   by option id (see the summary at the top); `AuditLog` remains the history,
   with no Postgres audit trigger; quick-create still shows only the essentials,
   so custom fields do not appear there yet.
+- **A build break the preview deploys caught.** The Vercel build runs several
+  scripts through `tsx` in plain Node, outside Next's module resolution. Phase 3
+  made the digest rebuild reach the custom-fields module, which carried an
+  `import "server-only"` — a guard Next resolves and Node cannot. Every preview
+  build of this branch failed on it, and the production build would have failed
+  the same way on merge. The guard came off the two modules in that path (the
+  database import already keeps them off the client, as it does for the digest
+  module beside them), and `tests/build-scripts.test.ts` now walks the import
+  graph of every script the build runs and fails if any of them reaches a
+  guarded module again. The whole build script was then run end to end against
+  a database built from nothing by the migrations: clean.
 
 ### Phase 4 — shipped
 

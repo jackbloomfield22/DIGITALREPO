@@ -3,7 +3,9 @@
 // records), and the create/rename/merge primitives the Settings page and the
 // pickers use.
 
-import "server-only";
+// No "server-only" guard here on purpose: the Vercel build loads this module
+// through scripts/rebuild-digests.ts, which runs in plain Node where that
+// import throws. The db import already keeps it off the client.
 import { db } from "@/lib/db";
 import { modelFor } from "@/lib/db-model";
 import { logAudit } from "@/lib/audit";

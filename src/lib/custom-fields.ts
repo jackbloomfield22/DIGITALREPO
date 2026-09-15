@@ -4,7 +4,9 @@
 // list columns, the filter fields and the search text — nothing else in the
 // app needs to know a field was added.
 
-import "server-only";
+// No "server-only" guard here on purpose: the Vercel build loads this module
+// through scripts/rebuild-digests.ts, which runs in plain Node where that
+// import throws. The db import already keeps it off the client.
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { modelForType } from "@/lib/options";
