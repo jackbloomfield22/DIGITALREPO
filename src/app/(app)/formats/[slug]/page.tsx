@@ -19,6 +19,7 @@ import { AttachmentList } from "@/components/attachments";
 import { attachmentsFor, uploadLimit } from "@/lib/files";
 import { labelFor, PERSON_PROJECT_ROLES } from "@/lib/taxonomy";
 import { RecordHeader } from "@/components/record-header";
+import { VerifyButton } from "@/components/verify-button";
 import { RecordLayout } from "@/components/record-layout";
 import { DetailsPanel } from "@/components/details-panel";
 import { Highlights } from "@/components/highlights";
@@ -28,7 +29,10 @@ import { RecordActivity } from "@/components/record-activity";
 import { RecordFooter } from "@/components/record-footer";
 import { RelationTable } from "@/components/relation-table";
 import { detailFields, fieldNamed, nameField, pickFields } from "@/lib/record-fields";
+import { formatDate, isStale } from "@/lib/format";
 import { recordChrome, type RecordSearchParams } from "@/lib/record-page";
+import { customDetailFields } from "@/lib/custom-fields";
+import { VERIFY_DAYS } from "@/lib/health";
 
 const LONG = ["description", "episodeStructure", "sponsorFit", "notes"];
 
@@ -68,6 +72,9 @@ export default async function FormatPage({ params, searchParams }: { params: Pro
 
   const record = format as unknown as Record<string, unknown>;
   const all = detailFields("format", record);
+  // Fields added under Settings → Fields sit below the built-in ones.
+  const unverified = isStale(format.verifiedAt, VERIFY_DAYS);
+  const custom = await customDetailFields("format", format.custom);
   const details = all.filter((f) => !LONG.includes(f.name) && f.name !== "logline");
   const highlights = pickFields(all, ["formatType", "targetPlatform", "episodeLength", "productionScale", "location", "lastActivityAt"]);
 
@@ -90,8 +97,9 @@ export default async function FormatPage({ params, searchParams }: { params: Pro
         name={nameField("format", record)} typeLabel="Format" canEdit={canEdit} favorited={chrome.favorited}
         archived={format.archived} archivedReason={format.archivedReason} mergedInto={chrome.merged} duplicates={chrome.duplicates}
         status={{ type: "format", value: format.status }} editHref={`${path}/edit`}
-        badges={<KindBadge kind="format" />}
+        badges={<><KindBadge kind="format" />{unverified && <span className="rounded bg-warn-wash px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warn" title={format.verifiedAt ? `Last verified ${formatDate(format.verifiedAt)}` : "Never verified"}>Unverified</span>}</>}
         subtitle={<p className="mt-2 max-w-2xl text-sm italic text-charcoal"><InlineField type="format" id={format.id} field={fieldNamed(all, "logline")} canEdit={canEdit} placeholder="Add a logline…" /></p>}
+        verify={canEdit ? <VerifyButton type="format" id={format.id} verifiedAt={format.verifiedAt?.toISOString() ?? null} fresh={!unverified} /> : null}
         nav={<><RecordContext type="format" id={format.id} name={format.title} slug={format.slug} path={path} canEdit={canEdit} status={format.status} /><RecordStepper type="format" fallback={neighbors} /></>}
         actions={<AddToCollectionButton targetType="format" targetId={format.id} targetLabel={format.title} />}
         linkTargets={[{ key: "talent", label: "Talent" }, { key: "people", label: "People" }, { key: "companies", label: "Companies" }, { key: "topics", label: "Topics" }]}
@@ -103,7 +111,7 @@ export default async function FormatPage({ params, searchParams }: { params: Pro
         </div>
       )}
 
-      <RecordLayout details={<DetailsPanel type="format" id={format.id} fields={details} canEdit={canEdit} />}>
+      <RecordLayout details={<DetailsPanel extra={custom} type="format" id={format.id} fields={details} canEdit={canEdit} />}>
         <RecordTabs path={path} tabs={tabs} current={tab} />
 
         {tab === "overview" && (
@@ -194,7 +202,7 @@ export default async function FormatPage({ params, searchParams }: { params: Pro
         {tab === "activity" && <RecordActivity type="format" id={format.id} />}
       </RecordLayout>
 
-      <RecordFooter type="format" id={format.id} createdAt={format.createdAt} updatedAt={format.updatedAt} owner={format.owner?.name} />
+      <RecordFooter type="format" id={format.id} createdAt={format.createdAt} updatedAt={format.updatedAt} owner={format.owner?.name} verifiedAt={format.verifiedAt} verifiedBy={format.verifiedBy} />
     </div>
   );
 }

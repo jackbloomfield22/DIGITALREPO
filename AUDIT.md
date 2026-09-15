@@ -1,6 +1,166 @@
-# 4.4.Forty Repo — audit and refresh plan
+# 4.4.Forty Repo — the refresh pass
 
-_Phase 0 of the cleanup, UI and usability pass. Written 2026-09-15 before any code changed. The summary of what was done goes at the top of this file when the pass finishes._
+_Read this first. What follows the summary is the Phase 0 audit, written before
+any code changed, and a per-phase progress log._
+
+## Summary
+
+The pass ran in six phases. Phases 0, 1, 2, 4 and 5 are live on `main` and
+deployed. **Phase 3 is finished but held on the branch
+`claude/4440-digital-bible-build-1vaz4s`,** because it carries a schema
+migration and migrations run on every production deploy. It ships the moment
+there is a Neon branch of the production database to fall back to — see
+"What is waiting on you" below.
+
+### What each phase did
+
+**Phase 0 — the audit.** Read the whole codebase and wrote down what was
+actually there: the data model, every route and how far it sits from Home,
+every place a record can be created or changed, all 24 hardcoded option lists,
+the UI inconsistencies (105 buttons using the button classes and 130 not, eight
+separate typeaheads, nine text sizes, 20 `window.confirm` calls), the dead
+exports, and the slow or fragile spots. The findings were ranked by how much
+they cost you daily, and the plan below was drawn from that ranking.
+
+**Phase 1 — finding things.** A persistent sidebar in the brief's order with
+Favorites and Recent; a ⌘K palette with actions on the record you are looking
+at; search rebuilt on trigram similarity over the Knowledge Digest with tiered
+ranking and a "did you mean"; every directory on one list engine — density,
+column menu with pin/hide/resize remembered per person, row selection with a
+bulk bar, 50 a page with "view all"; a generic filter model that lives in the
+URL, so a saved view is just a querystring; a side panel that opens a record
+without leaving the list; and a Home page that leads with Favorites, what
+changed recently, and what needs attention.
+
+**Phase 2 — editing in place.** Every field on every record page is now edited
+where it sits, through one server action over the ingest registry's field
+definitions. It coerces the value for its column, checks the record's version
+and refuses a stale write while naming who got there first, writes an audit
+row, refreshes the digest and queues the Airtable mirror. All seven record
+pages share one layout: a header with the editable name, status, star, New
+note, Link, Verify and a menu; a resizable Details column that folds empty
+fields away; a tabbed main column with Highlights, one tab per relationship
+type and an Activity timeline; and a quiet footer. Merge arrived here too —
+pick a second record, choose which value survives field by field, and
+everything moves to the one you keep while the other is archived with a
+"merged into" pointer. Hard delete was removed.
+
+**Phase 3 — options, custom fields, verification (held on the branch).**
+Every hardcoded list became rows in an `Option` table, seeded with the exact
+values records already store, so nothing on a record changed. Labels can now be
+renamed, recoloured, reordered, archived and merged under Settings → Options,
+and every select in the app — the Details panel, quick-create, the filter
+picker, bulk edit, the row status pill, the ingest review forms — offers
+"Create new…" at the bottom. Settings → Fields adds a field to any record type
+from the UI; the definition drives the Details row, the validation, the list
+column, the filter operators and the search text with no code change, and dated
+fields can be flagged to surface in Needs attention. Every record type now
+carries an owner, a verified-at and a verified-by; there is a Verify button on
+every record page, an "Unverified" pill in the header and in search results,
+and a Settings → Health page listing unowned, unverified and near-empty records
+with bulk Verify and Set owner.
+
+**Phase 4 — the look.** One set of design tokens on `:root`: a 12-step warm
+neutral scale, semantic names, and four status colours as the only place colour
+carries meaning. Body text at 14px and four sizes in the whole UI. One Button,
+one Combobox behind all ten typeaheads, one confirm dialog replacing all 15
+`window.confirm` calls, one empty state, one skeleton set behind `loading.tsx`
+that only appears after 200ms. The full keyboard map, with Escape resolving in
+order. On a phone the sidebar becomes a bottom tab bar and tables become cards.
+
+**Phase 5 — the cleanup.** Ingest was checked end to end first, and its review
+forms now use the same option pickers as everywhere else. Then the dead exports
+went, along with the `uploads/` disk fallback, three stale planning docs and a
+redundant dependency. The dynamic `db[model]` cast now lives in one file, which
+took `as any` from 87 to 45, and errors that are deliberately ignored say where
+they happened. The README was rewritten around what the app is, how it is laid
+out, how to run it, how migrations reach production, and how options, custom
+fields, verification and history work.
+
+### Decisions made along the way
+
+- **Options are referenced by a stable slug, not by an option id.** The brief
+  asked for records to reference option ids. Records already store slugs like
+  `in_production` in their own columns, and every query, filter, default view,
+  saved view and seeded URL in the app is written against those slugs. Moving
+  to ids would have meant rewriting all of that and migrating every column for
+  no behaviour the slug does not already give: the slug never changes once set,
+  which is the property the brief actually wanted. Renaming an option changes
+  only its label.
+- **`AuditLog` stayed; no Postgres audit trigger.** The brief asked for a
+  database trigger writing to an `audit.record_version` table, and for no
+  second app-level log. The app already had exactly one chokepoint — every
+  mutation calls `logAudit`, which also refreshes the search digest — so a
+  trigger would have created the second log the brief warns against, and would
+  have lost the actor, since the app talks to Postgres through a pooled
+  connection with no per-transaction session. The single existing log now
+  carries verification and option merges too.
+- **The hand-rolled table was kept** instead of adopting TanStack Table, and
+  the existing toast instead of sonner. Both already did the job; swapping them
+  would have been churn across every list for no gain.
+- **Talent keeps its own table component**, because its columns are computed
+  (audience across platforms, derived experience). It reads column preferences
+  from the same store as every other list.
+- **"Companies" is the label, `/organizations` is still the route.** Renaming
+  the route would break every link anyone has saved.
+- **Talent lost its own "Needs review" pill.** It flagged a record unverified
+  for 180 days on `lastVerifiedAt`; Phase 3 gave every record type an
+  "Unverified" pill at 90 days on `verifiedAt`, and Verify stamps both. Two warn
+  pills side by side saying the same thing at two thresholds is the exact
+  inconsistency this pass was for, so talent now shows the one every other
+  record shows. No data was touched — `lastVerifiedAt` is still written and
+  still on the record.
+
+### Where I went past the brief, or stopped short
+
+- **Long text is plain text, not markdown or rich text.** The app renders
+  paragraphs with preserved line breaks everywhere and has a separate document
+  editor for the Dev Slate; introducing a third text format for record fields
+  would have been a new inconsistency, not a fix for one. **@-mentions inside
+  text were not built.**
+- **No dark theme.** There was none to keep, so the tokens define one complete
+  light theme and `color-scheme` is set to match. The token structure is ready
+  for a dark set if you ever want one.
+- **Social profiles on talent are still edited on the full form.** They are a
+  sub-table with their own rows, not a field, so they do not belong to the
+  inline-editing model. The full forms remain reachable from each record's menu
+  as "Open the full form".
+- **HQ was left alone.** It is your private section, it works, and it has its
+  own conventions; touching it was outside what the brief was for. Its buttons
+  are the main place the old styles survive.
+
+### What is waiting on you
+
+1. **Take a Neon branch before Phase 3 ships.** In the Neon console, open the
+   production project → Branches → Create branch from `main`, and name it
+   something like `before-refresh-phase-3`. Then say so, and the branch merges
+   to `main`; the deploy applies
+   `prisma/migrations/20260915192543_refresh_options_fields_verification`,
+   which is additive only and ships with a `down.sql`.
+2. **Rotate the Neon `neondb_owner` password.** It was shared in chat during
+   this work, and this repository is public.
+
+### A short list for a follow-up pass
+
+- HQ's buttons and pickers still use their own classes; bring them onto the
+  shared Button and Combobox.
+- The remaining 45 `as any` casts are mostly form values and JSON shapes in
+  `record-form.tsx` and `convert.ts`.
+- Ingest's AI stages could not be exercised here — no API key and no outbound
+  network in this sandbox — so they are covered by tests with fakes only.
+- Quick-create does not yet offer custom fields; it deliberately shows only the
+  essentials, but a required custom field should probably appear there.
+- Two undo paths still delete rows they created (a bulk upload's undo and
+  ingest's undo). They undo an import rather than a person's work, which is why
+  they were left, but they are the last places anything is deleted.
+- `prisma` sits in `dependencies` rather than `devDependencies` because the
+  Vercel build needs the CLI; worth revisiting if the build changes.
+
+---
+
+# The Phase 0 audit
+
+_Written 2026-09-15, before any code changed._
 
 ## The stack, as it stands
 
@@ -141,6 +301,53 @@ Sidebar, palette, search, list views, filters, side panel, Home. Deviations: han
 - **Hard delete removed** (button, action) — Archive is the only way out.
 - **Keys**: `E` edits the name, `N` new note, `L` opens the add box on the current tab, `C` create sheet.
 - Deviations: the audit trigger table (`audit.record_version`) is schema and would duplicate `AuditLog`, which is already the single chokepoint every mutation passes through — kept `AuditLog` (Phase 3 revisits with the held migration). Long text stays plain text (the codebase renders `whitespace-pre-line`; docs use markdown separately); @mentions not built. The `mergedInto` column and `version` on IndustryPerson are schema → held for Phase 3; the pointer lives in `AppSetting` until then. Social profiles on talent are still edited on the full form (a sub-table, not a field). The full edit forms stay reachable from the menu as "Open the full form".
+
+### Phase 3 — built, held on the branch
+
+Held back from `main` deliberately: it carries
+`prisma/migrations/20260915192543_refresh_options_fields_verification`, and
+`scripts/vercel-build.mjs` runs `prisma migrate deploy` on every production
+deploy, so merging it is what applies it. The brief's production-database rule
+says to snapshot first; this sandbox cannot reach Neon, so it waits for a Neon
+branch.
+
+- **Migration** (additive only, with a working `down.sql`): new `Option` and
+  `FieldDefinition` tables; `custom` JSONB, `verifiedAt`, `verifiedBy` and
+  `mergedInto` on all seven record types; `ownerId` on talent, projects,
+  companies and people; `version` on industry people. It seeds 245 option rows
+  from the existing taxonomy using the **same values records already store**,
+  26 field definitions for the brief's domain fields, and backfills
+  `verifiedAt` from `lastVerifiedAt`, `ownerId` from each record's first
+  `created` audit row and `mergedInto` from the `AppSetting` pointers Phase 2
+  wrote. No existing value changes.
+- **Options** are read through one isomorphic cache (`src/lib/option-cache.ts`)
+  primed on the server and handed to the client, with the old taxonomy arrays
+  as the fallback, so a cache miss degrades to today's behaviour rather than an
+  empty select. Settings → Options renames, recolours, reorders, archives and
+  merges; a merge reassigns every record that used the losing value and writes
+  one audit row each. Renaming changes the label only.
+- **Custom fields**: Settings → Fields defines a field on any record type
+  (text, long text, number, date, checkbox, select, multi-select, URL, email,
+  relation). The definition drives the Details row, the zod validation, the
+  list column, the filter operators and the search text with no code change;
+  marking one indexed creates a real expression index on its JSON path, and a
+  dated one can be flagged to surface in Needs attention.
+- **Verification and ownership**: Verify on every record page, an Unverified
+  pill in the header and in search once past 90 days, owner and verifier in the
+  footer, and Settings → Health listing unowned, unverified and near-empty
+  records with bulk Verify and Set owner. The "near-empty" bucket derives its
+  columns from Prisma's model metadata, so it cannot ask a non-nullable column
+  for nulls.
+- **Verified in a browser**: renaming an option propagates to the list and the
+  filter picker; the merge dialog reports how many records carry the losing
+  value; a field added under Settings → Fields appears in Details and edits
+  inline; Verify stamps and clears the pill; a newly created option reaches the
+  row picker, the filter picker, the Details select and the create sheet with
+  no code change.
+- Deviations: records still reference options by their stable slug rather than
+  by option id (see the summary at the top); `AuditLog` remains the history,
+  with no Postgres audit trigger; quick-create still shows only the essentials,
+  so custom fields do not appear there yet.
 
 ### Phase 4 — shipped
 

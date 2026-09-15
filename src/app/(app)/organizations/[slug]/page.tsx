@@ -14,6 +14,7 @@ import { SourceList } from "@/components/sources-attachments";
 import { labelFor, CREATOR_ORG_RELATIONSHIPS, PROJECT_ORG_RELATIONSHIPS, PERSON_ROLE_TYPES } from "@/lib/taxonomy";
 import { LINK_SPECS } from "@/lib/ingest/registry";
 import { RecordHeader } from "@/components/record-header";
+import { VerifyButton } from "@/components/verify-button";
 import { RecordLayout } from "@/components/record-layout";
 import { DetailsPanel } from "@/components/details-panel";
 import { Highlights } from "@/components/highlights";
@@ -23,7 +24,10 @@ import { RecordActivity } from "@/components/record-activity";
 import { RecordFooter } from "@/components/record-footer";
 import { RelationTable } from "@/components/relation-table";
 import { detailFields, fieldNamed, nameField, pickFields } from "@/lib/record-fields";
+import { formatDate, isStale } from "@/lib/format";
 import { recordChrome, type RecordSearchParams } from "@/lib/record-page";
+import { customDetailFields } from "@/lib/custom-fields";
+import { VERIFY_DAYS } from "@/lib/health";
 
 const LONG = ["description", "internalNotes"];
 
@@ -33,6 +37,7 @@ export default async function OrganizationPage({ params, searchParams }: { param
   const org = await db.organization.findUnique({
     where: { slug },
     include: {
+      owner: { select: { name: true } },
       projects: { include: { project: { select: { id: true, title: true, slug: true, projectType: true, premiereYear: true, status: true } } } },
       creators: { include: { creator: { select: { id: true, name: true, slug: true, imageUrl: true } } } },
       formats: { include: { format: { select: { id: true, title: true, slug: true, status: true } } } },
@@ -79,6 +84,9 @@ export default async function OrganizationPage({ params, searchParams }: { param
 
   const record = org as unknown as Record<string, unknown>;
   const all = detailFields("organization", record);
+  // Fields added under Settings → Fields sit below the built-in ones.
+  const unverified = isStale(org.verifiedAt, VERIFY_DAYS);
+  const custom = await customDetailFields("organization", org.custom);
   const details = all.filter((f) => !LONG.includes(f.name));
   const highlights = pickFields(all, ["types", "location", "website"]);
 
@@ -98,6 +106,7 @@ export default async function OrganizationPage({ params, searchParams }: { param
     <div>
       <RecordHeader
         type="organization" id={org.id} slug={org.slug} path={path} version={org.version}
+        badges={unverified && <span className="rounded bg-warn-wash px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warn" title={org.verifiedAt ? `Last verified ${formatDate(org.verifiedAt)}` : "Never verified"}>Unverified</span>}
         name={nameField("organization", record)} typeLabel="Company" canEdit={canEdit} favorited={chrome.favorited}
         archived={org.archived} archivedReason={org.archivedReason} mergedInto={chrome.merged} duplicates={chrome.duplicates}
         editHref={`${path}/edit`}
@@ -109,13 +118,14 @@ export default async function OrganizationPage({ params, searchParams }: { param
             {org.website && <a href={org.website} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-accent-deep">Website ↗</a>}
           </div>
         }
+        verify={canEdit ? <VerifyButton type="organization" id={org.id} verifiedAt={org.verifiedAt?.toISOString() ?? null} fresh={!unverified} /> : null}
         nav={<><RecordContext type="organization" id={org.id} name={org.name} slug={org.slug} path={path} canEdit={canEdit} status={null} /><RecordStepper type="organization" fallback={neighbors} /></>}
         actions={<AddToCollectionButton targetType="organization" targetId={org.id} targetLabel={org.name} />}
         linkTargets={[{ key: "projects", label: "Project" }, { key: "talent", label: "Talent" }, { key: "formats", label: "Format" }, { key: "people", label: "Person" }]}
       />
 
       <RecordLayout details={<>
-        <DetailsPanel type="organization" id={org.id} fields={details} canEdit={canEdit} />
+        <DetailsPanel extra={custom} type="organization" id={org.id} fields={details} canEdit={canEdit} />
         <div className="card p-4">
           <div className="overline mb-2">At a glance</div>
           <ul className="space-y-1 text-sm">
@@ -218,7 +228,7 @@ export default async function OrganizationPage({ params, searchParams }: { param
         {tab === "activity" && <RecordActivity type="organization" id={org.id} />}
       </RecordLayout>
 
-      <RecordFooter type="organization" id={org.id} createdAt={org.createdAt} updatedAt={org.updatedAt} />
+      <RecordFooter type="organization" id={org.id} createdAt={org.createdAt} updatedAt={org.updatedAt} verifiedAt={org.verifiedAt} verifiedBy={org.verifiedBy} owner={org.owner?.name} />
     </div>
   );
 }

@@ -94,7 +94,7 @@ export async function reorderFieldDefinitions(recordType: string, ids: string[])
 }
 
 /** The option sets a new select field can draw from. */
-export async function optionSetChoices(): Promise<{ value: string; label: string }[]> {
+export async function optionSetChoicesPublic(): Promise<{ value: string; label: string }[]> {
   await requireRole("EDITOR");
   const known = Object.entries(OPTION_SETS).map(([value, s]) => ({ value, label: s.label }));
   const extra = await db.option.findMany({ distinct: ["setKey"], select: { setKey: true } });

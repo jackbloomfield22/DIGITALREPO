@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Combobox, lookupItems } from "@/components/combobox";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Portrait } from "@/components/ui";

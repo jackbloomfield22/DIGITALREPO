@@ -4,7 +4,7 @@
 // a small input appears; the option is added to the shared set and chosen at
 // once, so it exists everywhere that field is used from then on.
 
-import { useState, type SelectHTMLAttributes } from "react";
+import { forwardRef, useState, type SelectHTMLAttributes } from "react";
 import { useRouter } from "next/navigation";
 import { createOption } from "@/lib/actions/options";
 import { useToast } from "@/components/toast";
@@ -12,7 +12,7 @@ import type { LabeledValue } from "@/lib/taxonomy";
 
 const CREATE = "__create__";
 
-export function OptionSelect({ setKey, options, value, onChange, allowEmpty = true, emptyLabel = "—", canCreate = true, onCreated, ...rest }: {
+export type OptionSelectProps = {
   setKey?: string;
   options: LabeledValue[];
   value: string;
@@ -21,7 +21,12 @@ export function OptionSelect({ setKey, options, value, onChange, allowEmpty = tr
   emptyLabel?: string;
   canCreate?: boolean;
   onCreated?: (o: LabeledValue) => void;
-} & Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">) {
+} & Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">;
+
+export const OptionSelect = forwardRef<HTMLSelectElement, OptionSelectProps>(function OptionSelect(
+  { setKey, options, value, onChange, allowEmpty = true, emptyLabel = "—", canCreate = true, onCreated, ...rest },
+  ref,
+) {
   const [creating, setCreating] = useState(false);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,7 +54,7 @@ export function OptionSelect({ setKey, options, value, onChange, allowEmpty = tr
 
   if (creating) {
     return (
-      <span className="flex items-center gap-1">
+      <span className="flex items-center gap-1" data-option-create>
         <input autoFocus value={label} placeholder="New option…" aria-label="New option name" className="!min-h-8" disabled={busy}
           onChange={(e) => setLabel(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void create(); } if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setCreating(false); } }} />
@@ -59,11 +64,11 @@ export function OptionSelect({ setKey, options, value, onChange, allowEmpty = tr
     );
   }
   return (
-    <select {...rest} value={value} onChange={(e) => { if (e.target.value === CREATE) { setCreating(true); return; } onChange(e.target.value); }}>
+    <select ref={ref} {...rest} value={value} onChange={(e) => { if (e.target.value === CREATE) { setCreating(true); return; } onChange(e.target.value); }}>
       {allowEmpty && <option value="">{emptyLabel}</option>}
       {!known && value && <option value={value}>{value}</option>}
       {all.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       {canCreate && setKey && <option value={CREATE}>＋ Create new…</option>}
     </select>
   );
-}
+});

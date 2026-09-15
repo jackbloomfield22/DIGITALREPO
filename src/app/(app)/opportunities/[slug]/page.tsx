@@ -11,8 +11,9 @@ import { recordRecentView } from "@/lib/actions/misc";
 import { Portrait, Section, StatusPill } from "@/components/ui";
 import { AddCandidateButton } from "@/components/opportunity-match";
 import { labelFor } from "@/lib/taxonomy";
-import { compactNumber, totalAudience } from "@/lib/format";
+import { compactNumber, totalAudience, isStale } from "@/lib/format";
 import { RecordHeader } from "@/components/record-header";
+import { VerifyButton } from "@/components/verify-button";
 import { RecordLayout } from "@/components/record-layout";
 import { DetailsPanel } from "@/components/details-panel";
 import { Highlights } from "@/components/highlights";
@@ -22,7 +23,10 @@ import { RecordActivity } from "@/components/record-activity";
 import { RecordFooter } from "@/components/record-footer";
 import { RelationTable } from "@/components/relation-table";
 import { detailFields, fieldNamed, nameField, pickFields } from "@/lib/record-fields";
+import { formatDate } from "@/lib/format";
 import { recordChrome, type RecordSearchParams } from "@/lib/record-page";
+import { customDetailFields } from "@/lib/custom-fields";
+import { VERIFY_DAYS } from "@/lib/health";
 
 const CANDIDATE_STATUSES = [
   { value: "candidate", label: "Candidate" },
@@ -88,6 +92,9 @@ export default async function OpportunityPage({ params, searchParams }: { params
 
   const record = opp as unknown as Record<string, unknown>;
   const all = detailFields("opportunity", record);
+  // Fields added under Settings → Fields sit below the built-in ones.
+  const unverified = isStale(opp.verifiedAt, VERIFY_DAYS);
+  const custom = await customDetailFields("opportunity", opp.custom);
   const details = all.filter((f) => !LONG.includes(f.name));
   const highlights = pickFields(all, ["type", "deadline", "lastActivityAt", "audienceRequirements", "platformRequirements"]);
 
@@ -110,13 +117,14 @@ export default async function OpportunityPage({ params, searchParams }: { params
         name={nameField("opportunity", record)} typeLabel="Opportunity" canEdit={canEdit} favorited={chrome.favorited}
         archived={opp.archived} archivedReason={opp.archivedReason} mergedInto={chrome.merged} duplicates={chrome.duplicates}
         status={{ type: "opportunity", value: opp.status }} editHref={`${path}/edit`}
-        badges={opp.type ? <span className="kind-badge kind-project">{labelFor(opp.type)}</span> : null}
+        badges={<>{opp.type ? <span className="kind-badge kind-project">{labelFor(opp.type)}</span> : null}{unverified && <span className="rounded bg-warn-wash px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warn" title={opp.verifiedAt ? `Last verified ${formatDate(opp.verifiedAt)}` : "Never verified"}>Unverified</span>}</>}
         subtitle={opp.owner?.name ? <p className="mt-1 text-sm text-muted">Owned by {opp.owner.name}</p> : null}
+        verify={canEdit ? <VerifyButton type="opportunity" id={opp.id} verifiedAt={opp.verifiedAt?.toISOString() ?? null} fresh={!unverified} /> : null}
         nav={<><RecordContext type="opportunity" id={opp.id} name={opp.title} slug={opp.slug} path={path} canEdit={canEdit} status={opp.status} /><RecordStepper type="opportunity" fallback={neighbors} /></>}
         linkTargets={[{ key: "criteria", label: "Criterion" }, { key: "talent", label: "Talent" }, { key: "formats", label: "Format" }, { key: "companies", label: "Company" }, { key: "projects", label: "Project" }]}
       />
 
-      <RecordLayout details={<DetailsPanel type="opportunity" id={opp.id} fields={details} canEdit={canEdit} />}>
+      <RecordLayout details={<DetailsPanel extra={custom} type="opportunity" id={opp.id} fields={details} canEdit={canEdit} />}>
         <RecordTabs path={path} tabs={tabs} current={tab} />
 
         {tab === "overview" && (
@@ -203,7 +211,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
         {tab === "activity" && <RecordActivity type="opportunity" id={opp.id} />}
       </RecordLayout>
 
-      <RecordFooter type="opportunity" id={opp.id} createdAt={opp.createdAt} updatedAt={opp.updatedAt} owner={opp.owner?.name} />
+      <RecordFooter type="opportunity" id={opp.id} createdAt={opp.createdAt} updatedAt={opp.updatedAt} owner={opp.owner?.name} verifiedAt={opp.verifiedAt} verifiedBy={opp.verifiedBy} />
     </div>
   );
 }

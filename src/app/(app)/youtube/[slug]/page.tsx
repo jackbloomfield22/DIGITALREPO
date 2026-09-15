@@ -10,12 +10,13 @@ import { ChannelIdeas } from "@/components/channel-ideas";
 import { LINK_SPECS } from "@/lib/ingest/registry";
 import { AttachmentList } from "@/components/attachments";
 import { attachmentsFor, uploadLimit } from "@/lib/files";
-import { compactNumber, formatDate, relativeTime, isStale } from "@/lib/format";
+import { formatDate, relativeTime, isStale } from "@/lib/format";
 import { labelFor } from "@/lib/taxonomy";
 import { RecordStepper } from "@/components/record-stepper";
 import { RecordContext } from "@/components/record-context";
 import { recordNeighbors } from "@/lib/neighbors";
 import { RecordHeader } from "@/components/record-header";
+import { VerifyButton } from "@/components/verify-button";
 import { RecordLayout } from "@/components/record-layout";
 import { DetailsPanel } from "@/components/details-panel";
 import { Highlights } from "@/components/highlights";
@@ -26,6 +27,8 @@ import { RecordFooter } from "@/components/record-footer";
 import { RelationTable } from "@/components/relation-table";
 import { detailFields, fieldNamed, nameField, pickFields } from "@/lib/record-fields";
 import { recordChrome, type RecordSearchParams } from "@/lib/record-page";
+import { customDetailFields } from "@/lib/custom-fields";
+import { VERIFY_DAYS } from "@/lib/health";
 
 const STALE_DAYS = 60;
 const LONG = ["premise", "revenueModel", "notes", "ideas"];
@@ -68,6 +71,9 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
 
   const record = channel as unknown as Record<string, unknown>;
   const all = detailFields("channel", record);
+  // Fields added under Settings → Fields sit below the built-in ones.
+  const unverified = isStale(channel.verifiedAt, VERIFY_DAYS);
+  const custom = await customDetailFields("channel", channel.custom);
   const details = all.filter((f) => !LONG.includes(f.name));
   const highlights = pickFields(all, ["subscribers", "totalViews", "videoCount", "cadence", "launchedAt", "lastActivityAt"]);
 
@@ -85,6 +91,7 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
     <div>
       <RecordHeader
         type="channel" id={channel.id} slug={channel.slug} path={path} version={channel.version}
+        badges={unverified && <span className="rounded bg-warn-wash px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warn" title={channel.verifiedAt ? `Last verified ${formatDate(channel.verifiedAt)}` : "Never verified"}>Unverified</span>}
         name={nameField("channel", record)} typeLabel="YouTube channel" canEdit={canEdit} favorited={chrome.favorited}
         archived={channel.archived} archivedReason={channel.archivedReason} mergedInto={chrome.merged} mergeable={false}
         status={{ type: "channel", value: channel.status }} editHref={`${path}/edit`}
@@ -96,13 +103,14 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
             {channel.countUpdatedAt && <span className={isStale(channel.countUpdatedAt, STALE_DAYS) ? "text-warn" : undefined}>numbers checked {relativeTime(channel.countUpdatedAt)}</span>}
           </div>
         }
+        verify={canEdit ? <VerifyButton type="channel" id={channel.id} verifiedAt={channel.verifiedAt?.toISOString() ?? null} fresh={!unverified} /> : null}
         nav={<><RecordContext type="channel" id={channel.id} name={channel.name} slug={channel.slug} path={path} canEdit={canEdit} status={channel.status} /><RecordStepper type="channel" fallback={neighbors} /></>}
         actions={channel.url ? <a href={channel.url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">Open on YouTube</a> : null}
         linkTargets={[{ key: "companies", label: "Company" }, { key: "people", label: "Person" }]}
       />
 
       <RecordLayout details={<>
-        <DetailsPanel type="channel" id={channel.id} fields={details} canEdit={canEdit} />
+        <DetailsPanel extra={custom} type="channel" id={channel.id} fields={details} canEdit={canEdit} />
         <div className="card p-4">
           <div className="overline mb-2">Who</div>
           <dl className="space-y-1.5 text-sm">
@@ -153,7 +161,7 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
         {tab === "activity" && <RecordActivity type="channel" id={channel.id} />}
       </RecordLayout>
 
-      <RecordFooter type="channel" id={channel.id} createdAt={channel.createdAt} updatedAt={channel.updatedAt} owner={channel.owner?.name} />
+      <RecordFooter type="channel" id={channel.id} createdAt={channel.createdAt} updatedAt={channel.updatedAt} owner={channel.owner?.name} verifiedAt={channel.verifiedAt} verifiedBy={channel.verifiedBy} />
     </div>
   );
 }

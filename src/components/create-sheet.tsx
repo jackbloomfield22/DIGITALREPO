@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useDialogFocus } from "@/components/overlay";
 import { useToast } from "@/components/toast";
 import { usePrefs } from "@/components/prefs-provider";
+import { OptionSelect } from "@/components/option-select";
 import { createRecord } from "@/lib/actions/quick-create";
 import type { CreateType } from "@/lib/record-fields";
 import { RECORD_REGISTRY, type EditableField } from "@/lib/ingest/registry";
@@ -135,10 +136,7 @@ export function CreateSheet({ isEditor }: { isEditor: boolean }) {
             <label key={f.name} className={`block text-sm ${f.kind === "longtext" ? "sm:col-span-2" : ""}`}>
               <span className="mb-1 block text-xs font-semibold text-muted">{f.label}</span>
               {f.kind === "vocab" && (
-                <select value={String(values[f.name] ?? "")} onChange={(e) => set(f.name, e.target.value)}>
-                  <option value="">—</option>
-                  {(f.vocab?.() ?? []).filter((o) => o.value).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <OptionSelect setKey={f.set} options={(f.vocab?.() ?? []).filter((o) => o.value)} value={String(values[f.name] ?? "")} onChange={(v) => set(f.name, v)} />
               )}
               {f.kind === "vocablist" && (
                 <select multiple value={Array.isArray(values[f.name]) ? (values[f.name] as string[]) : []} onChange={(e) => set(f.name, [...e.target.selectedOptions].map((o) => o.value))} className="min-h-24">

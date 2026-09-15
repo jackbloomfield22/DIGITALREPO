@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { mergeRecordsCore, type MergeInput, type MergeOutcome } from "@/lib/merge-records";
 import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
-import { db } from "@/lib/db";
 import { modelFor } from "@/lib/db-model";
 
 export type MergeResult = { ok: true; outcome: MergeOutcome; href: string } | { ok: false; error: string };

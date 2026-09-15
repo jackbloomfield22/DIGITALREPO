@@ -16,7 +16,7 @@ import { CopySummaryButton } from "@/components/profile-chrome";
 import { SourceList } from "@/components/sources-attachments";
 import { AttachmentList } from "@/components/attachments";
 import { attachmentsFor, uploadLimit } from "@/lib/files";
-import { VerifyButton } from "@/components/talent/verify-button";
+import { VerifyButton } from "@/components/verify-button";
 import { TalentTypeSelect } from "@/components/talent/talent-type-select";
 import { RepList } from "@/components/talent/rep-list";
 import {
@@ -34,6 +34,8 @@ import { RecordFooter } from "@/components/record-footer";
 import { RelationTable } from "@/components/relation-table";
 import { detailFields, fieldNamed, nameField, pickFields } from "@/lib/record-fields";
 import { recordChrome, type RecordSearchParams } from "@/lib/record-page";
+import { customDetailFields } from "@/lib/custom-fields";
+import { VERIFY_DAYS } from "@/lib/health";
 
 const BUSINESS_RELS = new Set(["founder", "owner", "investor", "advisor"]);
 const BRAND_RELS = new Set(["ambassador", "campaign", "sponsored_content", "partner", "athlete", "collaboration", "team_member"]);
@@ -46,6 +48,7 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
   const creator = await db.creator.findUnique({
     where: { slug },
     include: {
+      owner: { select: { name: true } },
       socialProfiles: { orderBy: { followerCount: "desc" } },
       entityLinks: { include: { entity: true } },
       credits: { include: { project: { include: { organizations: { include: { organization: { select: { name: true, slug: true } } } } } } } },
@@ -86,7 +89,6 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
   const basedIn = locations.find((l) => l.relationship === "based_in") ?? locations[0];
   const age = ageFrom(creator.birthday, creator.age);
   const audience = totalAudience(creator.socialProfiles);
-  const needsReview = isStale(creator.lastVerifiedAt, 180);
   const chipTemplate = { kind: "creator_entity" as const, creatorId: creator.id };
 
   const projectMap = new Map<string, { project: (typeof creator.credits)[number]["project"]; roles: string[] }>();
@@ -142,6 +144,9 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
 
   const record = creator as unknown as Record<string, unknown>;
   const all = detailFields("creator", record);
+  // Fields added under Settings → Fields sit below the built-in ones.
+  const unverified = isStale(creator.verifiedAt, VERIFY_DAYS);
+  const custom = await customDetailFields("creator", creator.custom);
   const details = all.filter((f) => !LONG.includes(f.name) && f.name !== "headline");
   const highlights = pickFields(all, ["status", "age", "birthday", "aliases"]);
 
@@ -166,7 +171,7 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
         archived={creator.archived} archivedReason={creator.archivedReason} mergedInto={chrome.merged} duplicates={chrome.duplicates}
         status={{ type: "creator", value: creator.status }} editHref={`${path}/edit`}
         media={<Portrait name={creator.name} imageUrl={creator.imageUrl} className="h-32 w-32 shrink-0 rounded-lg sm:h-40 sm:w-40" textClass="text-5xl" />}
-        badges={needsReview ? <span className="rounded bg-warn-wash px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warn" title={creator.lastVerifiedAt ? `Last verified ${formatDate(creator.lastVerifiedAt)}` : "Never verified"}>Needs review</span> : null}
+        badges={unverified && <span className="rounded bg-warn-wash px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warn" title={creator.verifiedAt ? `Last verified ${formatDate(creator.verifiedAt)}` : "Never verified"}>Unverified</span>}
         subtitle={
           <>
             <p className="mt-1 text-muted"><InlineField type="creator" id={creator.id} field={fieldNamed(all, "headline")} canEdit={canEdit} placeholder="Add a headline…" /></p>
@@ -179,13 +184,13 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
           </>
         }
         nav={<><RecordContext type="creator" id={creator.id} name={creator.name} slug={creator.slug} path={path} canEdit={canEdit} status={creator.status} /><RecordStepper type="creator" fallback={neighbors} /></>}
-        verify={canEdit ? <VerifyButton creatorId={creator.id} /> : null}
+        verify={canEdit ? <VerifyButton type="creator" id={creator.id} verifiedAt={creator.verifiedAt?.toISOString() ?? null} fresh={!unverified} /> : null}
         actions={<><AddToCollectionButton targetType="creator" targetId={creator.id} targetLabel={creator.name} /><CopySummaryButton summary={summary} /><Link href={`${path}/one-sheet`} className="btn btn-secondary btn-sm">One-sheet</Link></>}
         linkTargets={[{ key: "projects", label: "Project" }, { key: "formats", label: "Format" }, { key: "companies", label: "Company" }, { key: "reps", label: "Rep" }, { key: "collaborators", label: "Collaborator" }]}
       />
 
       <RecordLayout details={<>
-        <DetailsPanel type="creator" id={creator.id} fields={details} canEdit={canEdit} />
+        <DetailsPanel extra={custom} type="creator" id={creator.id} fields={details} canEdit={canEdit} />
         <div className="card p-4">
           <div className="overline mb-2">Locations</div>
           <LinkChips
@@ -358,7 +363,7 @@ export default async function CreatorProfilePage({ params, searchParams }: { par
         {tab === "activity" && <RecordActivity type="creator" id={creator.id} />}
       </RecordLayout>
 
-      <RecordFooter type="creator" id={creator.id} createdAt={creator.createdAt} updatedAt={creator.updatedAt} verifiedAt={creator.lastVerifiedAt} />
+      <RecordFooter type="creator" id={creator.id} createdAt={creator.createdAt} updatedAt={creator.updatedAt} verifiedAt={creator.verifiedAt} verifiedBy={creator.verifiedBy} owner={creator.owner?.name} />
     </div>
   );
 }

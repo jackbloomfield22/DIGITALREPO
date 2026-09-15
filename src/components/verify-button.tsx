@@ -6,11 +6,10 @@ import { verifyRecord } from "@/lib/actions/verify";
 import { useToast } from "@/components/toast";
 import { Button } from "@/components/button";
 
-export function VerifyButton({ type, id, verifiedAt }: { type: string; id: string; verifiedAt?: string | null }) {
+export function VerifyButton({ type, id, verifiedAt, fresh = false }: { type: string; id: string; verifiedAt?: string | null; fresh?: boolean }) {
   const router = useRouter();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
-  const fresh = verifiedAt ? Date.now() - new Date(verifiedAt).getTime() < 90 * 86_400_000 : false;
   return (
     <Button size="sm" variant={fresh ? "ghost" : "secondary"} loading={busy} title={verifiedAt ? `Last verified ${new Date(verifiedAt).toLocaleDateString()}` : "Mark this record as checked today (V)"} data-verify-button
       onClick={async () => {

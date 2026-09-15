@@ -77,13 +77,19 @@ describe("backup round trip", () => {
   });
 
   it("does not let a snapshot grow with the files it is not carrying", async () => {
+    // What matters is the difference the file makes, not the dump's absolute
+    // size: the Repo's own rows grow over time, a file's bytes must never be
+    // in there at all. Measured before and against the same database.
+    const before = JSON.stringify(await buildBackup()).length;
     const big = new Uint8Array(2 * 1024 * 1024).fill(9);
     const file = await db.storedFile.create({
       data: { key: "zz-test-big.bin", mimeType: "application/octet-stream", sizeBytes: big.byteLength, data: big },
     });
     try {
-      const size = JSON.stringify(await buildBackup()).length;
-      expect(size).toBeLessThan(big.byteLength);
+      const after = JSON.stringify(await buildBackup()).length;
+      // Room for the row that records the file — its name, type and size — and
+      // nothing remotely like its two megabytes of content.
+      expect(after - before).toBeLessThan(4 * 1024);
     } finally {
       await db.storedFile.delete({ where: { id: file.id } });
     }

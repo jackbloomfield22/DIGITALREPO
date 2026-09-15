@@ -2,6 +2,8 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser, hasRole } from "@/lib/auth";
 import { attentionCounts, attentionWheres } from "@/lib/attention";
+import { customDateAlerts } from "@/lib/custom-fields";
+import { healthBuckets } from "@/lib/health";
 import { resolveRecordRefs } from "@/lib/record-refs";
 import { HomeSearch } from "@/components/home-search";
 import { typeLabel } from "@/lib/record-types";
@@ -29,7 +31,7 @@ export default async function Home() {
   const now = nowDate();
   const soon = daysAgo(-30);
   const { noRep, noProdCo, unverified } = attentionWheres();
-  const [favorites, audits, counts, deadlines, quietCandidates, events, noRepList, noCoList, unverifiedList] = await Promise.all([
+  const [favorites, audits, counts, deadlines, quietCandidates, events, noRepList, noCoList, unverifiedList, dateAlerts, health] = await Promise.all([
     db.favorite.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 12, select: { targetType: true, targetId: true } }),
     db.auditLog.findMany({ where: { targetType: { in: ["creator", "project", "organization", "format", "person", "opportunity", "channel"] } }, orderBy: { createdAt: "desc" }, take: 120, select: { targetType: true, targetId: true, targetLabel: true, userName: true, action: true, field: true, createdAt: true } }),
     attentionCounts(),
@@ -42,6 +44,8 @@ export default async function Home() {
     db.creator.findMany({ where: noRep, select: { id: true, name: true, slug: true }, take: 5, orderBy: { updatedAt: "desc" } }),
     db.project.findMany({ where: noProdCo, select: { id: true, title: true, slug: true }, take: 5, orderBy: { updatedAt: "desc" } }),
     db.creator.findMany({ where: unverified, select: { id: true, name: true, slug: true, lastVerifiedAt: true }, take: 5, orderBy: { lastVerifiedAt: { sort: "asc", nulls: "first" } } }),
+    customDateAlerts(6),
+    healthBuckets(0),
   ]);
 
   // Recently updated: one row per record, newest first, with who and when.
@@ -124,6 +128,25 @@ export default async function Home() {
                   <ul className="space-y-1">{unverifiedList.map((c) => <li key={c.id} className="flex items-baseline justify-between gap-2"><Link href={`/talent/${c.slug}`} className="truncate font-medium hover:text-accent-deep">{c.name}</Link><span className="shrink-0 text-xs text-muted">{c.lastVerifiedAt ? relativeTime(c.lastVerifiedAt) : "never"}</span></li>)}</ul>
                 </div>
               )}
+              {dateAlerts.length > 0 && (
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-muted">Dates coming up</div>
+                  <ul className="space-y-1">{dateAlerts.map((a) => <li key={`${a.recordType}:${a.id}:${a.field}`} className="flex items-baseline justify-between gap-2"><Link href={a.href} className="truncate font-medium hover:text-accent-deep">{a.name}</Link><span className={`shrink-0 text-xs ${a.overdue ? "text-accent-deep" : "text-muted"}`}>{a.overdue ? "overdue · " : ""}{a.field.toLowerCase()} {formatDate(a.date)}</span></li>)}</ul>
+                </div>
+              )}
+              {health.total > 0 && (
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-muted">Across every record type</div>
+                  <ul className="space-y-1">
+                    {health.buckets.filter((b) => b.count > 0).map((b) => (
+                      <li key={b.key} className="flex items-baseline justify-between gap-2">
+                        <Link href={`/settings/health?bucket=${b.key}`} className="truncate font-medium hover:text-accent-deep">{b.label}</Link>
+                        <span className="shrink-0 text-xs tabular-nums text-muted">{b.count.toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {(noRepList.length > 0 || noCoList.length > 0) && (
                 <div>
                   <div className="mb-1 text-xs font-semibold text-muted">Missing key fields</div>
@@ -134,7 +157,7 @@ export default async function Home() {
                   <p className="mt-1 text-xs text-faint">{counts.talentWithoutRep} talent without a rep · {counts.projectsWithoutCompany} projects without a company · {counts.staleSocialCounts} stale social counts</p>
                 </div>
               )}
-              {counts.total === 0 && quiet.length === 0 && <p className="text-faint">Nothing needs attention right now.</p>}
+              {counts.total === 0 && quiet.length === 0 && dateAlerts.length === 0 && health.total === 0 && <p className="text-faint">Nothing needs attention right now.</p>}
             </div>
           </Module>
 

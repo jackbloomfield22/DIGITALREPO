@@ -4,7 +4,6 @@
 // page. An exact existing name is offered back instead of a second copy.
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
 import { modelFor } from "@/lib/db-model";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";

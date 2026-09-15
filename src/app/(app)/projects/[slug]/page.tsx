@@ -20,6 +20,7 @@ import { AttachmentList } from "@/components/attachments";
 import { attachmentsFor, uploadLimit } from "@/lib/files";
 import { PERSON_PROJECT_ROLES, PROJECT_ORG_RELATIONSHIPS, PROJECT_ROLES, labelFor } from "@/lib/taxonomy";
 import { RecordHeader } from "@/components/record-header";
+import { VerifyButton } from "@/components/verify-button";
 import { RecordLayout } from "@/components/record-layout";
 import { DetailsPanel } from "@/components/details-panel";
 import { Highlights } from "@/components/highlights";
@@ -29,7 +30,10 @@ import { RecordActivity } from "@/components/record-activity";
 import { RecordFooter } from "@/components/record-footer";
 import { RelationTable } from "@/components/relation-table";
 import { detailFields, fieldNamed, nameField, pickFields } from "@/lib/record-fields";
+import { formatDate, isStale } from "@/lib/format";
 import { recordChrome, type RecordSearchParams } from "@/lib/record-page";
+import { customDetailFields } from "@/lib/custom-fields";
+import { VERIFY_DAYS } from "@/lib/health";
 
 const LONG = ["description", "internalNotes"];
 
@@ -39,6 +43,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const project = await db.project.findUnique({
     where: { slug },
     include: {
+      owner: { select: { name: true } },
       credits: { include: { creator: { select: { id: true, name: true, slug: true, imageUrl: true } } } },
       organizations: { include: { organization: true } },
       entityLinks: { include: { entity: true } },
@@ -68,6 +73,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
   const record = project as unknown as Record<string, unknown>;
   const all = detailFields("project", record);
+  // Fields added under Settings → Fields sit below the built-in ones.
+  const unverified = isStale(project.verifiedAt, VERIFY_DAYS);
+  const custom = await customDetailFields("project", project.custom);
   const details = all.filter((f) => !LONG.includes(f.name) && f.name !== "logline");
   const highlights = pickFields(all, ["projectType", "premiereYear", "endYear", "seasons", "episodes", "runtimeMinutes", "country"]).filter((f) => f.value != null).length
     ? pickFields(all, ["projectType", "premiereYear", "seasons", "episodes", "runtimeMinutes", "country"])
@@ -104,9 +112,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         name={nameField("project", record)} typeLabel="Project" canEdit={canEdit} favorited={chrome.favorited}
         archived={project.archived} archivedReason={project.archivedReason} mergedInto={chrome.merged} duplicates={chrome.duplicates}
         status={{ type: "project", value: project.status }} editHref={`${path}/edit`}
-        badges={<KindBadge kind="project" />}
+        badges={<><KindBadge kind="project" />{unverified && <span className="rounded bg-warn-wash px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warn" title={project.verifiedAt ? `Last verified ${formatDate(project.verifiedAt)}` : "Never verified"}>Unverified</span>}</>}
         media={<Portrait name={project.title} imageUrl={project.imageUrl} className="h-24 w-24 shrink-0 rounded-lg sm:h-28 sm:w-28" textClass="text-3xl" />}
         subtitle={<p className="mt-2 max-w-2xl text-sm italic text-charcoal"><InlineField type="project" id={project.id} field={fieldNamed(all, "logline")} canEdit={canEdit} placeholder="Add a logline…" /></p>}
+        verify={canEdit ? <VerifyButton type="project" id={project.id} verifiedAt={project.verifiedAt?.toISOString() ?? null} fresh={!unverified} /> : null}
         nav={<><RecordContext type="project" id={project.id} name={project.title} slug={project.slug} path={path} canEdit={canEdit} status={project.status} /><RecordStepper type="project" fallback={neighbors} /></>}
         actions={<AddToCollectionButton targetType="project" targetId={project.id} targetLabel={project.title} />}
         linkTargets={[{ key: "talent", label: "Talent" }, { key: "companies", label: "Companies" }, { key: "people", label: "People" }, { key: "topics", label: "Topics" }]}
@@ -119,7 +128,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       )}
 
       <RecordLayout details={<>
-        <DetailsPanel type="project" id={project.id} fields={details} canEdit={canEdit} />
+        <DetailsPanel extra={custom} type="project" id={project.id} fields={details} canEdit={canEdit} />
         {related.length > 0 && (
           <div className="card p-4">
             <div className="overline mb-2">Related projects</div>
@@ -218,7 +227,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         {tab === "activity" && <RecordActivity type="project" id={project.id} />}
       </RecordLayout>
 
-      <RecordFooter type="project" id={project.id} createdAt={project.createdAt} updatedAt={project.updatedAt} />
+      <RecordFooter type="project" id={project.id} createdAt={project.createdAt} updatedAt={project.updatedAt} verifiedAt={project.verifiedAt} verifiedBy={project.verifiedBy} owner={project.owner?.name} />
     </div>
   );
 }

@@ -9,7 +9,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { setField } from "@/lib/actions/inline";
-import { displayValue, isEmptyValue, sameValue, type DetailField } from "@/lib/record-fields";
+import { displayValue, isEmptyValue, sameValue, type DetailField, type PlainValue } from "@/lib/record-fields";
+import { OptionSelect } from "@/components/option-select";
+import { Combobox, lookupItems } from "@/components/combobox";
 import { useToast } from "@/components/toast";
 import { announce } from "@/components/live-region";
 
@@ -88,21 +90,30 @@ export function InlineField({ type, id, field, canEdit, heading, className, plac
   const begin = () => {
     if (!canEdit) return;
     cancelled.current = false;
+    // A checkbox has nowhere to type: clicking it is the edit.
+    if (field.kind === "boolean") { void commit(value === true ? "false" : "true"); return; }
     if (Array.isArray(value)) { setDraftList(value); setDraft(value.join(", ")); }
+    else if (value && typeof value === "object") setDraft("");
     else setDraft(value == null ? "" : String(value));
     setEditing(true);
   };
 
-  const commit = async (raw: string | string[], opts: { undoOf?: DetailField["value"]; quiet?: boolean } = {}) => {
+  const commit = async (raw: string | string[] | { id: string; name: string } | null, opts: { undoOf?: PlainValue; quiet?: boolean } = {}) => {
     setEditing(false);
     const prev = opts.undoOf === undefined ? value : opts.undoOf;
-    const nextPlain: DetailField["value"] = Array.isArray(raw)
-      ? raw
-      : field.kind === "list" || field.kind === "vocablist"
-        ? raw.split(/[,\n]/).map((s) => s.trim()).filter(Boolean)
-        : field.kind === "number" || field.kind === "year"
-          ? (raw.trim() === "" ? null : Number(raw))
-          : raw.trim() || null;
+    const nextPlain: PlainValue = raw === null
+      ? null
+      : Array.isArray(raw)
+        ? raw
+        : typeof raw === "object"
+          ? raw
+          : field.kind === "boolean"
+            ? raw === "true"
+            : field.kind === "list" || field.kind === "vocablist"
+              ? raw.split(/[,\n]/).map((s) => s.trim()).filter(Boolean)
+              : field.kind === "number" || field.kind === "year"
+                ? (raw.trim() === "" ? null : Number(raw))
+                : raw.trim() || null;
     if (sameValue(prev, nextPlain) && opts.undoOf === undefined) return;
     setValue(nextPlain);
     setSave("pending");
@@ -143,8 +154,16 @@ export function InlineField({ type, id, field, canEdit, heading, className, plac
   };
   const onBlur = () => { if (cancelled.current) { cancelled.current = false; return; } if (editing) void commit(field.kind === "vocablist" ? draftList : draft); };
 
-  const empty = isEmptyValue(value);
-  const shown = render ? render(value) : displayValue(field, value);
+  const empty = isEmptyValue(value) && field.kind !== "boolean";
+  const shown = render
+    ? render(value)
+    : field.kind === "boolean"
+      ? <span className="inline-flex items-center gap-1.5"><span aria-hidden className={`inline-block h-3.5 w-3.5 rounded border ${value === true ? "border-ink bg-ink" : "border-line-strong bg-surface"}`} />{value === true ? "Yes" : "No"}</span>
+      : field.kind === "url" && typeof value === "string" && value
+        ? <span className="underline underline-offset-2">{value.replace(/^https?:\/\//, "").slice(0, 60)}</span>
+        : field.kind === "relation" && value && typeof value === "object" && !Array.isArray(value)
+          ? <span>{value.name || value.id}</span>
+          : displayValue(field, value);
 
   // --- Read-only ---------------------------------------------------------------
   if (!editing) {
@@ -180,11 +199,38 @@ export function InlineField({ type, id, field, canEdit, heading, className, plac
   }
   if (field.kind === "vocab") {
     return (
-      <select ref={inputRef as never} className={`${base} ${heading ? "" : "text-sm"} ${className ?? ""}`} value={draft} aria-label={field.label}
-        onChange={(e) => { setDraft(e.target.value); void commit(e.target.value); }} onKeyDown={onKey} onBlur={onBlur}>
-        {field.name !== "status" && <option value="">—</option>}
-        {(field.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
+      <OptionSelect
+        ref={inputRef as never}
+        className={`${base} ${heading ? "" : "text-sm"} ${className ?? ""}`}
+        value={draft}
+        aria-label={field.label}
+        setKey={field.set}
+        options={field.options ?? []}
+        allowEmpty={field.name !== "status" && !field.required}
+        onChange={(v) => { setDraft(v); void commit(v); }}
+        onKeyDown={onKey}
+        // Opening the "create an option" box moves focus inside the control;
+        // that is not leaving the field, so it must not commit.
+        onBlur={(e) => { if ((e.relatedTarget as HTMLElement | null)?.closest?.("[data-option-create]")) return; onBlur(); }}
+      />
+    );
+  }
+  if (field.kind === "relation") {
+    return (
+      <div className={`rounded-md border border-line bg-surface p-2 shadow-pop ${className ?? ""}`} role="group" aria-label={field.label}>
+        <Combobox
+          autoFocus
+          aria-label={field.label}
+          placeholder={`Find ${field.label.toLowerCase()}…`}
+          fetchItems={lookupItems(field.lookupType ?? "creator")}
+          onPick={(item) => void commit({ id: item.id, name: item.name })}
+          onEscape={cancel}
+        />
+        <div className="mt-2 flex justify-end gap-2">
+          {!isEmptyValue(value) && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void commit(null)}>Clear</button>}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={cancel}>Cancel</button>
+        </div>
+      </div>
     );
   }
   if (field.kind === "vocablist") {
@@ -205,7 +251,7 @@ export function InlineField({ type, id, field, canEdit, heading, className, plac
       </div>
     );
   }
-  const inputType = field.kind === "date" ? "date" : field.kind === "number" || field.kind === "year" ? "number" : field.name.toLowerCase().includes("email") ? "email" : field.name.toLowerCase().includes("url") || field.name === "website" ? "url" : "text";
+  const inputType = field.kind === "date" ? "date" : field.kind === "number" || field.kind === "year" ? "number" : field.name.toLowerCase().includes("email") ? "email" : field.kind === "url" || field.name.toLowerCase().includes("url") || field.name === "website" ? "url" : "text";
   return (
     <input
       ref={inputRef as never}
@@ -223,8 +269,9 @@ export function InlineField({ type, id, field, canEdit, heading, className, plac
   );
 }
 
-function toRaw(v: DetailField["value"]): string | string[] {
+function toRaw(v: PlainValue): string | string[] | { id: string; name: string } | null {
   if (v == null) return "";
   if (Array.isArray(v)) return v;
+  if (typeof v === "object") return v;
   return String(v);
 }

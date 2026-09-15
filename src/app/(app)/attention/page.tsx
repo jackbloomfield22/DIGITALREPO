@@ -4,6 +4,9 @@ import { requireUser } from "@/lib/auth";
 import { Section } from "@/components/ui";
 import { daysAgo, formatDate, nowDate, relativeTime } from "@/lib/format";
 import { attentionWheres, STALE_DAYS } from "@/lib/attention";
+import { customDateAlerts } from "@/lib/custom-fields";
+import { healthBuckets } from "@/lib/health";
+import { typeLabel } from "@/lib/record-types";
 
 export const metadata = { title: "Needs Attention" };
 
@@ -75,6 +78,8 @@ export default async function AttentionPage() {
     }),
   ]);
 
+  const [dateAlerts, health] = await Promise.all([customDateAlerts(30), healthBuckets(12)]);
+
   const [noSource, noSourceCount] = await Promise.all([
     db.creator.findMany({
       where: { archived: false, id: { notIn: sourcedIds.map((s) => s.targetId) } },
@@ -88,7 +93,7 @@ export default async function AttentionPage() {
   ]);
 
   const total =
-    noRepCount + staleSocialCount + noProdCoCount + deadlines.length + unverifiedCount + noSourceCount;
+    noRepCount + staleSocialCount + noProdCoCount + deadlines.length + unverifiedCount + noSourceCount + dateAlerts.length + health.total;
 
   return (
     <div className="max-w-3xl">
@@ -112,6 +117,21 @@ export default async function AttentionPage() {
           href: `/opportunities/${o.slug}`,
         }))}
       />
+      <Bucket
+        title="Dates due or overdue"
+        count={dateAlerts.length}
+        blurb="Fields marked “show in Needs attention” under Settings → Fields — exclusivity windows, follow-ups, option dates — inside 30 days or already past."
+        items={dateAlerts.map((a) => ({ label: a.name, sub: `${a.field.toLowerCase()} ${formatDate(a.date)}${a.overdue ? " · overdue" : ""}`, href: a.href }))}
+      />
+      {health.buckets.filter((b) => b.count > 0).map((b) => (
+        <Bucket
+          key={b.key}
+          title={b.label}
+          count={b.count}
+          blurb={`${b.blurb} Work the full list on the Health page.`}
+          items={b.rows.map((r) => ({ label: r.name, sub: typeLabel(r.type), href: r.href }))}
+        />
+      ))}
       <Bucket
         title="Talent without current representation"
         count={noRepCount}

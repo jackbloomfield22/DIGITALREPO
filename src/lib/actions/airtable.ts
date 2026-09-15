@@ -6,8 +6,8 @@
 import { revalidatePath } from "next/cache";
 import { ignore } from "@/lib/errors";
 import { requireRole } from "@/lib/auth";
-import { saveAirtableConfig, airtableConfig } from "@/lib/airtable/config";
-import { checkConnection, drainAirtableQueue, forgetAirtableTables, isMirrored, queueAirtableSync, queueEverything, setupTables, syncRecord, airtableStateFor, type AirtableState, type ConnectionReport, type DrainSummary, type SetupReport } from "@/lib/airtable/sync";
+import { saveAirtableConfig } from "@/lib/airtable/config";
+import { checkConnection, drainAirtableQueue, forgetAirtableTables, isMirrored, queueEverything, setupTables, syncRecord, airtableStateFor, type AirtableState, type ConnectionReport, type DrainSummary, type SetupReport } from "@/lib/airtable/sync";
 import { db } from "@/lib/db";
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };

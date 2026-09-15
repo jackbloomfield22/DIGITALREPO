@@ -24,13 +24,15 @@ import { setIngestWorkspace } from "@/lib/actions/ingest";
 import { StatusPill } from "@/components/ui";
 import type { ApplyOutcome } from "@/lib/ingest/apply";
 import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
+import { OptionSelect } from "@/components/option-select";
+import type { LabeledValue } from "@/lib/taxonomy";
 
 /** The options a field takes, when the registry says it is a vocabulary. */
-function vocabFor(targetType: string | null, field: string | null | undefined) {
+function vocabFor(targetType: string | null, field: string | null | undefined): { set?: string; options: LabeledValue[] } | null {
   if (!targetType || !field) return null;
   const spec = RECORD_REGISTRY[targetType as IngestTargetType];
   const def = spec?.fields.find((f) => f.name === field);
-  return def?.kind === "vocab" && def.vocab ? def.vocab().filter((o) => o.value) : null;
+  return def?.kind === "vocab" && def.vocab ? { set: def.set, options: def.vocab().filter((o) => o.value) } : null;
 }
 
 /**
@@ -371,10 +373,7 @@ function ChangeCard({
                 <label key={key} className="block">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted">{key}</span>
                   {options ? (
-                    <select value={createDraft.fields[key]} onChange={(e) => setCreateDraft((d) => ({ ...d, fields: { ...d.fields, [key]: e.target.value } }))}>
-                      {!options.some((o) => o.value === createDraft.fields[key]) && <option value={createDraft.fields[key]}>{createDraft.fields[key] || "—"}</option>}
-                      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
+                    <OptionSelect setKey={options.set} options={options.options} value={createDraft.fields[key]} onChange={(v) => setCreateDraft((d) => ({ ...d, fields: { ...d.fields, [key]: v } }))} />
                   ) : (
                     <textarea
                       rows={2}
@@ -404,10 +403,7 @@ function ChangeCard({
         ) : editing ? (
           <div>
             {vocabFor(change.targetType, change.field) ? (
-              <select value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Edited value">
-                {!vocabFor(change.targetType, change.field)!.some((o) => o.value === draft) && <option value={draft}>{draft || "—"}</option>}
-                {vocabFor(change.targetType, change.field)!.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              <OptionSelect setKey={vocabFor(change.targetType, change.field)!.set} options={vocabFor(change.targetType, change.field)!.options} value={draft} onChange={setDraft} aria-label="Edited value" />
             ) : (
               <textarea rows={4} value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Edited value" />
             )}

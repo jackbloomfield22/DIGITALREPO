@@ -8,19 +8,23 @@ import { matchSorter } from "match-sorter";
 import { InlineField } from "@/components/inline-field";
 import { isEmptyValue, type DetailField } from "@/lib/record-fields";
 
-export function DetailsPanel({ type, id, fields, canEdit, title = "Details" }: {
-  type: string; id: string; fields: DetailField[]; canEdit: boolean; title?: string;
+export function DetailsPanel({ type, id, fields, extra = [], canEdit, title = "Details" }: {
+  type: string; id: string; fields: DetailField[];
+  /** Fields added under Settings → Fields; they sit below the built-in ones. */
+  extra?: DetailField[];
+  canEdit: boolean; title?: string;
 }) {
   const [showEmpty, setShowEmpty] = useState(false);
   const [q, setQ] = useState("");
-  const filled = fields.filter((f) => !isEmptyValue(f.value));
-  const empty = fields.filter((f) => isEmptyValue(f.value));
-  const searchable = fields.length > 12;
+  const all = useMemo(() => [...fields, ...extra], [fields, extra]);
+  const filled = all.filter((f) => !isEmptyValue(f.value));
+  const empty = all.filter((f) => isEmptyValue(f.value));
+  const searchable = all.length > 12;
   const visible = useMemo(() => {
-    const list = showEmpty || q ? fields : filled;
+    const list = showEmpty || q ? all : filled;
     return q ? matchSorter(list, q, { keys: ["label", "name"] }) : list;
-  }, [fields, filled, showEmpty, q]);
-  if (!fields.length) return null;
+  }, [all, filled, showEmpty, q]);
+  if (!all.length) return null;
   return (
     <section className="card p-4" aria-label={title}>
       <div className="mb-2 flex items-center justify-between gap-2">

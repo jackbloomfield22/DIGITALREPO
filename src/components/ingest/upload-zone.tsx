@@ -5,7 +5,7 @@
 // so no single request approaches the serverless duration limit.
 
 import { Combobox, lookupItems } from "@/components/combobox";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { upload as uploadToBlob } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast";

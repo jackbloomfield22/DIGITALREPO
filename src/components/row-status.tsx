@@ -14,8 +14,12 @@ import { useConfirm } from "@/components/confirm";
 import { labelFor } from "@/lib/taxonomy";
 import { statusOptionsFor, type ArchiveType, type StatusType } from "@/lib/row-status";
 import { archiveRecord, restoreRecord, setRecordStatus } from "@/lib/actions/quick-edit";
+import { createOption } from "@/lib/actions/options";
+import { Modal } from "@/components/overlay";
+import { STATUS_SET } from "@/lib/row-status";
 
 const ARCHIVE = "__archive__";
+const NEW_STATUS = "__new_status__";
 
 /**
  * The status pill, made editable in place. Read-only for anyone without edit
@@ -37,6 +41,8 @@ export function RowStatus({
   archivable?: boolean;
 }) {
   const [current, setCurrent] = useState(status);
+  const [creating, setCreating] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
   const { toast } = useToast();
@@ -44,8 +50,18 @@ export function RowStatus({
 
   if (!canEdit) return <StatusPill status={current} label={labelFor(current)} />;
 
+  // A status the list does not have yet: add it to the shared set and use it.
+  const createStatus = async () => {
+    const res = await createOption(STATUS_SET[type], newLabel);
+    if (!res.ok) return toast(res.error, { tone: "error" });
+    setCreating(false);
+    setNewLabel("");
+    await change(res.value);
+  };
+
   const change = async (value: string) => {
     if (value === current) return;
+    if (value === NEW_STATUS) { setCreating(true); return; }
     if (value === ARCHIVE) {
       if (!(await confirm({ title: `Move "${name}" to the Archive?`, message: "It leaves the live list but keeps everything — you can bring it back any time.", tone: "danger", action: "Archive" }))) return;
       start(async () => {
@@ -90,7 +106,17 @@ export function RowStatus({
           <option value={current}>{labelFor(current)}</option>
         )}
         {archivable && <option value={ARCHIVE}>→ Move to Archive</option>}
+        <option value={NEW_STATUS}>＋ New status…</option>
       </select>
+      <Modal open={creating} onClose={() => setCreating(false)} title="New status">
+        <p className="text-sm text-muted">It joins the shared list for every {type}, and can be renamed or reordered later under Settings → Options.</p>
+        <input autoFocus className="mt-3" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. In talks" aria-label="Status name"
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void createStatus(); } }} />
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCreating(false)}>Cancel</button>
+          <button type="button" className="btn btn-primary btn-sm" disabled={!newLabel.trim() || pending} onClick={() => void createStatus()}>Add and use</button>
+        </div>
+      </Modal>
     </span>
   );
 }

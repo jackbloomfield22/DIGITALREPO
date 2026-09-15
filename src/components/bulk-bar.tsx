@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { Combobox, lookupItems } from "@/components/combobox";
+import { OptionSelect } from "@/components/option-select";
 import { useRouter } from "next/navigation";
 import { bulkApply, undoBatch, type BulkOp } from "@/lib/actions/bulk";
 import { useToast } from "@/components/toast";
@@ -65,10 +66,9 @@ export function BulkBar({ type, selected, matching, onClear, onSelectAll, status
               {bulkFields.map((f) => <option key={f.name} value={f.name}>{f.label}</option>)}
             </select>
             {field && field.kind === "vocab" && (
-              <select className="!min-h-8 !w-auto !border-paper/30 !bg-ink !py-0.5 !text-paper" aria-label={`New ${field.label}`} disabled={busy} value={fieldValue} onChange={(e) => { setFieldValue(e.target.value); if (e.target.value) { void run({ kind: "field", field: field.name, value: e.target.value }); setFieldName(""); } }}>
-                <option value="">Choose…</option>
-                {(field.vocab?.() ?? []).filter((o) => o.value).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              <OptionSelect className="!min-h-8 !w-auto !border-paper/30 !bg-ink !py-0.5 !text-paper" aria-label={`New ${field.label}`} disabled={busy} value={fieldValue}
+                setKey={field.set} options={(field.vocab?.() ?? []).filter((o) => o.value)} emptyLabel="Choose…"
+                onChange={(v) => { setFieldValue(v); if (v) { void run({ kind: "field", field: field.name, value: v }); setFieldName(""); } }} />
             )}
             {field && field.kind !== "vocab" && (
               <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); void run({ kind: "field", field: field.name, value: fieldValue }); setFieldName(""); }}>
