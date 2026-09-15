@@ -121,3 +121,23 @@ Sidebar has four groups; two ("My lists", "Research & tools") start collapsed, w
 - **Phase 3 (schema, held on the branch)** — `Option` table seeded from every list above, referenced by the slug already stored on records (deviation: slugs, not ids — see summary); inline "Create 'X'" in every select; Settings → Options; `FieldDefinition` + `custom` JSONB on each record with generated validation/rows/columns/filters/search; owner/verifiedAt/verifiedBy on every record; Health page; show-archived toggles; the domain fields from the brief as option sets and custom fields.
 - **Phase 4 (no schema)** — semantic tokens + 12-step neutral scale + `color-scheme`; type scale down to four sizes; one Button/Input/Select/Combobox/Card/Table/Panel/Modal/Toast/Skeleton; empty/loading/error states; the keyboard map; mobile bottom tabs; focus rings, labels, targets, live region.
 - **Phase 5** — ingest end-to-end check with the shared option pickers; dead exports and leftovers removed; casts and swallowed errors reduced; README.
+
+## Progress log
+
+Kept here between phases so the closing summary has the details; rewritten into the summary at the top when the pass ends.
+
+### Phase 1 — shipped (bc47545)
+
+Sidebar, palette, search, list views, filters, side panel, Home. Deviations: hand-rolled table kept (no TanStack), existing toast kept (no sonner), talent table kept as its own component (columns via prefs), extra sections (Industry people, YouTube, workspaces) kept in the rail, "Companies" label over the existing `/organizations` routes.
+
+### Phase 2 — shipped
+
+- **One write path for inline edits**: `setField` (src/lib/actions/inline.ts) over the ingest registry's field definitions — coercion per kind (`src/lib/record-fields.ts`), version check with "changed by [who]" conflict, audit row, digest refresh, Airtable queue. Renaming keeps the slug so links stay valid.
+- **Record pages** (talent, projects, companies, formats, people, opportunities, YouTube channels) rebuilt on one layout: `RecordHeader` (editable name, type label, status, star, New note, Link, Verify, menu with Merge / History / Copy link / full form / Archive), resizable left `DetailsPanel` (width in prefs), tabbed main column (`Overview` with `Highlights` of up to six fields, one tab per relationship type as a `RelationTable`, `Activity` timeline), `RecordFooter` (created/updated/verified/owner/id). Archived records now render with a banner instead of a 404, so a merged record's page can still be read.
+- **Editing behaviour**: Enter / ⌘Enter / Escape / Tab / blur, unchanged values skipped, optimistic with revert + Retry, Saved tick, Saving after 300 ms, Undo toast for 8 s, conflict → reload.
+- **Quick create**: `C` / palette opens `CreateSheet` with the registry's create fields plus status; ⌘↩ and ⌘⇧↩; templates per type stored in prefs; an exact existing name is offered instead of a duplicate.
+- **Merge** for the six main types: `/merge` picker (likely duplicates first) → two-column compare with a radio per field → `mergeRecordsCore` re-points every foreign key found in Prisma's model metadata (a duplicate link is dropped, a self-relationship removed), moves favorites / recents / collection items / sources / attachments / Airtable rows, copies picked values, aliases the loser's name, archives it with "Merged into …" and a pointer in `AppSetting` (`merged:<type>:<id>`). Likely duplicates flagged on the page via trigram similarity ≥ 0.55.
+- **Bulk edit**: the floating bar gains "Set field…" for the type's select / text / number / date fields, still one audit row per record under a batch id, undoable as one.
+- **Hard delete removed** (button, action) — Archive is the only way out.
+- **Keys**: `E` edits the name, `N` new note, `L` opens the add box on the current tab, `C` create sheet.
+- Deviations: the audit trigger table (`audit.record_version`) is schema and would duplicate `AuditLog`, which is already the single chokepoint every mutation passes through — kept `AuditLog` (Phase 3 revisits with the held migration). Long text stays plain text (the codebase renders `whitespace-pre-line`; docs use markdown separately); @mentions not built. The `mergedInto` column and `version` on IndustryPerson are schema → held for Phase 3; the pointer lives in `AppSetting` until then. Social profiles on talent are still edited on the full form (a sub-table, not a field). The full edit forms stay reachable from the menu as "Open the full form".

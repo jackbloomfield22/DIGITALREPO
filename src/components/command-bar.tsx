@@ -88,7 +88,7 @@ export function CommandPalette({ isEditor, isAdmin, isOwner, recents: initialRec
         list.push({ id: "archive", label: "Archive this record", hint: "Restorable from the Archive", run: async () => { const r = await archiveRecord(record.type as ArchiveType, record.id); if (!r.ok) return toast(r.error ?? "Could not archive.", { tone: "error" }); toast(`${record.name} moved to the Archive.`); router.refresh(); } });
       }
     } else if (createHref && isEditor) {
-      list.push({ id: "create", label: `Create in ${typeOfSection(section)}`, shortcut: "C", run: () => go(createHref) });
+      list.push({ id: "create", label: `Create in ${typeOfSection(section)}`, shortcut: "C", run: () => { window.dispatchEvent(new CustomEvent("open-create", { detail: { section } })); } });
     }
     if (!record && pathname !== "/") list.push({ id: "filter", label: "Filter this list", shortcut: "F", run: () => { window.dispatchEvent(new CustomEvent("open-filters")); } });
     list.push({ id: "shortcuts", label: "Keyboard shortcuts", shortcut: "?", run: () => { window.dispatchEvent(new CustomEvent("open-shortcuts")); } });

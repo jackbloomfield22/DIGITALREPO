@@ -16,7 +16,13 @@ export type UserPrefs = {
   columns?: Record<string, ColumnPrefs>;
   /** Filter-panel open state per section. */
   filtersOpen?: Record<string, boolean>;
+  /** Width of the record-page side column, in pixels. */
+  asideWidth?: number;
+  /** Quick-create templates per record type: a name and the values it fills in. */
+  templates?: Record<string, RecordTemplate[]>;
 };
+
+export type RecordTemplate = { name: string; values: Record<string, string | string[]> };
 
 const KEY = (userId: string) => `prefs:${userId}`;
 
@@ -34,6 +40,7 @@ export async function writePrefs(userId: string, patch: UserPrefs): Promise<User
     layout: { ...(current.layout ?? {}), ...(patch.layout ?? {}) },
     columns: { ...(current.columns ?? {}), ...(patch.columns ?? {}) },
     filtersOpen: { ...(current.filtersOpen ?? {}), ...(patch.filtersOpen ?? {}) },
+    templates: { ...(current.templates ?? {}), ...(patch.templates ?? {}) },
   };
   await db.appSetting.upsert({ where: { key: KEY(userId) }, update: { value: next }, create: { key: KEY(userId), value: next } });
   return next;

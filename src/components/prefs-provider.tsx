@@ -29,6 +29,7 @@ export function PrefsProvider({ initial, children }: { initial: UserPrefs; child
       layout: { ...(p.layout ?? {}), ...(patch.layout ?? {}) },
       columns: { ...(p.columns ?? {}), ...(patch.columns ?? {}) },
       filtersOpen: { ...(p.filtersOpen ?? {}), ...(patch.filtersOpen ?? {}) },
+      templates: { ...(p.templates ?? {}), ...(patch.templates ?? {}) },
     }));
     void savePrefs(patch).catch(() => { /* the next change carries it */ });
   }, []);

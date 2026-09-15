@@ -3,43 +3,39 @@ import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
-import { DeleteRecordButton } from "@/components/delete-record-button";
 import { requireUser, hasRole } from "@/lib/auth";
 import { recordRecentView } from "@/lib/actions/misc";
 import { findRelatedProjects } from "@/lib/related";
-import { EmptyState, KindBadge, Portrait, Section, StatusPill } from "@/components/ui";
-import { LinkChips } from "@/components/link-editor";
+import { KindBadge, Portrait, Section } from "@/components/ui";
 import { QuietTimer } from "@/components/quiet-timer";
 import { AirtableCard } from "@/components/airtable-card";
 import { airtableStateFor } from "@/lib/airtable/sync";
 import { RecordStepper } from "@/components/record-stepper";
 import { RecordContext } from "@/components/record-context";
 import { recordNeighbors } from "@/lib/neighbors";
-
 import { onQuietTimer, quietClock } from "@/lib/quiet-rules";
-import { FavoriteButton, AddToCollectionButton } from "@/components/action-buttons";
+import { AddToCollectionButton } from "@/components/action-buttons";
 import { SourceList } from "@/components/sources-attachments";
 import { AttachmentList } from "@/components/attachments";
 import { attachmentsFor, uploadLimit } from "@/lib/files";
-import {
-  PERSON_PROJECT_ROLES,
-  PROJECT_ORG_RELATIONSHIPS,
-  PROJECT_ROLES,
-  labelFor,
-} from "@/lib/taxonomy";
-import { formatDate, relativeTime } from "@/lib/format";
+import { PERSON_PROJECT_ROLES, PROJECT_ORG_RELATIONSHIPS, PROJECT_ROLES, labelFor } from "@/lib/taxonomy";
+import { RecordHeader } from "@/components/record-header";
+import { RecordLayout } from "@/components/record-layout";
+import { DetailsPanel } from "@/components/details-panel";
+import { Highlights } from "@/components/highlights";
+import { InlineField } from "@/components/inline-field";
+import { RecordTabs, currentTab, type RecordTab } from "@/components/record-tabs";
+import { RecordActivity } from "@/components/record-activity";
+import { RecordFooter } from "@/components/record-footer";
+import { RelationTable } from "@/components/relation-table";
+import { detailFields, fieldNamed, nameField, pickFields } from "@/lib/record-fields";
+import { recordChrome, type RecordSearchParams } from "@/lib/record-page";
 
-const PRODUCTION_RELS = new Set(["production_company", "co_production_company", "studio", "financier", "rights_holder", "agency", "publisher"]);
-const DISTRIBUTION_RELS = new Set(["network", "streamer", "distributor", "platform"]);
-const BRAND_RELS = new Set(["brand_partner", "sponsor"]);
+const LONG = ["description", "internalNotes"];
 
-export default async function ProjectPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function ProjectPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: RecordSearchParams }) {
   const user = await requireUser();
-  const { slug } = await params;
+  const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const project = await db.project.findUnique({
     where: { slug },
     include: {
@@ -47,333 +43,182 @@ export default async function ProjectPage({
       organizations: { include: { organization: true } },
       entityLinks: { include: { entity: true } },
       people: { include: { person: { select: { id: true, name: true, slug: true, title: true, organizations: { take: 1, include: { organization: { select: { name: true } } } } } } } },
-      opportunities: { include: { opportunity: { select: { title: true, slug: true } } } },
+      opportunities: { include: { opportunity: { select: { id: true, title: true, slug: true, status: true } } } },
     },
   });
   if (!project) notFound();
-  // A page that was moved forwards to its new home; anything else archived is simply gone from here.
   if (project.archived) {
     const to = movedTo(project.archivedReason);
     if (to) redirect(to);
-    notFound();
   }
 
   const canEdit = hasRole(user, "EDITOR");
   const limits = uploadLimit();
+  const path = `/projects/${project.slug}`;
   await recordRecentView(user.id, "project", project.id);
 
-  const [favorite, recordSources, attachments, related, airtableState] = await Promise.all([
-    db.favorite.findUnique({
-      where: { userId_targetType_targetId: { userId: user.id, targetType: "project", targetId: project.id } },
-    }),
+  const [chrome, recordSources, attachments, related, airtableState, neighbors] = await Promise.all([
+    recordChrome(user.id, "project", project.id, project.title, project.archived),
     db.recordSource.findMany({ where: { targetType: "project", targetId: project.id }, include: { source: true } }),
     attachmentsFor("project", project.id),
     findRelatedProjects(project.id),
     airtableStateFor("project", project.id),
+    recordNeighbors("project", { id: project.id, name: project.title }),
   ]);
 
-  // Group credits by creator
-  const talentMap = new Map<string, { creator: (typeof project.credits)[number]["creator"]; roles: string[] }>();
+  const record = project as unknown as Record<string, unknown>;
+  const all = detailFields("project", record);
+  const details = all.filter((f) => !LONG.includes(f.name) && f.name !== "logline");
+  const highlights = pickFields(all, ["projectType", "premiereYear", "endYear", "seasons", "episodes", "runtimeMinutes", "country"]).filter((f) => f.value != null).length
+    ? pickFields(all, ["projectType", "premiereYear", "seasons", "episodes", "runtimeMinutes", "country"])
+    : pickFields(all, ["projectType", "premiereYear", "country"]);
+
+  const links = [
+    { label: "Trailer", url: project.trailerUrl }, { label: "Official page", url: project.officialUrl },
+    { label: "IMDb", url: project.imdbUrl }, { label: "YouTube", url: project.youtubeUrl },
+  ].filter((l) => l.url);
+
+  const talentMap = new Map<string, { creator: (typeof project.credits)[number]["creator"]; roles: { role: string; id: string }[] }>();
   for (const c of project.credits) {
     const e = talentMap.get(c.creatorId) ?? { creator: c.creator, roles: [] };
-    e.roles.push(c.role);
+    e.roles.push({ role: c.role, id: c.id });
     talentMap.set(c.creatorId, e);
   }
 
-  const orgGroup = (rels: Set<string>) => project.organizations.filter((o) => rels.has(o.relationship));
-  const otherOrgs = project.organizations.filter(
-    (o) => !PRODUCTION_RELS.has(o.relationship) && !DISTRIBUTION_RELS.has(o.relationship) && !BRAND_RELS.has(o.relationship),
-  );
-
-  const links = [
-    { label: "Trailer", url: project.trailerUrl },
-    { label: "Official Page", url: project.officialUrl },
-    { label: "IMDb", url: project.imdbUrl },
-    { label: "YouTube", url: project.youtubeUrl },
-  ].filter((l) => l.url);
-
-  const facts = [
-    ["Type", labelFor(project.projectType)],
-    ["Status", labelFor(project.status)],
-    ["Premiered", project.premiereYear?.toString()],
-    ["Ended", project.endYear?.toString()],
-    ["Seasons", project.seasons?.toString()],
-    ["Episodes", project.episodes?.toString()],
-    ["Runtime", project.runtimeMinutes ? `${project.runtimeMinutes} min` : null],
-    ["Country", project.country],
-  ].filter(([, v]) => v) as [string, string][];
-
-  const orgSection = (title: string, rels: Set<string>, roleOptions: typeof PROJECT_ORG_RELATIONSHIPS, empty: string) => (
-    <Section title={title}>
-      <LinkChips
-        canEdit={canEdit}
-        items={orgGroup(rels).map((o) => ({
-          key: o.id,
-          label: o.organization.name,
-          sub: labelFor(o.relationship),
-          href: `/organizations/${o.organization.slug}`,
-          removePayload: { kind: "project_org", projectId: project.id, organizationId: o.organizationId, relationship: o.relationship },
-        }))}
-        addConfig={{
-          template: { kind: "project_org", projectId: project.id },
-          idField: "organizationId",
-          lookupType: "organization",
-          roleField: "relationship",
-          roleOptions,
-          createKind: "organization",
-          buttonLabel: "+ Add Company",
-        }}
-        emptyMessage={empty}
-      />
-    </Section>
-  );
+  const tabs: RecordTab[] = [
+    { key: "overview", label: "Overview" },
+    { key: "talent", label: "Talent", count: talentMap.size },
+    { key: "companies", label: "Companies", count: project.organizations.length },
+    { key: "people", label: "People", count: project.people.length },
+    { key: "topics", label: "Topics", count: project.entityLinks.length },
+    { key: "opportunities", label: "Opportunities", count: project.opportunities.length },
+    { key: "activity", label: "Activity" },
+  ];
+  const tab = currentTab(sp, tabs);
+  const autoLink = sp.link === "1";
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <KindBadge kind="project" />
-          <StatusPill status={project.status} label={labelFor(project.status)} />
-        </div>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{project.title}</h1>
-            <div className="mt-1 text-sm text-muted">
-              {[labelFor(project.projectType), project.premiereYear, project.seasons ? `${project.seasons} seasons` : null, project.episodes ? `${project.episodes} episodes` : null]
-                .filter(Boolean)
-                .join(" · ")}
-            </div>
-            {project.logline && <p className="mt-2 max-w-2xl text-[15px] italic text-charcoal">{project.logline}</p>}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <RecordContext type="project" id={project.id} name={project.title} slug={project.slug} path={`/projects/${project.slug}`} canEdit={canEdit} status={project.status} />
-            <RecordStepper type="project" fallback={await recordNeighbors("project", { id: project.id, name: project.title })} />
-            {canEdit && (
-              <Link href={`/projects/${project.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>
-            )}
-            {canEdit && <DeleteRecordButton targetType="project" id={project.id} label={project.title} />}
-            <FavoriteButton targetType="project" targetId={project.id} favorited={!!favorite} />
-            <AddToCollectionButton targetType="project" targetId={project.id} targetLabel={project.title} />
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+      <RecordHeader
+        type="project" id={project.id} slug={project.slug} path={path} version={project.version}
+        name={nameField("project", record)} typeLabel="Project" canEdit={canEdit} favorited={chrome.favorited}
+        archived={project.archived} archivedReason={project.archivedReason} mergedInto={chrome.merged} duplicates={chrome.duplicates}
+        status={{ type: "project", value: project.status }} editHref={`${path}/edit`}
+        badges={<KindBadge kind="project" />}
+        media={<Portrait name={project.title} imageUrl={project.imageUrl} className="h-24 w-24 shrink-0 rounded-lg sm:h-28 sm:w-28" textClass="text-3xl" />}
+        subtitle={<p className="mt-2 max-w-2xl text-[15px] italic text-charcoal"><InlineField type="project" id={project.id} field={fieldNamed(all, "logline")} canEdit={canEdit} placeholder="Add a logline…" /></p>}
+        nav={<><RecordContext type="project" id={project.id} name={project.title} slug={project.slug} path={path} canEdit={canEdit} status={project.status} /><RecordStepper type="project" fallback={neighbors} /></>}
+        actions={<AddToCollectionButton targetType="project" targetId={project.id} targetLabel={project.title} />}
+        linkTargets={[{ key: "talent", label: "Talent" }, { key: "companies", label: "Companies" }, { key: "people", label: "People" }, { key: "topics", label: "Topics" }]}
+      />
+      {!project.archived && (
+        <div className="-mt-2 mb-6 flex flex-wrap gap-2">
           <QuietTimer targetType="project" id={project.id} name={project.title} canEdit={canEdit} onTimer={onQuietTimer("project", project.status)} {...quietClock(project)} />
           <AirtableCard targetType="project" targetId={project.id} canEdit={canEdit} state={{ ...airtableState, syncedAt: airtableState.syncedAt?.toISOString() ?? null }} />
         </div>
-      </div>
+      )}
 
-      <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
-        <div className="min-w-0">
-          <UpdatePanel
-            user={user}
-            targetType="project"
-            targetId={project.id}
-            name={project.title}
-            path={`/projects/${project.slug}`}
-            recordType="project"
-          />
-          {(project.description || canEdit) && (
-            <Section title="Description">
-              {project.description ? (
-                <p className="whitespace-pre-line text-[15px] leading-relaxed">{project.description}</p>
-              ) : (
-                <EmptyState message="No description yet." action={<Link className="chip border-dashed" href={`/projects/${project.slug}/edit`}>+ Add Description</Link>} />
-              )}
-            </Section>
-          )}
-
-          <Section title="Talent">
-            <div className="space-y-2">
-              {[...talentMap.values()].map(({ creator, roles }) => (
-                <div key={creator.id} className="card flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                  <Link href={`/talent/${creator.slug}`} className="flex min-w-0 items-center gap-2.5 font-semibold hover:text-accent-deep">
-                    <Portrait name={creator.name} imageUrl={creator.imageUrl} className="h-8 w-8 shrink-0 rounded" textClass="text-[11px]" />
-                    <span className="truncate">{creator.name}</span>
-                  </Link>
-                  <LinkChips
-                    canEdit={canEdit}
-                    items={roles.map((role) => ({
-                      key: role,
-                      label: labelFor(role),
-                      removePayload: { kind: "creator_project", creatorId: creator.id, projectId: project.id, role },
-                    }))}
-                  />
-                </div>
-              ))}
-              <LinkChips
-                canEdit={canEdit}
-                items={[]}
-                addConfig={{
-                  template: { kind: "creator_project", projectId: project.id },
-                  idField: "creatorId",
-                  lookupType: "creator",
-                  roleField: "role",
-                  roleOptions: PROJECT_ROLES,
-                  buttonLabel: "+ Add Talent",
-                }}
-                emptyMessage={talentMap.size ? "" : "No talent linked yet."}
-              />
-            </div>
-          </Section>
-
-          <Section title="Key Industry People">
-            <LinkChips
-              canEdit={canEdit}
-              items={project.people.map((pp) => ({
-                key: pp.id,
-                label: pp.person.name,
-                sub: [labelFor(pp.role), pp.person.organizations[0]?.organization.name ?? pp.person.title].filter(Boolean).join(" · "),
-                href: `/people/${pp.person.slug}`,
-                removePayload: { kind: "project_person", projectId: project.id, personId: pp.personId, role: pp.role },
-              }))}
-              addConfig={{
-                template: { kind: "project_person", projectId: project.id },
-                idField: "personId",
-                lookupType: "person",
-                roleField: "role",
-                roleOptions: PERSON_PROJECT_ROLES,
-                createKind: "person",
-                buttonLabel: "+ Add Credit",
-              }}
-              emptyMessage="No industry credits recorded."
-            />
-          </Section>
-
-          {orgSection("Production", PRODUCTION_RELS, PROJECT_ORG_RELATIONSHIPS.filter((r) => PRODUCTION_RELS.has(r.value)), "No production companies linked.")}
-          {orgSection("Platforms & Distribution", DISTRIBUTION_RELS, PROJECT_ORG_RELATIONSHIPS.filter((r) => DISTRIBUTION_RELS.has(r.value)), "No networks or platforms linked.")}
-          {orgSection("Brands & Sponsors", BRAND_RELS, PROJECT_ORG_RELATIONSHIPS.filter((r) => BRAND_RELS.has(r.value)), "No brand partners recorded.")}
-          {otherOrgs.length > 0 &&
-            orgSection("Other Organizations", new Set(otherOrgs.map((o) => o.relationship)), PROJECT_ORG_RELATIONSHIPS, "")}
-
-          <Section title="Topics & Genres">
-            <LinkChips
-              canEdit={canEdit}
-              items={project.entityLinks.map((l) => ({
-                key: l.id,
-                label: l.entity.name,
-                sub: labelFor(l.entity.kind),
-                href: `/explore/${l.entity.kind}/${l.entity.slug}`,
-                removePayload: { kind: "project_entity", projectId: project.id, entityId: l.entityId },
-              }))}
-              addConfig={{
-                template: { kind: "project_entity", projectId: project.id },
-                idField: "entityId",
-                lookupType: "entity",
-                createKind: "entity",
-                lookupKind: "vertical",
-                buttonLabel: "+ Add Topic",
-              }}
-              emptyMessage="No topics tagged."
-            />
-          </Section>
-
-          {links.length > 0 && (
-            <Section title="Links">
-              <div className="flex flex-wrap gap-2">
-                {links.map((l) => (
-                  <a key={l.label} className="chip" href={l.url!} target="_blank" rel="noreferrer">
-                    {l.label} ↗
-                  </a>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          <Section title="Sources">
-            <SourceList
-              canEdit={canEdit}
-              targetType="project"
-              targetId={project.id}
-              sources={recordSources.map((rs) => ({
-                recordSourceId: rs.id,
-                title: rs.source.title,
-                url: rs.source.url,
-                sourceType: rs.source.sourceType,
-              }))}
-            />
-          </Section>
-
-          <Section title="Attachments">
-            <AttachmentList
-              canEdit={canEdit}
-              targetType="project"
-              targetId={project.id}
-              attachments={attachments}
-              blobReady={limits.blob}
-              maxBytes={limits.bytes}
-            />
-          </Section>
-
-          {(project.internalNotes || canEdit) && (
-            <Section title="Internal Notes">
-              {project.internalNotes ? (
-                <p className="whitespace-pre-line text-sm text-muted">{project.internalNotes}</p>
-              ) : (
-                <p className="text-sm text-faint">No internal notes.</p>
-              )}
-            </Section>
-          )}
-        </div>
-
-        <aside className="min-w-0 space-y-6">
-          {facts.length > 0 && (
-            <div className="card p-4">
-              <div className="overline mb-2">Key Facts</div>
-              <ul className="space-y-1 text-sm">
-                {facts.map(([k, v]) => (
-                  <li key={k} className="flex justify-between gap-3">
-                    <span className="text-muted">{k}</span>
-                    <span className="text-right font-medium">{v}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {project.opportunities.length > 0 && (
-            <div className="card p-4">
-              <div className="overline mb-2">Opportunities</div>
-              <ul className="space-y-1 text-sm">
-                {project.opportunities.map((o) => (
-                  <li key={o.id}>
-                    <Link href={`/opportunities/${o.opportunity.slug}`} className="hover:text-accent-deep hover:underline">
-                      {o.opportunity.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {related.length > 0 && (
-            <div className="card p-4">
-              <div className="overline mb-2">Related Projects</div>
-              <ul className="space-y-2.5 text-sm">
-                {related.map((r) => (
-                  <li key={r.id}>
-                    <Link href={`/projects/${r.slug}`} className="font-medium hover:text-accent-deep hover:underline">
-                      {r.title}
-                    </Link>
-                    <div className="text-xs text-muted">{r.reasons.join(" · ")}</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
+      <RecordLayout details={<>
+        <DetailsPanel type="project" id={project.id} fields={details} canEdit={canEdit} />
+        {related.length > 0 && (
           <div className="card p-4">
-            <div className="overline mb-2">Record</div>
-            <ul className="space-y-1 text-xs text-muted">
-              <li className="flex justify-between"><span>Updated</span><span>{relativeTime(project.updatedAt)}</span></li>
-              <li className="flex justify-between"><span>Added</span><span>{formatDate(project.createdAt)}</span></li>
+            <div className="overline mb-2">Related projects</div>
+            <ul className="space-y-2 text-sm">
+              {related.map((r) => (
+                <li key={r.id}>
+                  <Link href={`/projects/${r.slug}`} className="font-medium hover:text-accent-deep hover:underline">{r.title}</Link>
+                  <div className="text-xs text-muted">{r.reasons.join(" · ")}</div>
+                </li>
+              ))}
             </ul>
-            <Link href={`/activity?type=project&id=${project.id}`} className="mt-2 inline-block text-xs underline underline-offset-2 hover:text-accent">
-              History →
-            </Link>
           </div>
-        </aside>
-      </div>
+        )}
+      </>}>
+        <RecordTabs path={path} tabs={tabs} current={tab} />
+
+        {tab === "overview" && (
+          <>
+            <Highlights type="project" id={project.id} fields={highlights} canEdit={canEdit} />
+            <UpdatePanel user={user} targetType="project" targetId={project.id} name={project.title} path={path} recordType="project" />
+            <Section title="Description">
+              <InlineField type="project" id={project.id} field={fieldNamed(all, "description")} canEdit={canEdit} className="text-[15px] leading-relaxed" placeholder="What is this project? Add a description…" />
+            </Section>
+            {links.length > 0 && (
+              <Section title="Links">
+                <div className="flex flex-wrap gap-2">
+                  {links.map((l) => <a key={l.label} className="chip" href={l.url!} target="_blank" rel="noreferrer">{l.label} ↗</a>)}
+                </div>
+              </Section>
+            )}
+            <Section title="Sources">
+              <SourceList canEdit={canEdit} targetType="project" targetId={project.id} sources={recordSources.map((rs) => ({ recordSourceId: rs.id, title: rs.source.title, url: rs.source.url, sourceType: rs.source.sourceType }))} />
+            </Section>
+            <Section title="Attachments">
+              <AttachmentList canEdit={canEdit} targetType="project" targetId={project.id} attachments={attachments} blobReady={limits.blob} maxBytes={limits.bytes} />
+            </Section>
+            <Section title="Internal Notes">
+              <InlineField type="project" id={project.id} field={fieldNamed(all, "internalNotes")} canEdit={canEdit} className="text-sm text-muted" placeholder="Add internal notes…" />
+            </Section>
+          </>
+        )}
+
+        {tab === "talent" && (
+          <RelationTable
+            canEdit={canEdit} autoOpen={autoLink} title="Talent" columns={{ role: "Roles" }}
+            rows={[...talentMap.values()].map(({ creator, roles }) => ({
+              id: creator.id, name: creator.name, href: `/talent/${creator.slug}`,
+              role: roles.map((r) => labelFor(r.role)).join(", "),
+              removePayload: roles.length === 1 ? { kind: "creator_project", creatorId: creator.id, projectId: project.id, role: roles[0].role } : undefined,
+              extra: roles.length > 1 && canEdit ? <span className="text-xs text-faint">Remove roles from the talent page</span> : null,
+            }))}
+            addConfig={{ template: { kind: "creator_project", projectId: project.id }, idField: "creatorId", lookupType: "creator", roleField: "role", roleOptions: PROJECT_ROLES, buttonLabel: "+ Add talent" }}
+            emptyMessage="No talent linked yet."
+          />
+        )}
+        {tab === "companies" && (
+          <RelationTable
+            canEdit={canEdit} autoOpen={autoLink} title="Company" columns={{ role: "Relationship" }}
+            rows={project.organizations.map((o) => ({
+              id: o.id, name: o.organization.name, href: `/organizations/${o.organization.slug}`, role: labelFor(o.relationship),
+              removePayload: { kind: "project_org", projectId: project.id, organizationId: o.organizationId, relationship: o.relationship },
+            }))}
+            addConfig={{ template: { kind: "project_org", projectId: project.id }, idField: "organizationId", lookupType: "organization", roleField: "relationship", roleOptions: PROJECT_ORG_RELATIONSHIPS, createKind: "organization", buttonLabel: "+ Add company" }}
+            emptyMessage="No production companies, networks, platforms or brands linked yet."
+          />
+        )}
+        {tab === "people" && (
+          <RelationTable
+            canEdit={canEdit} autoOpen={autoLink} title="Person" columns={{ sub: "Company", role: "Role" }}
+            rows={project.people.map((pp) => ({
+              id: pp.id, name: pp.person.name, href: `/people/${pp.person.slug}`, sub: pp.person.organizations[0]?.organization.name ?? pp.person.title ?? undefined, role: labelFor(pp.role),
+              removePayload: { kind: "project_person", projectId: project.id, personId: pp.personId, role: pp.role },
+            }))}
+            addConfig={{ template: { kind: "project_person", projectId: project.id }, idField: "personId", lookupType: "person", roleField: "role", roleOptions: PERSON_PROJECT_ROLES, createKind: "person", buttonLabel: "+ Add credit" }}
+            emptyMessage="No industry credits recorded."
+          />
+        )}
+        {tab === "topics" && (
+          <RelationTable
+            canEdit={canEdit} autoOpen={autoLink} title="Topic" columns={{ sub: "Kind" }}
+            rows={project.entityLinks.map((l) => ({
+              id: l.id, name: l.entity.name, href: `/explore/${l.entity.kind}/${l.entity.slug}`, sub: labelFor(l.entity.kind),
+              removePayload: { kind: "project_entity", projectId: project.id, entityId: l.entityId },
+            }))}
+            addConfig={{ template: { kind: "project_entity", projectId: project.id }, idField: "entityId", lookupType: "entity", createKind: "entity", lookupKind: "vertical", buttonLabel: "+ Add topic" }}
+            emptyMessage="No topics or genres tagged."
+          />
+        )}
+        {tab === "opportunities" && (
+          <RelationTable
+            canEdit={canEdit} title="Opportunity" columns={{ sub: "Status" }}
+            rows={project.opportunities.map((o) => ({ id: o.id, name: o.opportunity.title, href: `/opportunities/${o.opportunity.slug}`, sub: labelFor(o.opportunity.status) }))}
+            emptyMessage="No opportunities reference this project."
+          />
+        )}
+        {tab === "activity" && <RecordActivity type="project" id={project.id} />}
+      </RecordLayout>
+
+      <RecordFooter type="project" id={project.id} createdAt={project.createdAt} updatedAt={project.updatedAt} />
     </div>
   );
 }

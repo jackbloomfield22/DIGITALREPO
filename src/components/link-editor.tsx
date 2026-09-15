@@ -37,7 +37,7 @@ export type AddConfig = {
 
 type LookupItem = { id: string; name: string; sub?: string };
 
-function AddLinkPopover({
+export function AddLinkPopover({
   config,
   onDone,
 }: {

@@ -14,13 +14,19 @@ import { queueAirtableSync } from "@/lib/airtable/sync";
 import { upsertLink, deleteLink } from "@/lib/link-core";
 import { STATUS_TYPES, statusOptionsFor, type StatusType, type ArchiveType } from "@/lib/row-status";
 import type { LinkPayload } from "@/lib/link-schema";
+import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
+import { coerceField, displayValue, plainValue, sameValue } from "@/lib/record-fields";
 
 const MODEL: Record<string, string> = { creator: "creator", project: "project", format: "format", opportunity: "opportunity", channel: "channel", organization: "organization", person: "industryPerson" };
 const NAME: Record<string, string> = { creator: "name", project: "title", format: "title", opportunity: "title", channel: "name", organization: "name", person: "name" };
 const TAG_KIND: Record<string, string> = { creator: "creator_entity", project: "project_entity", format: "format_entity", opportunity: "opportunity_entity" };
 const MAX = 500;
 
-export type BulkOp = { kind: "status"; status: string } | { kind: "archive" } | { kind: "tag"; entityId: string; entityName?: string };
+export type BulkOp =
+  | { kind: "status"; status: string }
+  | { kind: "archive" }
+  | { kind: "tag"; entityId: string; entityName?: string }
+  | { kind: "field"; field: string; value: unknown };
 export type BulkResult = { ok: true; changed: number; batchId: string; label: string } | { ok: false; error: string };
 type Undo = { type: string; id: string; before: Record<string, unknown>; link?: LinkPayload };
 
@@ -36,6 +42,15 @@ export async function bulkApply(type: string, ids: string[], op: BulkOp): Promis
       if (!statusOptionsFor(type as StatusType).some((s) => s.value === op.status)) return { ok: false, error: "That status does not exist here." };
     }
     if (op.kind === "tag" && !TAG_KIND[type]) return { ok: false, error: "These records cannot carry tags." };
+    const spec = RECORD_REGISTRY[type as IngestTargetType];
+    const fieldSpec = op.kind === "field" ? spec?.fields.find((f) => f.name === op.field) : undefined;
+    let fieldValue: { value: unknown; plain: ReturnType<typeof plainValue> } | null = null;
+    if (op.kind === "field") {
+      if (!fieldSpec || (type === "channel" && op.field === "ideas")) return { ok: false, error: "That field cannot be set in bulk." };
+      const c = coerceField(fieldSpec, op.value);
+      if (!c.ok) return { ok: false, error: c.error };
+      fieldValue = { value: c.value, plain: c.plain };
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const table = (db as any)[model];
     const rows: Record<string, unknown>[] = await table.findMany({ where: { id: { in: unique } } });
@@ -55,7 +70,14 @@ export async function bulkApply(type: string, ids: string[], op: BulkOp): Promis
         await table.update({ where: { id }, data: { archived: true, archivedReason: "Archived in a bulk change", archivedAt: new Date() } });
         await logAudit(user, { targetType: type, targetId: id, targetLabel: label, action: "archived", newValue: "bulk" });
         undo.push({ type, id, before: { archived: false, archivedReason: row.archivedReason ?? null, archivedAt: row.archivedAt ?? null } });
-      } else {
+      } else if (op.kind === "field" && fieldSpec && fieldValue) {
+        const before = plainValue(fieldSpec.kind, row[fieldSpec.name]);
+        if (sameValue(before, fieldValue.plain)) continue;
+        const view = { kind: fieldSpec.kind, options: fieldSpec.vocab?.() };
+        await table.update({ where: { id }, data: { [fieldSpec.name]: fieldValue.value, ...(spec.hasVersion ? { version: { increment: 1 } } : {}) } });
+        await logAudit(user, { targetType: type, targetId: id, targetLabel: label, action: "updated", field: fieldSpec.name, oldValue: displayValue(view, before).slice(0, 300) || null, newValue: displayValue(view, fieldValue.plain).slice(0, 300) || null });
+        undo.push({ type, id, before: { [fieldSpec.name]: row[fieldSpec.name] ?? null } });
+      } else if (op.kind === "tag") {
         const payload = { kind: TAG_KIND[type], [`${type}Id`]: id, entityId: op.entityId } as unknown as LinkPayload;
         await upsertLink(payload);
         await logAudit(user, { targetType: type, targetId: id, targetLabel: label, action: "linked", field: "tag", newValue: op.entityName ?? op.entityId });
@@ -70,7 +92,10 @@ export async function bulkApply(type: string, ids: string[], op: BulkOp): Promis
     revalidatePath("/", "layout");
     const wanted = op.kind === "status" ? op.status : "";
     const statusLabel = wanted ? (statusOptionsFor(type as StatusType).find((s) => s.value === wanted)?.label ?? wanted) : "";
-    const label = op.kind === "status" ? `status → ${statusLabel}` : op.kind === "archive" ? "moved to the Archive" : `tagged ${op.entityName ?? ""}`.trim();
+    const label = op.kind === "status" ? `status → ${statusLabel}`
+      : op.kind === "archive" ? "moved to the Archive"
+      : op.kind === "field" ? `${fieldSpec?.label.toLowerCase() ?? op.field} → ${fieldValue ? displayValue({ kind: fieldSpec!.kind, options: fieldSpec!.vocab?.() }, fieldValue.plain) || "empty" : ""}`
+      : `tagged ${op.entityName ?? ""}`.trim();
     return { ok: true, changed, batchId, label };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Bulk change failed." };

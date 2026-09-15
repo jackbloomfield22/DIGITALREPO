@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { bulkApply, undoBatch, type BulkOp } from "@/lib/actions/bulk";
 import { useToast } from "@/components/toast";
 import type { LabeledValue } from "@/lib/filters";
+import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
 
 type LookupItem = { id: string; name: string; sub?: string };
 
@@ -19,6 +20,11 @@ export function BulkBar({ type, selected, matching, onClear, onSelectAll, status
   const [tagQ, setTagQ] = useState("");
   const [tagOpen, setTagOpen] = useState(false);
   const [tags, setTags] = useState<LookupItem[]>([]);
+  const [fieldName, setFieldName] = useState("");
+  const [fieldValue, setFieldValue] = useState("");
+  const spec = RECORD_REGISTRY[type as IngestTargetType];
+  const bulkFields = (spec?.fields ?? []).filter((f) => f.kind !== "longtext" && f.kind !== "list" && f.kind !== "vocablist" && f.name !== "status" && !(type === "channel" && f.name === "ideas"));
+  const field = bulkFields.find((f) => f.name === fieldName);
   const { toast } = useToast();
   const router = useRouter();
   useEffect(() => {
@@ -59,6 +65,26 @@ export function BulkBar({ type, selected, matching, onClear, onSelectAll, status
                 <input autoFocus type="search" className="!min-h-8" placeholder="Find a tag…" aria-label="Find a tag" value={tagQ} onChange={(e) => setTagQ(e.target.value)} />
                 <div className="mt-1 max-h-48 overflow-y-auto">{tags.map((t) => <button type="button" key={t.id} className="filter-option" onClick={() => { setTagOpen(false); void run({ kind: "tag", entityId: t.id, entityName: t.name }); }}><span className="truncate">{t.name}</span>{t.sub && <span className="ml-auto text-xs text-muted">{t.sub}</span>}</button>)}</div>
               </div>
+            )}
+          </div>
+        )}
+        {bulkFields.length > 0 && (
+          <div className="flex items-center gap-1">
+            <select className="!min-h-8 !w-auto !border-paper/30 !bg-ink !py-0.5 !text-paper" aria-label="Set a field" disabled={busy} value={fieldName} onChange={(e) => { setFieldName(e.target.value); setFieldValue(""); }}>
+              <option value="">Set field…</option>
+              {bulkFields.map((f) => <option key={f.name} value={f.name}>{f.label}</option>)}
+            </select>
+            {field && field.kind === "vocab" && (
+              <select className="!min-h-8 !w-auto !border-paper/30 !bg-ink !py-0.5 !text-paper" aria-label={`New ${field.label}`} disabled={busy} value={fieldValue} onChange={(e) => { setFieldValue(e.target.value); if (e.target.value) { void run({ kind: "field", field: field.name, value: e.target.value }); setFieldName(""); } }}>
+                <option value="">Choose…</option>
+                {(field.vocab?.() ?? []).filter((o) => o.value).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            )}
+            {field && field.kind !== "vocab" && (
+              <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); void run({ kind: "field", field: field.name, value: fieldValue }); setFieldName(""); }}>
+                <input autoFocus className="!min-h-8 !w-36 !border-paper/30 !bg-ink !py-0.5 !text-paper" type={field.kind === "date" ? "date" : field.kind === "number" || field.kind === "year" ? "number" : "text"} aria-label={`New ${field.label}`} placeholder={field.label} value={fieldValue} onChange={(e) => setFieldValue(e.target.value)} />
+                <button type="submit" className="rounded border border-paper/30 px-2 py-0.5 hover:bg-paper/10" disabled={busy}>Apply</button>
+              </form>
             )}
           </div>
         )}

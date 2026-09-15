@@ -228,11 +228,18 @@ status, years, confidence, source).
   the filtered directory.
 - **⌘K command bar** — typo-tolerant global search across every type, grouped, plus
   create actions.
-- **Quick everything** — quick preview drawer (evaluate without navigating), quick edit
-  drawer (statuses, counts, chips), inline "Create ‘X’" from any relationship picker with
-  duplicate suggestions before you fragment the graph. Small edits autosave with Undo
-  toasts; big edits use explicit Save (⌘S), unsaved-changes warnings, and optimistic
-  concurrency — a stale edit can never silently overwrite a colleague's work.
+- **Edit in place** — every field on every record page is editable where it sits: click
+  a value, type, press Enter (⌘Enter in a paragraph), Tab or click away. The change shows
+  at once, a tick confirms the save, Undo lives in the toast, and a stale edit is refused
+  with "changed by … just now" rather than silently overwriting a colleague's work. The
+  record header carries the name, status, star, New note, Link, Verify and a menu with
+  Merge, Archive, History and Copy link; a resizable Details column lists every field
+  ("Show N empty fields" keeps it short); the main column is tabbed — Overview with
+  Highlights, one tab per relationship type as a small table, and Activity.
+- **Quick create** — `C` anywhere opens a sheet with only the essentials (name, status or
+  type, a couple of starting fields); ⌘↩ saves and opens, ⌘⇧↩ saves and starts another;
+  templates per type remember a set of select values. Inline "Create ‘X’" from any
+  relationship picker, with duplicate suggestions before you fragment the graph.
 - **Print / One-Sheet + Copy Summary** — replaces the Google Docs workflow.
 
 ### AI (optional, never load-bearing)
@@ -358,8 +365,12 @@ captures notes.
 - **Data Health** — likely duplicates (fuzzy name matching), never-verified/stale profiles,
   stale social counts, creators without interests/projects/sources, orphaned projects,
   archived records with restore.
-- **Merging** — merge duplicate organizations or taxonomy entities; every relationship is
-  re-pointed to the kept record, the old name survives as an alias, history is preserved.
+- **Merging** — from any record's menu, pick a second record of the same type and choose
+  which value survives field by field; every relationship, tag, file, source, star and
+  collection membership is re-pointed to the kept record, the old name survives as an
+  alias, and the losing record goes to the Archive untouched with a "merged into" pointer.
+  Likely duplicates (near-identical names) are flagged at the top of the record page.
+  Taxonomy entities are merged under Admin.
 - **Users** — create users, assign VIEWER / EDITOR / ADMIN.
 - **CSV Import** — bulk creator migration with a downloadable template, preview, and
   duplicate skipping.

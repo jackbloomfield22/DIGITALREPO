@@ -34,7 +34,10 @@ export function Shortcuts({ isEditor }: { isEditor: boolean }) {
       if (key === "g" || key === "G") { pendingG = Date.now(); return; }
       if (key === "?") { e.preventDefault(); setHelp((h) => !h); return; }
       if (key === "/") { e.preventDefault(); const box = document.querySelector<HTMLInputElement>('input[type="search"]'); if (box) box.focus(); else window.dispatchEvent(new CustomEvent("open-command-bar")); return; }
-      if ((key === "c" || key === "C") && isEditor) { const section = "/" + (pathname.split("/")[1] ?? ""); const href = CREATE_FOR_SECTION[section]; if (href) { e.preventDefault(); router.push(href); } return; }
+      if ((key === "c" || key === "C") && isEditor) { const section = "/" + (pathname.split("/")[1] ?? ""); if (CREATE_FOR_SECTION[section] || section === "/") { e.preventDefault(); window.dispatchEvent(new CustomEvent("open-create", { detail: { section } })); } return; }
+      if ((key === "n" || key === "N") && isEditor && document.querySelector("[data-inline-field]")) { e.preventDefault(); window.dispatchEvent(new CustomEvent("open-quick-capture")); return; }
+      if ((key === "e" || key === "E") && isEditor) { const name = document.querySelector<HTMLButtonElement>('h1 [data-inline-field]'); if (name) { e.preventDefault(); name.click(); } return; }
+      if ((key === "l" || key === "L") && isEditor) { const add = document.querySelector<HTMLButtonElement>("[data-add-link]"); if (add) { e.preventDefault(); add.click(); add.scrollIntoView({ block: "center" }); } return; }
       if (key === "f" || key === "F") { window.dispatchEvent(new CustomEvent("open-filters")); return; }
     };
     const onOpen = () => setHelp(true);
@@ -48,7 +51,7 @@ export function Shortcuts({ isEditor }: { isEditor: boolean }) {
     ["G then T / P / C / F / O", "Go to Talent / Projects / Companies / Formats / Opportunities"], ["G then H / I / A", "Go Home / Ingest / Archive"],
     ["↑ ↓ (side panel)", "Previous / next record"], ["← →", "Previous / next record on a record page"], ["F", "Open filters on a list"],
     ["J / K", "Move down / up a list row"], ["X", "Select the focused row"], ["Space", "Peek at the focused row"], ["Enter", "Open the focused row"],
-    ["E", "Edit the record you are on"], ["S", "Change status on a record page"], ["Esc", "Cancel an editor, then close the palette, then the side panel, then clear a selection"],
+    ["E", "Edit the name of the record you are on"], ["N", "New note on this record"], ["L", "Link a record (opens the add box on the current tab)"], ["S", "Change status on a record page"], ["Esc", "Cancel an editor, then close the palette, then the side panel, then clear a selection"],
   ];
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4"><div className="absolute inset-0 bg-ink/40" aria-hidden onClick={() => setHelp(false)} />

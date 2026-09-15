@@ -9,6 +9,7 @@ import { QuickCapture } from "@/components/quick-capture";
 import { PeekPanel } from "@/components/peek-panel";
 import { PrefsProvider } from "@/components/prefs-provider";
 import { Shortcuts } from "@/components/shortcuts";
+import { CreateSheet } from "@/components/create-sheet";
 import { isOwner } from "@/lib/hq/owner";
 import { readPrefs } from "@/lib/prefs";
 import { sidebarLists } from "@/lib/record-refs";
@@ -29,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </main>
         <Suspense><PeekPanel canEdit={permissions.isEditor} /></Suspense>
         {permissions.isEditor && <QuickCapture />}
+        {permissions.isEditor && <CreateSheet isEditor />}
       </PrefsProvider>
     </NuqsAdapter>
   );

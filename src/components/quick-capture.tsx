@@ -125,6 +125,13 @@ export function QuickCapture() {
     setOpen(true);
   };
 
+  // The record header's "New note" button and the N key land here.
+  useEffect(() => {
+    const onOpen = () => { setSource(whereFrom(window.location.pathname)); setOpen(true); };
+    window.addEventListener("open-quick-capture", onOpen);
+    return () => window.removeEventListener("open-quick-capture", onOpen);
+  }, []);
+
   const reset = () => {
     setText("");
     setStage({ at: "writing" });

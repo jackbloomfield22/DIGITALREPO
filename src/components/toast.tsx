@@ -9,15 +9,19 @@ import {
   type ReactNode,
 } from "react";
 
+type ToastAction = { label: string; run: () => void | Promise<void> };
+type ToastOpts = { undo?: () => void | Promise<void>; action?: ToastAction; tone?: "default" | "error"; duration?: number };
+
 type Toast = {
   id: number;
   message: string;
   undo?: () => void | Promise<void>;
+  action?: ToastAction;
   tone?: "default" | "error";
 };
 
 const ToastContext = createContext<{
-  toast: (message: string, opts?: { undo?: () => void | Promise<void>; tone?: "default" | "error" }) => void;
+  toast: (message: string, opts?: ToastOpts) => void;
 }>({ toast: () => {} });
 
 export function useToast() {
@@ -33,10 +37,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toast = useCallback(
-    (message: string, opts?: { undo?: () => void | Promise<void>; tone?: "default" | "error" }) => {
+    (message: string, opts?: ToastOpts) => {
       const id = ++idRef.current;
-      setToasts((t) => [...t.slice(-3), { id, message, undo: opts?.undo, tone: opts?.tone }]);
-      setTimeout(() => dismiss(id), opts?.undo ? 8000 : 4000);
+      setToasts((t) => [...t.slice(-3), { id, message, undo: opts?.undo, action: opts?.action, tone: opts?.tone }]);
+      setTimeout(() => dismiss(id), opts?.duration ?? (opts?.undo || opts?.action ? 8000 : 4000));
     },
     [dismiss],
   );
@@ -67,6 +71,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 }}
               >
                 Undo
+              </button>
+            )}
+            {t.action && (
+              <button
+                className="font-semibold underline underline-offset-2 hover:opacity-80"
+                onClick={async () => {
+                  dismiss(t.id);
+                  await t.action?.run();
+                }}
+              >
+                {t.action.label}
               </button>
             )}
             <button
