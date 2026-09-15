@@ -4,8 +4,9 @@ import { CreatorForm } from "@/components/talent/creator-form";
 
 export const metadata = { title: "New Talent" };
 
-export default async function NewCreatorPage() {
+export default async function NewCreatorPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requireUser();
   if (!hasRole(user, "EDITOR")) redirect("/talent");
-  return <CreatorForm />;
+  const name = ((await searchParams).name ?? "").toString().trim().slice(0, 300);
+  return <CreatorForm initialName={name || undefined} />;
 }

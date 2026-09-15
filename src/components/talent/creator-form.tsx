@@ -170,12 +170,12 @@ function Group({
   );
 }
 
-export function CreatorForm({ initial }: { initial?: CreatorFormInitial }) {
+export function CreatorForm({ initial, initialName }: { initial?: CreatorFormInitial; initialName?: string }) {
   const isEdit = !!initial;
   const router = useRouter();
   const { toast } = useToast();
 
-  const [name, setName] = useState(initial?.scalars.name ?? "");
+  const [name, setName] = useState(initial?.scalars.name ?? initialName ?? "");
   const [imageUrl, setImageUrl] = useState(initial?.scalars.imageUrl ?? "");
   const [headline, setHeadline] = useState(initial?.scalars.headline ?? "");
   const [status, setStatus] = useState(initial?.scalars.status ?? "active");

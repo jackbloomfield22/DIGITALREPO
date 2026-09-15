@@ -28,3 +28,7 @@ export function directoryPageUrl(path: string, params: SearchParams, page: numbe
   if (page > 1) query.set("page", String(page));
   return `${path}${query.size ? `?${query}` : ""}`;
 }
+
+/** Rows a list shows at once; "View all" goes up to this many. */
+export const PAGE_SIZE = 50;
+export const VIEW_ALL_CAP = 500;

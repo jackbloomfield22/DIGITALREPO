@@ -11,6 +11,7 @@ import { bulkAddEntity, bulkAddToCollection, bulkArchive, bulkSetStatus } from "
 import { createCollectionInline, createEntityInline } from "@/lib/actions/create-inline";
 import { CREATOR_STATUSES } from "@/lib/taxonomy";
 import { useToast } from "@/components/toast";
+import { usePrefs } from "@/components/prefs-provider";
 import type { CreatorCardVM } from "./types";
 
 function CardHover({
@@ -306,34 +307,25 @@ export function CreatorTable({
   creators,
   canEdit,
   isAdmin,
+  matchingIds = [],
 }: {
   creators: CreatorCardVM[];
   canEdit: boolean;
   isAdmin: boolean;
+  matchingIds?: string[];
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [columns, setColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
+  const { columnsFor, setColumns: saveColumns, density } = usePrefs();
+  const stored = columnsFor("talent");
+  const columns: ColumnKey[] = (stored.order?.length ? stored.order : DEFAULT_COLUMNS).filter((k): k is ColumnKey => ALL_COLUMNS.some((c) => c.key === k));
+  const setColumns = (next: ColumnKey[]) => saveColumns("talent", { order: next });
   const [columnMenu, setColumnMenu] = useState(false);
   const [previewSlug, setPreviewSlug] = useState<string | null>(null);
   const [editSlug, setEditSlug] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        const stored = localStorage.getItem("creator-table-columns");
-        if (stored) setColumns(JSON.parse(stored));
-      } catch {}
-    }, 0);
-    return () => clearTimeout(t);
-  }, []);
-  const persistColumns = (next: ColumnKey[]) => {
-    setColumns(next);
-    try {
-      localStorage.setItem("creator-table-columns", JSON.stringify(next));
-    } catch {}
-  };
+  const rowPad = density === "compact" ? "py-1" : density === "relaxed" ? "py-4" : "py-2.5";
+  const persistColumns = (next: ColumnKey[]) => setColumns(next);
 
   const toggle = (id: string) =>
     setSelected((s) => {
@@ -461,7 +453,7 @@ export function CreatorTable({
           </thead>
           <tbody>
             {creators.map((creator) => (
-              <tr key={creator.id} className="border-b border-line last:border-0 hover:bg-wash/60">
+              <tr key={creator.id} className={`border-b border-line last:border-0 hover:bg-wash/60 [&_td]:${rowPad}`}>
                 {canEdit && (
                   <td className="px-3 py-2">
                     <input
@@ -517,6 +509,7 @@ export function CreatorTable({
       {canEdit && selected.size > 0 && (
         <div className="sticky bottom-4 z-30 mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-pop">
           <span className="text-sm font-medium">{selected.size} selected</span>
+          {matchingIds.length > selected.size && <button type="button" className="text-sm underline decoration-dotted underline-offset-2 hover:text-accent" onClick={() => setSelected(new Set(matchingIds))}>Select all {matchingIds.length} matching</button>}
           <BulkPicker
             label="+ Collection"
             lookupType="collection"

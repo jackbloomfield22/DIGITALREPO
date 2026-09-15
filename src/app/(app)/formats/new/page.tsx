@@ -5,8 +5,9 @@ import { FORMAT_FIELDS } from "@/lib/form-fields";
 
 export const metadata = { title: "New Format" };
 
-export default async function NewFormatPage() {
+export default async function NewFormatPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const name = ((await searchParams).name ?? "").toString().trim().slice(0, 300);
   const user = await requireUser();
   if (!hasRole(user, "EDITOR")) redirect("/formats");
-  return <RecordForm kind="format" heading="New Format" fields={FORMAT_FIELDS} />;
+  return <RecordForm kind="format" heading="New Format" fields={FORMAT_FIELDS} prefill={name ? { title: name } : undefined} />;
 }

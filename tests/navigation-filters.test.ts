@@ -31,9 +31,15 @@ describe("filter URLs", () => {
     for (const value of ["NaN", "Infinity", "-3", "999999999999"]) expect(nonNegativeNumber(value)).toBeUndefined();
     expect(nonNegativeNumber("300000")).toBe(300000);
   });
-  it("uses the same default talent view as the shared controls", () => {
-    expect(parseCreatorFilters({}).view).toBe("table");
-    expect(parseCreatorFilters({ view: "cards" }).view).toBe("cards");
+  it("reads old talent links into the shared filter model", () => {
+    const f = parseCreatorFilters({ status: "active", entity: ["e1", "e2"], min: "300000", format: "none" });
+    expect(f.state.and).toEqual([
+      { field: "topic", op: "any", values: ["e1", "e2"] },
+      { field: "status", op: "is", values: ["active"] },
+      { field: "followers", op: "gt", values: ["300000"] },
+      { field: "format", op: "empty", values: [] },
+    ]);
+    expect(parseCreatorFilters({}).sort).toBe("name");
   });
 });
 

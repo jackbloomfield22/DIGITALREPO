@@ -1,101 +1,48 @@
 import { redirect } from "next/navigation";
-import { directoryPageUrl } from "@/lib/directory-params";
 import Link from "next/link";
+import { directoryPageUrl } from "@/lib/directory-params";
 import { requireUser, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import {
-  parseCreatorFilters,
-  queryCreators,
-  resolveFilterLabels,
-} from "@/lib/queries/talent";
+import { parseCreatorFilters, queryCreators, TALENT_FIELDS, TALENT_DEFAULT_VIEWS } from "@/lib/queries/talent";
 import { toCreatorCardVM } from "@/lib/creator-vm";
-import {
-  CreatorDirectoryControls,
-  type ActiveChip,
-} from "@/components/talent/directory-controls";
+import { CreatorDirectoryControls } from "@/components/talent/directory-controls";
 import { CreatorCardGrid, CreatorTable } from "@/components/talent/creator-views";
-import { labelFor } from "@/lib/taxonomy";
-import { compactNumber } from "@/lib/format";
 import { Pagination } from "@/components/pagination";
+import { filterNames } from "@/lib/filter-where";
+import { directoryUser, layoutFor } from "@/lib/directory";
 
 export const metadata = { title: "Talent" };
 
-export default async function CreatorsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function CreatorsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requireUser();
   const params = await searchParams;
   const filters = parseCreatorFilters(params);
-
-  const [{ creators, total, pages }, labels, favorites] = await Promise.all([
+  const [{ creators, total, pages, page, all, ids, requested }, names, favorites, { prefs, views }] = await Promise.all([
     queryCreators(filters),
-    resolveFilterLabels(filters),
-    db.favorite.findMany({
-      where: { userId: user.id, targetType: "creator" },
-      select: { targetId: true },
-    }),
+    filterNames(TALENT_FIELDS, filters.state),
+    db.favorite.findMany({ where: { userId: user.id, targetType: "creator" }, select: { targetId: true } }),
+    directoryUser(user.id, "talent"),
   ]);
-
-  if (filters.page > pages) redirect(directoryPageUrl("/talent", params, pages));
-
+  if (!all && requested > pages) redirect(directoryPageUrl("/talent", params, pages));
+  const view = layoutFor(params, prefs, "talent");
   const favoriteIds = new Set(favorites.map((f) => f.targetId));
   const vms = creators.map((c) => toCreatorCardVM(c, favoriteIds));
   const canEdit = hasRole(user, "EDITOR");
 
-  const chips: ActiveChip[] = [
-    ...labels.entities.map((e) => ({
-      param: "entity",
-      value: e.id,
-      label: `${e.name}`,
-    })),
-    ...(filters.role
-      ? [{ param: "role", value: filters.role, label: `Has been ${labelFor(filters.role)}` }]
-      : []),
-    ...(labels.orgName ? [{ param: "org", value: filters.org!, label: labels.orgName }] : []),
-    ...(labels.repName ? [{ param: "rep", value: filters.rep!, label: `Rep: ${labels.repName}` }] : []),
-    ...(filters.format === "any"
-      ? [{ param: "format", value: "any", label: "Has Format" }]
-      : filters.format === "none"
-        ? [{ param: "format", value: "none", label: "No Format" }]
-        : labels.formatTitle
-          ? [{ param: "format", value: filters.format!, label: `Format: ${labels.formatTitle}` }]
-          : []),
-    ...(filters.platform
-      ? [{ param: "platform", value: filters.platform, label: labelFor(filters.platform) }]
-      : []),
-    ...(filters.minFollowers
-      ? [{ param: "min", value: String(filters.minFollowers), label: `${compactNumber(filters.minFollowers)}+ followers` }]
-      : []),
-    ...(filters.status
-      ? [{ param: "status", value: filters.status, label: `Status: ${labelFor(filters.status)}` }]
-      : []),
-  ];
-
-
   return (
     <div>
-      <CreatorDirectoryControls total={total} activeChips={chips} canEdit={canEdit} />
-
+      <CreatorDirectoryControls total={total} canEdit={canEdit} fields={TALENT_FIELDS} state={filters.state} names={Object.fromEntries(names)} savedViews={views} defaultViews={TALENT_DEFAULT_VIEWS} />
       {vms.length === 0 ? (
         <div className="rounded-md border border-dashed border-line-strong bg-wash/50 px-6 py-10 text-center text-sm text-muted">
-          No talent matches these filters.
-          {canEdit && (
-            <div className="mt-3">
-              <Link href="/talent/new" className="btn btn-secondary btn-sm">
-                + Add Talent
-              </Link>
-            </div>
-          )}
+          {filters.q || filters.state.and.length || filters.state.or.length ? "No talent matches these filters." : "No talent yet. Creators, athletes and personalities live here."}
+          {canEdit && <div className="mt-3"><Link href="/talent/new" className="btn btn-secondary btn-sm">+ Add Talent</Link></div>}
         </div>
-      ) : filters.view === "table" ? (
-        <CreatorTable creators={vms} canEdit={canEdit} isAdmin={hasRole(user, "ADMIN")} />
+      ) : view === "table" ? (
+        <CreatorTable creators={vms} canEdit={canEdit} isAdmin={hasRole(user, "ADMIN")} matchingIds={ids} />
       ) : (
         <CreatorCardGrid creators={vms} canEdit={canEdit} />
       )}
-
-      <Pagination page={filters.page} pages={pages} />
+      <Pagination page={page} pages={pages} total={total} all={all} />
     </div>
   );
 }

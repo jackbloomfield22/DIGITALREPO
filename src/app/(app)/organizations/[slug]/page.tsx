@@ -5,6 +5,7 @@ import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { RecordStepper } from "@/components/record-stepper";
+import { RecordContext } from "@/components/record-context";
 import { recordNeighbors } from "@/lib/neighbors";
 
 import { requireUser, hasRole } from "@/lib/auth";
@@ -101,6 +102,7 @@ export default async function OrganizationPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <RecordContext type="organization" id={org.id} name={org.name} slug={org.slug} path={`/organizations/${org.slug}`} canEdit={canEdit} status={null} />
           <RecordStepper type="organization" fallback={await recordNeighbors("organization", { id: org.id, name: org.name })} />
           {canEdit && (
             <span className="flex gap-2">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { RecordStepper } from "@/components/record-stepper";
+import { RecordContext } from "@/components/record-context";
 import { recordNeighbors } from "@/lib/neighbors";
 
 import { notFound, redirect } from "next/navigation";
@@ -85,6 +86,7 @@ export default async function ChannelPage({ params }: { params: Promise<{ slug: 
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <RecordContext type="channel" id={channel.id} name={channel.name} slug={channel.slug} path={`/youtube/${channel.slug}`} canEdit={canEdit} status={channel.status} />
           <RecordStepper type="channel" fallback={await recordNeighbors("channel", { id: channel.id, name: channel.name })} />
           {channel.url && (
             <a href={channel.url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">

@@ -36,7 +36,7 @@ describe("shared repo discovery", () => {
     expect(archive.groups.find((g) => g.type === "creator")?.count).toBe(3);
   });
   it("keeps Recently Added ordering when filtering total audience", async () => {
-    const result = await queryCreators({ q: prefix, entities: [], sort: "added", minFollowers: 300000, page: 1, view: "table" });
+    const result = await queryCreators({ q: prefix, state: { and: [{ field: "followers", op: "gt", values: ["300000"] }], or: [] }, sort: "added", params: {} });
     expect(result.creators.map((c) => c.name)).toEqual([`${prefix} Zulu`, `${prefix} Alpha`]);
   });
   it("returns useful results rather than an empty oversized page", async () => {

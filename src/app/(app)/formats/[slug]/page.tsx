@@ -12,6 +12,7 @@ import { QuietTimer } from "@/components/quiet-timer";
 import { AirtableCard } from "@/components/airtable-card";
 import { airtableStateFor } from "@/lib/airtable/sync";
 import { RecordStepper } from "@/components/record-stepper";
+import { RecordContext } from "@/components/record-context";
 import { recordNeighbors } from "@/lib/neighbors";
 
 import { onQuietTimer, quietClock } from "@/lib/quiet-rules";
@@ -83,6 +84,7 @@ export default async function FormatPage({
             {format.logline && <p className="mt-2 max-w-2xl text-[15px] italic text-charcoal">{format.logline}</p>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <RecordContext type="format" id={format.id} name={format.title} slug={format.slug} path={`/formats/${format.slug}`} canEdit={canEdit} status={format.status} />
             <RecordStepper type="format" fallback={await recordNeighbors("format", { id: format.id, name: format.title })} />
             {canEdit && <Link href={`/formats/${format.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>}
             {canEdit && <DeleteRecordButton targetType="format" id={format.id} label={format.title} />}

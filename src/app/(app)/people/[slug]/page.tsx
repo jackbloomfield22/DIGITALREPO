@@ -5,6 +5,7 @@ import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { RecordStepper } from "@/components/record-stepper";
+import { RecordContext } from "@/components/record-context";
 import { recordNeighbors } from "@/lib/neighbors";
 
 import { requireUser, hasRole } from "@/lib/auth";
@@ -59,6 +60,7 @@ export default async function PersonPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <RecordContext type="person" id={person.id} name={person.name} slug={person.slug} path={`/people/${person.slug}`} canEdit={canEdit} status={null} />
           <RecordStepper type="person" fallback={await recordNeighbors("person", { id: person.id, name: person.name })} />
           {canEdit && (
             <span className="flex gap-2">

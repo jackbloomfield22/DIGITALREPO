@@ -5,6 +5,7 @@ import { movedTo } from "@/lib/conversions";
 import { UpdatePanel } from "@/components/update-panel";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { RecordStepper } from "@/components/record-stepper";
+import { RecordContext } from "@/components/record-context";
 import { recordNeighbors } from "@/lib/neighbors";
 
 import { requireUser, hasRole } from "@/lib/auth";
@@ -119,6 +120,7 @@ export default async function OpportunityPage({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <RecordContext type="opportunity" id={opp.id} name={opp.title} slug={opp.slug} path={`/opportunities/${opp.slug}`} canEdit={canEdit} status={opp.status} />
             <RecordStepper type="opportunity" fallback={await recordNeighbors("opportunity", { id: opp.id, name: opp.title })} />
             {canEdit && (
               <span className="flex gap-2">

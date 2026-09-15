@@ -1,31 +1,22 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser, hasRole } from "@/lib/auth";
-import { resolveTargets } from "@/lib/resolve-targets";
-import { attentionCounts } from "@/lib/attention";
+import { attentionCounts, attentionWheres } from "@/lib/attention";
+import { resolveRecordRefs } from "@/lib/record-refs";
 import { HomeSearch } from "@/components/home-search";
-import { Portrait, StatusPill } from "@/components/ui";
-import { labelFor, targetTypeLabel } from "@/lib/taxonomy";
+import { typeLabel } from "@/lib/record-types";
 import { daysAgo, formatDate, nowDate, relativeTime } from "@/lib/format";
+import { quietClock, onQuietTimer } from "@/lib/quiet-rules";
 
-// The command center: what should I know, continue, or investigate right now?
+// Home: what you starred, what changed, and what needs a hand — nothing
+// decorative. Every block links to the place the work happens.
 
-const ACTIVE_FORMAT_STATUSES = ["developing", "outbound", "pitched", "in_discussion"];
-
-function Module({ title, action, children }: {
-  title: string;
-  action?: { href: string; label: string };
-  children: React.ReactNode;
-}) {
+function Module({ title, action, children }: { title: string; action?: { href: string; label: string }; children: React.ReactNode }) {
   return (
     <section>
-      <div className="mb-2 flex items-baseline justify-between">
+      <div className="mb-2 flex items-baseline justify-between gap-3 border-b border-line pb-1.5">
         <h2 className="overline">{title}</h2>
-        {action && (
-          <Link href={action.href} className="text-xs text-muted hover:text-accent-deep hover:underline">
-            {action.label} →
-          </Link>
-        )}
+        {action && <Link href={action.href} className="text-xs text-muted hover:text-accent">{action.label} →</Link>}
       </div>
       {children}
     </section>
@@ -36,211 +27,120 @@ export default async function Home() {
   const user = await requireUser();
   const canEdit = hasRole(user, "EDITOR");
   const now = nowDate();
-
-  const [recents, activeFormats, deadlines, events, attention, activity, favorites, collections] =
-    await Promise.all([
-      db.recentView.findMany({ where: { userId: user.id }, orderBy: { viewedAt: "desc" }, take: 8 }),
-      db.format.findMany({
-        where: { archived: false, status: { in: ACTIVE_FORMAT_STATUSES } },
-        orderBy: { updatedAt: "desc" },
-        take: 5,
-        include: { creators: { include: { creator: { select: { name: true } } }, take: 3 } },
-      }),
-      db.opportunity.findMany({
-        where: { archived: false, deadline: { gte: now, lte: daysAgo(-21) } },
-        orderBy: { deadline: "asc" },
-        take: 5,
-        select: { title: true, slug: true, deadline: true, type: true },
-      }),
-      db.sportsEvent.findMany({
-        where: { startDate: { gte: now } },
-        orderBy: { startDate: "asc" },
-        take: 6,
-      }),
-      attentionCounts(),
-      db.auditLog.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 8,
-        select: { id: true, userName: true, action: true, targetType: true, targetLabel: true, createdAt: true },
-      }),
-      db.favorite.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 6 }),
-      db.collection.findMany({
-        orderBy: { updatedAt: "desc" },
-        take: 4,
-        include: { _count: { select: { items: true } } },
-      }),
-    ]);
-
-  const [recentResolved, favResolved] = await Promise.all([
-    resolveTargets(recents),
-    resolveTargets(favorites),
+  const soon = daysAgo(-30);
+  const { noRep, noProdCo, unverified } = attentionWheres();
+  const [favorites, audits, counts, deadlines, quietCandidates, events, noRepList, noCoList, unverifiedList] = await Promise.all([
+    db.favorite.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 12, select: { targetType: true, targetId: true } }),
+    db.auditLog.findMany({ where: { targetType: { in: ["creator", "project", "organization", "format", "person", "opportunity", "channel"] } }, orderBy: { createdAt: "desc" }, take: 120, select: { targetType: true, targetId: true, targetLabel: true, userName: true, action: true, field: true, createdAt: true } }),
+    attentionCounts(),
+    db.opportunity.findMany({ where: { archived: false, deadline: { lte: soon } }, orderBy: { deadline: "asc" }, take: 8, select: { id: true, title: true, slug: true, deadline: true, status: true } }),
+    Promise.all([
+      db.format.findMany({ where: { archived: false, status: { in: ["idea", "concept", "developing"] } }, select: { id: true, title: true, slug: true, status: true, updatedAt: true, lastActivityAt: true }, take: 300 }),
+      db.project.findMany({ where: { archived: false, status: "announced" }, select: { id: true, title: true, slug: true, status: true, updatedAt: true, lastActivityAt: true }, take: 300 }),
+    ]),
+    db.sportsEvent.findMany({ where: { startDate: { gte: daysAgo(1), lte: daysAgo(-21) } }, orderBy: { startDate: "asc" }, take: 5, select: { id: true, title: true, slug: true, startDate: true, sport: { select: { name: true } } } }),
+    db.creator.findMany({ where: noRep, select: { id: true, name: true, slug: true }, take: 5, orderBy: { updatedAt: "desc" } }),
+    db.project.findMany({ where: noProdCo, select: { id: true, title: true, slug: true }, take: 5, orderBy: { updatedAt: "desc" } }),
+    db.creator.findMany({ where: unverified, select: { id: true, name: true, slug: true, lastVerifiedAt: true }, take: 5, orderBy: { lastVerifiedAt: { sort: "asc", nulls: "first" } } }),
   ]);
 
-  const attentionRows = [
-    { count: attention.deadlinesThisWeek, label: "opportunity deadlines this week" },
-    { count: attention.talentWithoutRep, label: "talent without current representation" },
-    { count: attention.staleSocialCounts, label: "stale social counts" },
-    { count: attention.projectsWithoutCompany, label: "projects missing a production company" },
-    { count: attention.talentWithoutSource, label: "talent profiles without a source" },
-    { count: attention.unverifiedTalent, label: "profiles not verified in 90+ days" },
-  ].filter((r) => r.count > 0);
+  // Recently updated: one row per record, newest first, with who and when.
+  const seen = new Set<string>();
+  const recent = audits.filter((a) => { const k = `${a.targetType}:${a.targetId}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 20);
+  const [favRefs, recentRefs] = await Promise.all([resolveRecordRefs(favorites), resolveRecordRefs(recent)]);
+  const refOf = new Map(recentRefs.map((r) => [`${r.type}:${r.id}`, r]));
+
+  const quiet = [
+    ...quietCandidates[0].map((f) => ({ type: "format", href: `/formats/${f.slug}`, name: f.title, status: f.status, clock: quietClock(f, now), on: onQuietTimer("format", f.status) })),
+    ...quietCandidates[1].map((p) => ({ type: "project", href: `/projects/${p.slug}`, name: p.title, status: p.status, clock: quietClock(p, now), on: onQuietTimer("project", p.status) })),
+  ].filter((x) => x.on && x.clock.daysLeft <= 14).sort((a, b) => a.clock.daysLeft - b.clock.daysLeft).slice(0, 6);
+
+  const QUICK = [
+    { href: "/talent/new", label: "+ Talent" }, { href: "/projects/new", label: "+ Project" }, { href: "/organizations/new", label: "+ Company" },
+    { href: "/formats/new", label: "+ Format" }, { href: "/opportunities/new", label: "+ Opportunity" }, { href: "/people/new", label: "+ Person" }, { href: "/ingest", label: "+ Add information" },
+  ];
 
   return (
-    <div className="max-w-5xl">
+    <div>
       <div className="mb-8">
         <div className="overline mb-1">{formatDate(now)}</div>
-        <h1 className="mb-4 font-display text-3xl font-bold tracking-tight">
-          THE 4.4.FORTY REPO
-        </h1>
+        <h1 className="mb-4 font-display text-2xl font-bold tracking-tight">The 4.4.Forty Repo</h1>
         <HomeSearch />
-        {canEdit && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {[
-              { href: "/talent/new", label: "+ Talent" },
-              { href: "/formats/new", label: "+ Format" },
-              { href: "/projects/new", label: "+ Project" },
-              { href: "/opportunities/new", label: "+ Opportunity" },
-              { href: "/organizations/new", label: "+ Organization" },
-              { href: "/ingest", label: "+ Ingest research" },
-            ].map((a) => (
-              <Link key={a.href} href={a.href} className="chip text-muted hover:text-accent-deep">
-                {a.label}
-              </Link>
-            ))}
-          </div>
-        )}
+        {canEdit && <div className="mt-3 flex flex-wrap gap-1.5">{QUICK.map((a) => <Link key={a.href} href={a.href} className="chip text-muted hover:text-accent-deep">{a.label}</Link>)}</div>}
       </div>
 
       <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[3fr_2fr]">
         <div className="space-y-8">
-          {recents.length > 0 && (
-            <Module title="Continue Working" action={{ href: "/recent", label: "All recent" }}>
+          <Module title="Favorites" action={{ href: "/favorites", label: "All favorites" }}>
+            {favRefs.length ? (
               <div className="grid gap-1.5 sm:grid-cols-2">
-                {recents.map((r) => {
-                  const res = recentResolved.get(`${r.targetType}:${r.targetId}`);
-                  if (!res || res.archived) return null;
-                  return (
-                    <Link key={r.id} href={res.href} className="card flex items-center gap-2.5 px-3 py-2 transition-shadow hover:shadow-pop">
-                      {r.targetType === "creator" ? (
-                        <Portrait name={res.label} imageUrl={res.imageUrl} className="h-7 w-7 shrink-0 rounded" textClass="text-[10px]" />
-                      ) : (
-                        <span className="kind-badge kind-project shrink-0">{targetTypeLabel(r.targetType)}</span>
-                      )}
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium">{res.label}</span>
-                      </span>
-                    </Link>
-                  );
-                })}
+                {favRefs.map((r) => (
+                  <Link key={`${r.type}:${r.id}`} href={r.href} className="card flex items-center gap-2.5 px-3 py-2 transition-shadow hover:shadow-pop">
+                    <span className="w-14 shrink-0 text-[10px] uppercase tracking-wide text-faint">{typeLabel(r.type)}</span>
+                    <span className="min-w-0"><span className="block truncate text-sm font-medium">{r.name}</span>{r.sub && <span className="block truncate text-xs text-muted">{r.sub}</span>}</span>
+                  </Link>
+                ))}
               </div>
-            </Module>
-          )}
-
-          <Module title="Active Development" action={{ href: "/development", label: "Development" }}>
-            <div className="space-y-1.5">
-              {activeFormats.map((f) => (
-                <Link key={f.id} href={`/formats/${f.slug}`} className="card flex items-baseline justify-between gap-3 px-3.5 py-2.5 transition-shadow hover:shadow-pop">
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">{f.title}</span>
-                    <span className="block truncate text-xs text-muted">
-                      {[f.logline, f.creators.length ? f.creators.map((c) => c.creator.name).join(", ") : null]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <StatusPill status={f.status} label={labelFor(f.status)} />
-                    <span className="text-xs text-faint">{relativeTime(f.updatedAt)}</span>
-                  </span>
-                </Link>
-              ))}
-              {activeFormats.length === 0 && (
-                <p className="text-sm text-faint">No formats in active development. The slate lives under Development.</p>
-              )}
-              {deadlines.map((o) => (
-                <Link key={o.slug} href={`/opportunities/${o.slug}`} className="card flex items-baseline justify-between gap-3 px-3.5 py-2.5 transition-shadow hover:shadow-pop">
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">{o.title}</span>
-                    <span className="block truncate text-xs text-muted">{labelFor(o.type)}</span>
-                  </span>
-                  <span className="shrink-0 text-xs font-medium text-accent-deep">
-                    due {formatDate(o.deadline)}
-                  </span>
-                </Link>
-              ))}
-            </div>
+            ) : <p className="text-sm text-faint">Star a record with ☆ and it lands here, and in the sidebar.</p>}
           </Module>
 
-          <Module title="Team Activity" action={{ href: "/activity", label: "All activity" }}>
-            <div className="space-y-1">
-              {activity.map((a) => (
-                <div key={a.id} className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="min-w-0 truncate">
-                    <span className="font-medium">{a.userName}</span>{" "}
-                    <span className="text-muted">{a.action}</span>{" "}
-                    <span className="font-medium">{a.targetLabel}</span>{" "}
-                    <span className="text-xs text-faint">({targetTypeLabel(a.targetType)})</span>
-                  </span>
-                  <span className="shrink-0 text-xs text-faint">{relativeTime(a.createdAt)}</span>
-                </div>
-              ))}
-              {activity.length === 0 && <p className="text-sm text-faint">No activity yet.</p>}
-            </div>
+          <Module title="Recently updated" action={{ href: "/activity", label: "All activity" }}>
+            {recent.length ? (
+              <ul className="divide-y divide-line rounded-md border border-line bg-surface">
+                {recent.map((a) => {
+                  const r = refOf.get(`${a.targetType}:${a.targetId}`);
+                  return (
+                    <li key={`${a.targetType}:${a.targetId}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-3 py-2 text-sm">
+                      <span className="w-14 shrink-0 text-[10px] uppercase tracking-wide text-faint">{typeLabel(a.targetType)}</span>
+                      {r ? <Link href={r.href} className="font-medium hover:text-accent-deep">{r.name}</Link> : <span className="text-muted">{a.targetLabel}</span>}
+                      <span className="text-xs text-muted">{a.action}{a.field ? ` · ${a.field}` : ""}</span>
+                      <span className="ml-auto text-xs text-faint">{a.userName ?? "System"} · {relativeTime(a.createdAt)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : <p className="text-sm text-faint">Changes to records show up here, with who made them and when.</p>}
           </Module>
         </div>
 
         <div className="space-y-8">
-          {attentionRows.length > 0 && (
-            <Module title="Needs Attention" action={{ href: "/attention", label: "Work the queue" }}>
-              <Link href="/attention" className="card block px-3.5 py-2.5 transition-shadow hover:shadow-pop">
-                <div className="space-y-1 text-sm">
-                  {attentionRows.map((r) => (
-                    <div key={r.label} className="flex items-baseline gap-2">
-                      <span className="w-7 shrink-0 text-right font-display font-bold text-accent-deep">{r.count}</span>
-                      <span className="text-muted">{r.label}</span>
-                    </div>
-                  ))}
+          <Module title="Needs attention" action={{ href: "/attention", label: "Work the queue" }}>
+            <div className="space-y-4 text-sm">
+              {deadlines.length > 0 && (
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-muted">Deadlines overdue or within 30 days</div>
+                  <ul className="space-y-1">{deadlines.map((o) => { const overdue = o.deadline && o.deadline < now; return <li key={o.id} className="flex items-baseline justify-between gap-2"><Link href={`/opportunities/${o.slug}`} className="truncate font-medium hover:text-accent-deep">{o.title}</Link><span className={`shrink-0 text-xs ${overdue ? "text-accent-deep" : "text-muted"}`}>{overdue ? "overdue · " : ""}{formatDate(o.deadline)}</span></li>; })}</ul>
                 </div>
-              </Link>
-            </Module>
-          )}
-
-          <Module title="Upcoming" action={{ href: "/calendar", label: "Calendar" }}>
-            <div className="space-y-1">
-              {events.map((e) => (
-                <div key={e.id} className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="min-w-0 truncate">
-                    {e.league && <span className="text-xs font-semibold text-muted">{e.league} · </span>}
-                    {e.title}
-                  </span>
-                  <span className="shrink-0 text-xs text-faint">
-                    {formatDate(e.startDate)}
-                    {e.approximate ? " (approx.)" : ""}
-                  </span>
+              )}
+              {quiet.length > 0 && (
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-muted">About to archive on the two-month timer</div>
+                  <ul className="space-y-1">{quiet.map((x) => <li key={x.href} className="flex items-baseline justify-between gap-2"><Link href={x.href} className="truncate font-medium hover:text-accent-deep">{x.name}</Link><span className="shrink-0 text-xs text-muted">{x.clock.daysLeft === 0 ? "next sweep" : `${x.clock.daysLeft} days`}</span></li>)}</ul>
                 </div>
-              ))}
-              {events.length === 0 && <p className="text-sm text-faint">No upcoming events on the calendar.</p>}
+              )}
+              {unverifiedList.length > 0 && (
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-muted">Not verified in 90 days <span className="font-normal text-faint">({counts.unverifiedTalent} talent)</span></div>
+                  <ul className="space-y-1">{unverifiedList.map((c) => <li key={c.id} className="flex items-baseline justify-between gap-2"><Link href={`/talent/${c.slug}`} className="truncate font-medium hover:text-accent-deep">{c.name}</Link><span className="shrink-0 text-xs text-muted">{c.lastVerifiedAt ? relativeTime(c.lastVerifiedAt) : "never"}</span></li>)}</ul>
+                </div>
+              )}
+              {(noRepList.length > 0 || noCoList.length > 0) && (
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-muted">Missing key fields</div>
+                  <ul className="space-y-1">
+                    {noRepList.map((c) => <li key={c.id} className="flex items-baseline justify-between gap-2"><Link href={`/talent/${c.slug}`} className="truncate font-medium hover:text-accent-deep">{c.name}</Link><span className="shrink-0 text-xs text-muted">no rep</span></li>)}
+                    {noCoList.map((p) => <li key={p.id} className="flex items-baseline justify-between gap-2"><Link href={`/projects/${p.slug}`} className="truncate font-medium hover:text-accent-deep">{p.title}</Link><span className="shrink-0 text-xs text-muted">no company</span></li>)}
+                  </ul>
+                  <p className="mt-1 text-xs text-faint">{counts.talentWithoutRep} talent without a rep · {counts.projectsWithoutCompany} projects without a company · {counts.staleSocialCounts} stale social counts</p>
+                </div>
+              )}
+              {counts.total === 0 && quiet.length === 0 && <p className="text-faint">Nothing needs attention right now.</p>}
             </div>
           </Module>
 
-          {(favorites.length > 0 || collections.length > 0) && (
-            <Module title="Pinned" action={{ href: "/favorites", label: "Favorites" }}>
-              <div className="flex flex-wrap gap-1.5">
-                {favorites.map((f) => {
-                  const res = favResolved.get(`${f.targetType}:${f.targetId}`);
-                  if (!res || res.archived) return null;
-                  return (
-                    <Link key={f.id} href={res.href} className="chip hover:text-accent-deep">
-                      ★ {res.label}
-                    </Link>
-                  );
-                })}
-                {collections.map((c) => (
-                  <Link key={c.id} href={`/collections/${c.slug}`} className="chip hover:text-accent-deep">
-                    {c.name} <span className="text-xs text-muted">{c._count.items}</span>
-                  </Link>
-                ))}
-              </div>
+          {events.length > 0 && (
+            <Module title="Coming up" action={{ href: "/calendar", label: "Calendar" }}>
+              <ul className="space-y-1 text-sm">{events.map((e) => <li key={e.id} className="flex items-baseline justify-between gap-2"><Link href={`/calendar#${e.slug}`} className="truncate hover:text-accent-deep">{e.title}</Link><span className="shrink-0 text-xs text-muted">{formatDate(e.startDate)}{e.sport ? ` · ${e.sport.name}` : ""}</span></li>)}</ul>
             </Module>
           )}
         </div>

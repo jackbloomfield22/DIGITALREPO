@@ -56,14 +56,14 @@ export async function saveView(input: {
   name: string;
   targetType: string;
   query: string;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{ ok: boolean; error?: string; id?: string }> {
   try {
     const user = await requireUser();
     const name = input.name.trim();
     if (!name || name.length > 100) return { ok: false, error: "Use a view name of 1–100 characters." };
     const allowedTypes = ["creators", "talent", "projects", "formats", "organizations", "people", "opportunities", "youtube/channels", "digital", "search", "archive"];
     if (!allowedTypes.includes(input.targetType) || input.query.length > 4000) return { ok: false, error: "Invalid saved view." };
-    await db.savedView.create({
+    const view = await db.savedView.create({
       data: {
         name,
         ownerId: user.id,
@@ -72,7 +72,7 @@ export async function saveView(input: {
       },
     });
     revalidatePath("/", "layout");
-    return { ok: true };
+    return { ok: true, id: view.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not save view." };
   }
@@ -123,5 +123,19 @@ export async function deleteCollection(id: string): Promise<{ ok: boolean; error
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not delete collection." };
+  }
+}
+
+/** Overwrite a saved view's filters with the current ones. */
+export async function updateSavedView(id: string, query: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const user = await requireUser();
+    if (query.length > 4000) return { ok: false, error: "That view is too large to save." };
+    const r = await db.savedView.updateMany({ where: { id, ownerId: user.id }, data: { query } });
+    if (!r.count) return { ok: false, error: "That view is not yours to change." };
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not save." };
   }
 }

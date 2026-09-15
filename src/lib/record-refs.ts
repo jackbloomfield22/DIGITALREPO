@@ -8,11 +8,7 @@ import { labelFor } from "@/lib/taxonomy";
 
 export type RecordRef = { type: string; id: string; name: string; href: string; sub?: string; archived?: boolean };
 
-const TYPE_LABEL: Record<string, string> = {
-  creator: "Talent", project: "Project", organization: "Company", format: "Format", person: "Person",
-  opportunity: "Opportunity", channel: "Channel", entity: "Topic", collection: "Collection",
-};
-export const typeLabel = (type: string) => TYPE_LABEL[type] ?? type;
+export { typeLabel } from "@/lib/record-types";
 
 export async function resolveRecordRefs(refs: { targetType: string; targetId: string }[]): Promise<RecordRef[]> {
   const byType = new Map<string, string[]>();

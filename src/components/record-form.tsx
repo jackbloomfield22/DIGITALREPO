@@ -66,17 +66,20 @@ export function RecordForm({
   heading,
   fields,
   initial,
+  prefill,
 }: {
   kind: RecordKind;
   heading: string;
   fields: FieldDef[];
   initial?: { id: string; slug: string; version: number; values: Values };
+  /** Values to start a new record with (a name typed into search, say). */
+  prefill?: Values;
 }) {
   const isEdit = !!initial;
   const [values, setValues] = useState<Values>(() => {
     const v: Values = {};
     for (const f of fields) {
-      v[f.name] = initial?.values[f.name] ?? (f.type === "multicheck" ? [] : "");
+      v[f.name] = initial?.values[f.name] ?? prefill?.[f.name] ?? (f.type === "multicheck" ? [] : "");
     }
     return v;
   });

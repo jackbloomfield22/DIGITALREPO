@@ -2,221 +2,109 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { creatorSearch } from "@/lib/search-where";
-import { pageNumber, nonNegativeNumber } from "@/lib/directory-params";
+import { firstParam, type SearchParams } from "@/lib/directory-params";
 import { totalAudience } from "@/lib/format";
+import { parseFilterParams, type FilterField, type FilterState } from "@/lib/filters";
+import { filterWhere, type FieldMap } from "@/lib/filter-where";
+import { paging } from "@/lib/directory";
+import { CREATOR_STATUSES, PROJECT_ROLES, SOCIAL_PLATFORMS } from "@/lib/taxonomy";
 
-export type CreatorFilters = {
-  q?: string;
-  entities: string[]; // entity ids, AND semantics
-  role?: string; // creator-project role, e.g. "host"
-  org?: string; // organization id — direct relationship OR worked on its projects
-  rep?: string; // industry person id
-  format?: string; // "any" | "none" | format id
-  platform?: string;
-  minFollowers?: number;
-  status?: string;
-  sort: string;
-  view: "cards" | "table";
-  page: number;
+// The talent list: the shared filter model plus a few sorts that have to be
+// worked out in memory (audience, per-platform following, connections).
+
+export const TALENT_FIELDS: FilterField[] = [
+  { key: "topic", label: "Interests, sports & locations", kind: "lookup", lookupType: "entity", legacy: "entity" },
+  { key: "status", label: "Talent status", kind: "select", options: CREATOR_STATUSES, legacy: "status" },
+  { key: "platform", label: "Social platform", kind: "select", options: SOCIAL_PLATFORMS.map((p) => ({ value: p.value, label: p.label })), legacy: "platform" },
+  { key: "followers", label: "Followers on a platform", kind: "number", legacy: "min", placeholder: "e.g. 300000" },
+  { key: "company", label: "Company / brand", kind: "lookup", lookupType: "organization", legacy: "org" },
+  { key: "rep", label: "Representative", kind: "lookup", lookupType: "person", legacy: "rep" },
+  { key: "role", label: "Project role", kind: "select", options: PROJECT_ROLES, legacy: "role" },
+  { key: "format", label: "Format", kind: "lookup", lookupType: "format", legacy: "format", presets: [{ value: "any", label: "Has a format" }, { value: "none", label: "No format yet" }] },
+  { key: "project", label: "Project", kind: "lookup", lookupType: "project" },
+  { key: "location", label: "Location", kind: "text" },
+  { key: "updated", label: "Updated", kind: "date" },
+];
+export const TALENT_MAPS: Record<string, FieldMap> = {
+  topic: { relation: "entityLinks", idField: "entityId" },
+  status: { column: "status" },
+  platform: { relation: "socialProfiles", idField: "platform" },
+  followers: { custom: (c) => { const n = Number(c.values[0]); if (!Number.isFinite(n)) return null; return c.op === "lt" ? { socialProfiles: { some: { followerCount: { lte: n } } } } : c.op === "between" ? { socialProfiles: { some: { followerCount: { gte: n, lte: Number(c.values[1]) } } } } : c.op === "is" ? { socialProfiles: { some: { followerCount: n } } } : c.op === "empty" ? { socialProfiles: { none: { followerCount: { not: null } } } } : c.op === "not_empty" ? { socialProfiles: { some: { followerCount: { not: null } } } } : { socialProfiles: { some: { followerCount: { gte: n } } } }; } },
+  company: { custom: (c) => c.op === "any" || c.op === "is" ? { OR: [{ organizations: { some: { organizationId: { in: c.values } } } }, { credits: { some: { project: { organizations: { some: { organizationId: { in: c.values } } } } } } }] } : c.op === "none" || c.op === "is_not" ? { NOT: { organizations: { some: { organizationId: { in: c.values } } } } } : c.op === "empty" ? { organizations: { none: {} } } : { organizations: { some: {} } } },
+  rep: { relation: "people", idField: "personId" },
+  role: { custom: (c) => c.op === "is" ? { credits: { some: { role: c.values[0] } } } : c.op === "any" ? { credits: { some: { role: { in: c.values } } } } : c.op === "is_not" ? { credits: { none: { role: c.values[0] } } } : c.op === "none" ? { credits: { none: { role: { in: c.values } } } } : null },
+  format: { relation: "formats", idField: "formatId" },
+  project: { relation: "credits", idField: "projectId" },
+  location: { column: "location" },
+  updated: { column: "updatedAt", kind: "date" },
 };
+export const TALENT_DEFAULT_VIEWS = [
+  { name: "All", query: "" },
+  { name: "Active", query: "f=status~is~active" },
+  { name: "Priority", query: "f=status~is~priority" },
+  { name: "Watch list", query: "f=status~is~watch" },
+  { name: "Recently updated", query: "sort=updated" },
+];
 
-export const PAGE_SIZE = 24;
+export type CreatorFilters = { q?: string; state: FilterState; sort: string; params: SearchParams };
 
-export function parseCreatorFilters(
-  params: Record<string, string | string[] | undefined>,
-): CreatorFilters {
-  const one = (v: string | string[] | undefined) =>
-    Array.isArray(v) ? v[0] : v;
-  const many = (v: string | string[] | undefined) =>
-    v == null ? [] : Array.isArray(v) ? v : [v];
-  return {
-    q: one(params.q)?.trim() || undefined,
-    entities: many(params.entity).filter(Boolean),
-    role: one(params.role) || undefined,
-    org: one(params.org) || undefined,
-    rep: one(params.rep) || undefined,
-    format: one(params.format) || undefined,
-    platform: one(params.platform) || undefined,
-    minFollowers: nonNegativeNumber(params.min),
-    status: one(params.status) || undefined,
-    sort: one(params.sort) || "name",
-    view: one(params.view) === "cards" ? "cards" : "table",
-    page: pageNumber(params.page),
-  };
+export function parseCreatorFilters(params: SearchParams): CreatorFilters {
+  return { q: firstParam(params.q)?.trim() || undefined, state: parseFilterParams(params, TALENT_FIELDS), sort: firstParam(params.sort) || "name", params };
 }
 
 export function buildCreatorWhere(f: CreatorFilters): Prisma.CreatorWhereInput {
-  const and: Prisma.CreatorWhereInput[] = [{ archived: false }];
-
-  if (f.q) and.push(creatorSearch(f.q));
-  for (const entityId of f.entities) {
-    and.push({ entityLinks: { some: { entityId } } });
-  }
-  if (f.role) and.push({ credits: { some: { role: f.role } } });
-  if (f.org) {
-    and.push({
-      OR: [
-        { organizations: { some: { organizationId: f.org } } },
-        { credits: { some: { project: { organizations: { some: { organizationId: f.org } } } } } },
-      ],
-    });
-  }
-  if (f.rep) and.push({ people: { some: { personId: f.rep } } });
-  if (f.format === "any") and.push({ formats: { some: {} } });
-  else if (f.format === "none") and.push({ formats: { none: {} } });
-  else if (f.format) and.push({ formats: { some: { formatId: f.format } } });
-  if (f.status) and.push({ status: f.status });
-  if (f.platform && f.minFollowers) {
-    and.push({
-      socialProfiles: {
-        some: { platform: f.platform, followerCount: { gte: f.minFollowers } },
-      },
-    });
-  } else if (f.platform) {
-    and.push({ socialProfiles: { some: { platform: f.platform } } });
-  }
-  // minFollowers with no platform = total listed audience, applied post-query.
-  return { AND: and };
+  return { AND: [{ archived: false }, ...(f.q ? [creatorSearch(f.q)] : []), ...(filterWhere(TALENT_MAPS, f.state) as Prisma.CreatorWhereInput[])] };
 }
 
 const cardInclude = {
-  socialProfiles: {
-    select: { platform: true, handle: true, followerCount: true, countUpdatedAt: true },
-  },
-  entityLinks: {
-    select: {
-      relationship: true,
-      entity: { select: { id: true, kind: true, name: true, slug: true } },
-    },
-  },
-  formats: {
-    select: { format: { select: { title: true, slug: true } } },
-  },
-  credits: {
-    select: { role: true, project: { select: { id: true, title: true, slug: true } } },
-  },
-  people: {
-    select: { relationship: true, person: { select: { name: true, slug: true } } },
-  },
-  _count: {
-    select: { formats: true, relationshipsA: true, relationshipsB: true },
-  },
+  socialProfiles: { select: { platform: true, handle: true, followerCount: true, countUpdatedAt: true } },
+  entityLinks: { select: { relationship: true, entity: { select: { id: true, kind: true, name: true, slug: true } } } },
+  formats: { select: { format: { select: { title: true, slug: true } } } },
+  credits: { select: { role: true, project: { select: { id: true, title: true, slug: true } } } },
+  people: { select: { relationship: true, person: { select: { name: true, slug: true } } } },
+  _count: { select: { formats: true, relationshipsA: true, relationshipsB: true } },
 } satisfies Prisma.CreatorInclude;
 
-export type CreatorCardData = Prisma.CreatorGetPayload<{
-  include: typeof cardInclude;
-}>;
+export type CreatorCardData = Prisma.CreatorGetPayload<{ include: typeof cardInclude }>;
 
-const PLATFORM_SORTS: Record<string, string> = {
-  instagram: "instagram",
-  tiktok: "tiktok",
-  youtube: "youtube",
-};
+const PLATFORM_SORTS: Record<string, string> = { instagram: "instagram", tiktok: "tiktok", youtube: "youtube" };
 
-export async function queryCreators(f: CreatorFilters): Promise<{
-  creators: CreatorCardData[];
-  total: number;
-  pages: number;
-}> {
+export async function queryCreators(f: CreatorFilters): Promise<{ creators: CreatorCardData[]; total: number; pages: number; page: number; all: boolean; ids: string[]; requested: number }> {
   const where = buildCreatorWhere(f);
-
   const simpleOrder: Record<string, Prisma.CreatorOrderByWithRelationInput> = {
-    name: { name: "asc" },
-    added: { createdAt: "desc" },
-    updated: { updatedAt: "desc" },
-    formats: { formats: { _count: "desc" } },
-    projects: { credits: { _count: "desc" } },
+    name: { name: "asc" }, added: { createdAt: "desc" }, updated: { updatedAt: "desc" }, formats: { formats: { _count: "desc" } }, projects: { credits: { _count: "desc" } },
   };
+  const needsComputedSort = f.sort === "audience" || f.sort === "connections" || f.sort in PLATFORM_SORTS;
 
-  const needsComputedSort =
-    f.sort === "audience" || f.sort === "connections" || f.sort in PLATFORM_SORTS;
-  const needsAudienceFilter = !!f.minFollowers && !f.platform;
-
-  if (!needsComputedSort && !needsAudienceFilter) {
+  if (!needsComputedSort) {
+    const total = await db.creator.count({ where });
+    const pg = paging(f.params, total);
     const orderBy = simpleOrder[f.sort] ?? simpleOrder.name;
-    const [creators, total] = await Promise.all([
-      db.creator.findMany({
-        where,
-        include: cardInclude,
-        orderBy: [orderBy, { name: "asc" }],
-        skip: (f.page - 1) * PAGE_SIZE,
-        take: PAGE_SIZE,
-      }),
-      db.creator.count({ where }),
+    const [creators, ids] = await Promise.all([
+      db.creator.findMany({ where, include: cardInclude, orderBy: [orderBy, { name: "asc" }], skip: pg.skip, take: pg.take }),
+      db.creator.findMany({ where, select: { id: true }, take: 500 }),
     ]);
-    return { creators, total, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
+    return { creators, total, pages: pg.pages, page: pg.page, all: pg.all, ids: ids.map((r) => r.id), requested: pg.requested };
   }
 
-  // Computed sorts / total-audience filter: rank the full matching set in
-  // memory (ids + aggregates only), then hydrate the page.
+  // Computed sorts: rank the whole matching set in memory (ids + aggregates only), then hydrate the page.
   const rows = await db.creator.findMany({
     where,
-    select: {
-      id: true,
-      name: true,
-      createdAt: true,
-      updatedAt: true,
-      socialProfiles: { select: { platform: true, followerCount: true } },
-      _count: { select: { formats: true, credits: true, relationshipsA: true, relationshipsB: true } },
-    },
+    select: { id: true, name: true, socialProfiles: { select: { platform: true, followerCount: true } }, _count: { select: { relationshipsA: true, relationshipsB: true } } },
   });
-
-  let ranked = rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    added: r.createdAt.getTime(),
-    updated: r.updatedAt.getTime(),
-    formats: r._count.formats,
-    projects: r._count.credits,
-    audience: totalAudience(r.socialProfiles),
-    platformCount: (platform: string) =>
-      r.socialProfiles
-        .filter((s) => s.platform === platform)
-        .reduce((sum, s) => sum + (s.followerCount ?? 0), 0),
+  const ranked = rows.map((r) => ({
+    id: r.id, name: r.name, audience: totalAudience(r.socialProfiles),
+    platformCount: (platform: string) => r.socialProfiles.filter((s) => s.platform === platform).reduce((sum, s) => sum + (s.followerCount ?? 0), 0),
     connections: r._count.relationshipsA + r._count.relationshipsB,
   }));
-
-  if (needsAudienceFilter) {
-    ranked = ranked.filter((r) => r.audience >= (f.minFollowers ?? 0));
-  }
-
   if (f.sort === "audience") ranked.sort((a, b) => b.audience - a.audience || a.name.localeCompare(b.name));
   else if (f.sort === "connections") ranked.sort((a, b) => b.connections - a.connections || a.name.localeCompare(b.name));
-  else if (f.sort in PLATFORM_SORTS) {
-    const platform = PLATFORM_SORTS[f.sort];
-    ranked.sort((a, b) => b.platformCount(platform) - a.platformCount(platform) || a.name.localeCompare(b.name));
-  } else if (["added", "updated", "formats", "projects"].includes(f.sort)) {
-    const key = f.sort as "added" | "updated" | "formats" | "projects";
-    ranked.sort((a, b) => b[key] - a[key] || a.name.localeCompare(b.name));
-  } else ranked.sort((a, b) => a.name.localeCompare(b.name));
-
+  else { const platform = PLATFORM_SORTS[f.sort]; ranked.sort((a, b) => b.platformCount(platform) - a.platformCount(platform) || a.name.localeCompare(b.name)); }
   const total = ranked.length;
-  const pageIds = ranked.slice((f.page - 1) * PAGE_SIZE, f.page * PAGE_SIZE).map((r) => r.id);
-  const creators = await db.creator.findMany({
-    where: { id: { in: pageIds } },
-    include: cardInclude,
-  });
+  const pg = paging(f.params, total);
+  const pageIds = ranked.slice(pg.skip, pg.skip + pg.take).map((r) => r.id);
+  const creators = await db.creator.findMany({ where: { id: { in: pageIds } }, include: cardInclude });
   const order = new Map(pageIds.map((creatorId, i) => [creatorId, i]));
   creators.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
-  return { creators, total, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
-}
-
-/** Resolve display labels for active filter chips. */
-export async function resolveFilterLabels(f: CreatorFilters) {
-  const [entities, orgRecord, repRecord, formatRecord] = await Promise.all([
-    f.entities.length
-      ? db.entity.findMany({ where: { id: { in: f.entities } }, select: { id: true, name: true, kind: true } })
-      : Promise.resolve([]),
-    f.org ? db.organization.findUnique({ where: { id: f.org }, select: { name: true } }) : null,
-    f.rep ? db.industryPerson.findUnique({ where: { id: f.rep }, select: { name: true } }) : null,
-    f.format && f.format !== "any" && f.format !== "none"
-      ? db.format.findUnique({ where: { id: f.format }, select: { title: true } })
-      : null,
-  ]);
-  return {
-    entities,
-    orgName: orgRecord?.name,
-    repName: repRecord?.name,
-    formatTitle: formatRecord?.title,
-  };
+  return { creators, total, pages: pg.pages, page: pg.page, all: pg.all, ids: ranked.slice(0, 500).map((r) => r.id), requested: pg.requested };
 }

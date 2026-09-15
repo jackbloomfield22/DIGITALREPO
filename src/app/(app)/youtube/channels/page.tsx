@@ -15,6 +15,12 @@ import { parseSort } from "@/lib/directory-sort";
 import { compactNumber, formatDate, relativeTime, isStale } from "@/lib/format";
 import { CHANNEL_STATUSES, labelFor } from "@/lib/taxonomy";
 import { YouTubeHeader } from "@/components/youtube-nav";
+import { parseFilterParams, type FilterField } from "@/lib/filters";
+import { filterWhere, type FieldMap } from "@/lib/filter-where";
+import { directoryUser } from "@/lib/directory";
+
+const FIELDS: FilterField[] = [{ key: "status", label: "Channel status", kind: "select", options: CHANNEL_STATUSES.filter((s) => s.value !== "archived"), legacy: "status" }];
+const MAPS: Record<string, FieldMap> = { status: { column: "status" } };
 
 export const metadata = { title: "Channels" };
 
@@ -39,15 +45,14 @@ export default async function ChannelsPage({
   const params = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const q = one(params.q)?.trim();
-  const status = one(params.status);
+  const state = parseFilterParams(params, FIELDS);
   const view = one(params.view) === "board" ? "board" : "table";
+  const { views } = await directoryUser(user.id, "youtube/channels");
   const sort = parseSort(one(params.sort), "subscribers-desc");
   const page = pageNumber(one(params.page));
   const canEdit = hasRole(user, "EDITOR");
 
-  const and: Prisma.ChannelWhereInput[] = [{ archived: false }];
-  if (q) and.push(channelSearch(q));
-  if (status) and.push({ status });
+  const and: Prisma.ChannelWhereInput[] = [{ archived: false }, ...(q ? [channelSearch(q)] : []), ...(filterWhere(MAPS, state) as Prisma.ChannelWhereInput[])];
   const where = { AND: and };
 
   const orderBy: Prisma.ChannelOrderByWithRelationInput[] =
@@ -95,9 +100,9 @@ export default async function ChannelsPage({
         action={canEdit ? <Link href="/youtube/new" className="btn btn-primary btn-sm">+ Add Channel</Link> : null}
       />
 
-      <DirectoryControls headingLevel={2} title="Channels" total={view === "board" ? board.length : total} canEdit={canEdit} searchPlaceholder="Search channels, athletes, ideas…" savedViewType="youtube/channels" views={[{ value: "table", label: "List" }, { value: "board", label: "Pipeline" }]} chips={status ? [{ param: "status", value: status, label: labelFor(status) }] : []} sorts={[
+      <DirectoryControls headingLevel={2} title="Channels" total={view === "board" ? board.length : total} canEdit={canEdit} searchPlaceholder="Search channels, athletes, ideas…" section="youtube/channels" layouts={[{ value: "table", label: "List" }, { value: "board", label: "Pipeline" }]} fields={FIELDS} state={state} savedViews={views} sorts={[
         { value: "subscribers-desc", label: "Most subscribers" }, { value: "name", label: "Alphabetical" }, { value: "date-desc", label: "Latest activity" }, { value: "status", label: "Status" },
-      ]} filters={[{ param: "status", label: "Channel status", kind: "select", options: CHANNEL_STATUSES.filter((s) => s.value !== "archived") }]} />
+      ]} />
       <p className="mb-4 text-sm text-muted">{live} live channels · {compactNumber(reach._sum.subscribers ?? 0)} subscribers overall · {ideasInFlight} ideas in this pipeline</p>
 
       {view === "board" ? (

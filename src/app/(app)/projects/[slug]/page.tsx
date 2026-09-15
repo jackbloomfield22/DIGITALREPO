@@ -13,6 +13,7 @@ import { QuietTimer } from "@/components/quiet-timer";
 import { AirtableCard } from "@/components/airtable-card";
 import { airtableStateFor } from "@/lib/airtable/sync";
 import { RecordStepper } from "@/components/record-stepper";
+import { RecordContext } from "@/components/record-context";
 import { recordNeighbors } from "@/lib/neighbors";
 
 import { onQuietTimer, quietClock } from "@/lib/quiet-rules";
@@ -146,6 +147,7 @@ export default async function ProjectPage({
             {project.logline && <p className="mt-2 max-w-2xl text-[15px] italic text-charcoal">{project.logline}</p>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <RecordContext type="project" id={project.id} name={project.title} slug={project.slug} path={`/projects/${project.slug}`} canEdit={canEdit} status={project.status} />
             <RecordStepper type="project" fallback={await recordNeighbors("project", { id: project.id, name: project.title })} />
             {canEdit && (
               <Link href={`/projects/${project.slug}/edit`} className="btn btn-primary btn-sm">Edit</Link>

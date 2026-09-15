@@ -143,7 +143,7 @@ describe("derived experience", () => {
     });
     const hosts = await db.creator.findMany({
       where: buildCreatorWhere({
-        entities: [], role: "host", sort: "name", view: "cards", page: 1, q: `${P} HostExp`,
+        state: { and: [{ field: "role", op: "is", values: ["host"] }], or: [] }, sort: "name", params: {}, q: `${P} HostExp`,
       }),
     });
     expect(hosts.map((h) => h.name)).toContain(`${P} HostExp`);
@@ -181,8 +181,8 @@ describe("combined filtering", () => {
 
     const results = await db.creator.findMany({
       where: buildCreatorWhere({
-        entities: [location.id, interest.id], role: "host",
-        sort: "name", view: "cards", page: 1,
+        state: { and: [{ field: "topic", op: "any", values: [location.id] }, { field: "topic", op: "any", values: [interest.id] }, { field: "role", op: "is", values: ["host"] }], or: [] },
+        sort: "name", params: {},
       }),
     });
     const names = results.map((r) => r.name);
@@ -241,7 +241,7 @@ describe("saved views are dynamic", () => {
       data: { kind: "interest", name: `${P} SavedViewTopic`, slug: slugify(`${P} SavedViewTopic`) },
     });
     // The saved view stores only the querystring — results come from a live query.
-    const savedQuery = { entities: [entity.id], sort: "name", view: "cards" as const, page: 1 };
+    const savedQuery = { state: { and: [{ field: "topic", op: "any" as const, values: [entity.id] }], or: [] }, sort: "name", params: {} };
     const before = await db.creator.findMany({ where: buildCreatorWhere(savedQuery) });
     expect(before).toHaveLength(0);
 
