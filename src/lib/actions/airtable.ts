@@ -4,6 +4,7 @@
 // page, the rest on Admin → Airtable.
 
 import { revalidatePath } from "next/cache";
+import { ignore } from "@/lib/errors";
 import { requireRole } from "@/lib/auth";
 import { saveAirtableConfig, airtableConfig } from "@/lib/airtable/config";
 import { checkConnection, drainAirtableQueue, forgetAirtableTables, isMirrored, queueAirtableSync, queueEverything, setupTables, syncRecord, airtableStateFor, type AirtableState, type ConnectionReport, type DrainSummary, type SetupReport } from "@/lib/airtable/sync";
@@ -16,13 +17,13 @@ export async function syncRecordNow(targetType: string, targetId: string): Promi
   try {
     await requireRole("EDITOR");
     if (!isMirrored(targetType)) return { ok: false, error: "Only formats and projects go to Airtable." };
-    await db.airtableJob.deleteMany({ where: { targetType, targetId } }).catch(() => {});
+    await db.airtableJob.deleteMany({ where: { targetType, targetId } }).catch(ignore("airtable"));
     await syncRecord(targetType, targetId, { reason: "forced" });
     revalidatePath("/", "layout");
     return { ok: true, state: await airtableStateFor(targetType, targetId) };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not sync to Airtable.";
-    await db.airtableSync.updateMany({ where: { targetType, targetId }, data: { error: message.slice(0, 1000), errorAt: new Date() } }).catch(() => {});
+    await db.airtableSync.updateMany({ where: { targetType, targetId }, data: { error: message.slice(0, 1000), errorAt: new Date() } }).catch(ignore("airtable"));
     return { ok: false, error: message };
   }
 }
@@ -96,12 +97,3 @@ export async function retryFailedAirtableJobs(): Promise<Result<{ reset: number 
   }
 }
 
-export async function currentAirtableConfig() {
-  await requireRole("ADMIN");
-  return airtableConfig();
-}
-
-export async function queueAirtableFor(targetType: string, targetId: string): Promise<void> {
-  await requireRole("EDITOR");
-  await queueAirtableSync(targetType, targetId);
-}

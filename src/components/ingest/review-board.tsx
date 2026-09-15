@@ -23,6 +23,15 @@ import { useConfirm } from "@/components/confirm";
 import { setIngestWorkspace } from "@/lib/actions/ingest";
 import { StatusPill } from "@/components/ui";
 import type { ApplyOutcome } from "@/lib/ingest/apply";
+import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
+
+/** The options a field takes, when the registry says it is a vocabulary. */
+function vocabFor(targetType: string | null, field: string | null | undefined) {
+  if (!targetType || !field) return null;
+  const spec = RECORD_REGISTRY[targetType as IngestTargetType];
+  const def = spec?.fields.find((f) => f.name === field);
+  return def?.kind === "vocab" && def.vocab ? def.vocab().filter((o) => o.value) : null;
+}
 
 /**
  * Correcting the section an item was read as. A wrong reading is not something
@@ -140,6 +149,8 @@ export type ChangeVM = {
   editedValue: string | null;
   /** A reviewer's corrected name/fields for a proposed new record. */
   editedCreate: { name: string; fields: Record<string, string> } | null;
+  /** The record type the change lands on — lets the editor offer the right vocabulary. */
+  targetType: string | null;
   confidence: number;
   rationale: string | null;
   evidence: { snippet: string; start: number; end: number }[];
@@ -354,18 +365,28 @@ function ChangeCard({
                 onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
               />
             </label>
-            {Object.keys(createDraft.fields).map((key) => (
-              <label key={key} className="block">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted">{key}</span>
-                <textarea
-                  rows={2}
-                  value={createDraft.fields[key]}
-                  onChange={(e) =>
-                    setCreateDraft((d) => ({ ...d, fields: { ...d.fields, [key]: e.target.value } }))
-                  }
-                />
-              </label>
-            ))}
+            {Object.keys(createDraft.fields).map((key) => {
+              const options = vocabFor(change.targetType, key);
+              return (
+                <label key={key} className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted">{key}</span>
+                  {options ? (
+                    <select value={createDraft.fields[key]} onChange={(e) => setCreateDraft((d) => ({ ...d, fields: { ...d.fields, [key]: e.target.value } }))}>
+                      {!options.some((o) => o.value === createDraft.fields[key]) && <option value={createDraft.fields[key]}>{createDraft.fields[key] || "—"}</option>}
+                      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  ) : (
+                    <textarea
+                      rows={2}
+                      value={createDraft.fields[key]}
+                      onChange={(e) =>
+                        setCreateDraft((d) => ({ ...d, fields: { ...d.fields, [key]: e.target.value } }))
+                      }
+                    />
+                  )}
+                </label>
+              );
+            })}
             <div className="flex gap-2">
               <button
                 className="btn btn-primary btn-sm"
@@ -382,7 +403,14 @@ function ChangeCard({
           </div>
         ) : editing ? (
           <div>
-            <textarea rows={4} value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Edited value" />
+            {vocabFor(change.targetType, change.field) ? (
+              <select value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Edited value">
+                {!vocabFor(change.targetType, change.field)!.some((o) => o.value === draft) && <option value={draft}>{draft || "—"}</option>}
+                {vocabFor(change.targetType, change.field)!.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            ) : (
+              <textarea rows={4} value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Edited value" />
+            )}
             <div className="mt-1.5 flex gap-2">
               <button
                 className="btn btn-primary btn-sm"

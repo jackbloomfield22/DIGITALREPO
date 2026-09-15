@@ -5,8 +5,10 @@
 // be undone from the toast as one.
 
 import { revalidatePath } from "next/cache";
+import { ignore } from "@/lib/errors";
 import crypto from "crypto";
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { refreshDigest } from "@/lib/ingest/digest";
@@ -51,8 +53,7 @@ export async function bulkApply(type: string, ids: string[], op: BulkOp): Promis
       if (!c.ok) return { ok: false, error: c.error };
       fieldValue = { value: c.value, plain: c.plain };
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const table = (db as any)[model];
+    const table = modelFor(model);
     const rows: Record<string, unknown>[] = await table.findMany({ where: { id: { in: unique } } });
     const batchId = crypto.randomBytes(6).toString("hex");
     const undo: Undo[] = [];
@@ -84,7 +85,7 @@ export async function bulkApply(type: string, ids: string[], op: BulkOp): Promis
         undo.push({ type, id, before: {}, link: payload });
       }
       changed++;
-      await refreshDigest(type, id).catch(() => {});
+      await refreshDigest(type, id).catch(ignore("bulk"));
       await queueAirtableSync(type, id);
     }
     const record = JSON.parse(JSON.stringify({ type, op, undo, userId: user.id, when: new Date().toISOString() }));
@@ -109,18 +110,17 @@ export async function undoBatch(batchId: string): Promise<{ ok: boolean; restore
     const row = await db.appSetting.findUnique({ where: { key: `batch:${batchId}` } });
     if (!row) return { ok: false, error: "That change can no longer be undone." };
     const batch = row.value as { type: string; undo: Undo[] };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const table = (db as any)[MODEL[batch.type]];
+    const table = modelFor(MODEL[batch.type]);
     let restored = 0;
     for (const u of batch.undo) {
       if (u.link) await deleteLink(u.link);
-      else await table.update({ where: { id: u.id }, data: u.before }).catch(() => {});
+      else await table.update({ where: { id: u.id }, data: u.before }).catch(ignore("bulk"));
       await logAudit(user, { targetType: u.type, targetId: u.id, targetLabel: "", action: "restored", field: "bulk undo", newValue: batchId });
-      await refreshDigest(u.type, u.id).catch(() => {});
+      await refreshDigest(u.type, u.id).catch(ignore("bulk"));
       await queueAirtableSync(u.type, u.id);
       restored++;
     }
-    await db.appSetting.delete({ where: { key: `batch:${batchId}` } }).catch(() => {});
+    await db.appSetting.delete({ where: { key: `batch:${batchId}` } }).catch(ignore("bulk"));
     revalidatePath("/", "layout");
     return { ok: true, restored };
   } catch (e) {

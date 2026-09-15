@@ -8,6 +8,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { queueAirtableSync } from "@/lib/airtable/sync";
@@ -58,8 +59,7 @@ export async function setRecordStatus(type: StatusType, id: string, status: stri
     if (!spec.statuses.some((s) => s.value === status)) {
       return { ok: false, error: `"${status}" isn't a status a ${spec.label.toLowerCase()} can have.` };
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = (db as any)[spec.model];
+    const model = modelFor(spec.model);
     const before = await model.findUnique({ where: { id } });
     if (!before) return { ok: false, error: "That record is no longer here." };
     if (before.status === status) return { ok: true };
@@ -91,8 +91,7 @@ export async function archiveRecord(type: ArchiveType, id: string, reason?: stri
     const user = await requireRole("EDITOR");
     const spec = archiveSpec(type);
     if (!spec) return { ok: false, error: "Unknown record type." };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = (db as any)[spec.model];
+    const model = modelFor(spec.model);
     const before = await model.findUnique({ where: { id } });
     if (!before) return { ok: false, error: "That record is no longer here." };
 
@@ -129,8 +128,7 @@ export async function restoreRecord(type: ArchiveType, id: string, status?: stri
     const user = await requireRole("EDITOR");
     const spec = archiveSpec(type);
     if (!spec) return { ok: false, error: "Unknown record type." };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = (db as any)[spec.model];
+    const model = modelFor(spec.model);
     const before = await model.findUnique({ where: { id } });
     if (!before) return { ok: false, error: "That record is no longer here." };
 

@@ -5,6 +5,7 @@
 // and files are copied once and remembered by their Airtable id.
 
 import "server-only";
+import { ignore } from "@/lib/errors";
 import crypto from "crypto";
 import { db } from "@/lib/db";
 import { airtable, AirtableError, DIRECT_UPLOAD_LIMIT, repoIdFormula, type AirtableAttachment, type AirtableTable } from "@/lib/airtable/client";
@@ -15,7 +16,7 @@ import { signedUrlFor } from "@/lib/files";
 import { labelFor, FORMAT_STATUSES, FORMAT_TYPES, PROJECT_STATUSES, PROJECT_TYPES } from "@/lib/taxonomy";
 import type { LinkPayload } from "@/lib/link-schema";
 
-export const MIRRORED: readonly string[] = ["format", "project"];
+const MIRRORED: readonly string[] = ["format", "project"];
 export const isMirrored = (t: string): t is MirrorType => MIRRORED.includes(t);
 
 // ---------------------------------------------------------------------------
@@ -93,13 +94,13 @@ export async function drainAirtableQueue(opts: { limit?: number } = {}): Promise
     try {
       const result = await syncRecord(job.targetType as MirrorType, job.targetId, { reason: job.reason as "changed" | "deleted" | "forced", removeIds: job.removeIds });
       if (result === "skipped") out.skipped++; else out.synced++;
-      await db.airtableJob.delete({ where: { id: job.id } }).catch(() => {});
+      await db.airtableJob.delete({ where: { id: job.id } }).catch(ignore("sync"));
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       out.failed++;
       out.errors.push({ targetType: job.targetType, targetId: job.targetId, error: message });
-      await db.airtableJob.update({ where: { id: job.id }, data: { attempts: { increment: 1 }, lastError: message.slice(0, 1000), claimedAt: null } }).catch(() => {});
-      await db.airtableSync.updateMany({ where: { targetType: job.targetType, targetId: job.targetId }, data: { error: message.slice(0, 1000), errorAt: new Date() } }).catch(() => {});
+      await db.airtableJob.update({ where: { id: job.id }, data: { attempts: { increment: 1 }, lastError: message.slice(0, 1000), claimedAt: null } }).catch(ignore("sync"));
+      await db.airtableSync.updateMany({ where: { targetType: job.targetType, targetId: job.targetId }, data: { error: message.slice(0, 1000), errorAt: new Date() } }).catch(ignore("sync"));
       // A bad token or a missing base fails every job the same way; stop here rather than burn the rest.
       if (e instanceof AirtableError && (e.status === 401 || e.status === 403 || e.status === 404)) break;
     }
@@ -311,7 +312,7 @@ async function syncFiles(cfg: AirtableConfig, table: TableRef, recordId: string,
     const added = after.find((a) => !before.has(a.id) && (a.filename === file.filename || after.filter((x) => !before.has(x.id)).length === 1)) ?? after.find((a) => !before.has(a.id));
     list = after;
     touched = true;
-    await db.attachment.update({ where: { id: file.id }, data: { airtableAttachmentId: added?.id ?? null, airtableSyncedAt: new Date() } }).catch(() => {});
+    await db.attachment.update({ where: { id: file.id }, data: { airtableAttachmentId: added?.id ?? null, airtableSyncedAt: new Date() } }).catch(ignore("sync"));
   }
   return touched;
 }

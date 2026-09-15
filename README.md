@@ -396,7 +396,7 @@ the Activity feed and per-record history.
 | Database   | PostgreSQL 16 via Prisma — ~40 tables, proper FKs/uniques/indexes        |
 | Auth       | Signed HTTP-only cookie sessions (jose), bcrypt passwords, server-enforced roles |
 | AI         | Anthropic SDK (`claude-opus-5`) with a manual tool-use loop over read-only DB tools |
-| Files      | Local `uploads/` served through an authenticated route handler           |
+| Files      | Vercel Blob (private, signed reads) with a Postgres fallback for small files |
 | Tests      | Vitest against a live database                                           |
 
 Key implementation notes:
@@ -413,7 +413,17 @@ Key implementation notes:
 - **Related creators / related projects** are computed with weighted, *explainable* signals
   (direct collaboration > shared project > shared format > shared niche interest > shared
   org > same rep > same location > same broad category).
-- **Optimistic concurrency** via a `version` column on all major records.
+- **Optimistic concurrency** via a `version` column on all major records; every inline
+  edit sends the version it read and is refused, naming who got there first, if the
+  record moved on.
+- **One write path per kind of change**: `setField` for a field, `addLink`/`removeLink`
+  for a relationship, `bulkApply` for many rows at once, `mergeRecordsCore` for a merge,
+  `archiveRecord`/`restoreRecord` for the Archive. Every one of them is a server action
+  behind `requireRole`, writes an `AuditLog` row through `logAudit`, refreshes the
+  Knowledge Digest and queues the Airtable mirror.
+- **One way to look things up from the client**: the `Combobox` component over
+  `/api/lookup`; one confirm dialog (`useConfirm`); one toast; one empty state; one
+  skeleton. Design tokens live on `:root` in `src/app/globals.css`.
 
 ### Swapping in Supabase
 
@@ -425,36 +435,92 @@ Supabase Storage). Nothing else knows how either works.
 ### Repository map
 
 ```
-prisma/schema.prisma        # the knowledge-graph schema (start here)
-prisma/seed.ts              # fictional demo world
-src/lib/taxonomy.ts         # every controlled vocabulary (roles, statuses, kinds)
-src/lib/actions/            # all mutations (server actions, role-gated, audited)
-src/lib/queries/talent.ts # directory filter/sort engine
-src/lib/related.ts          # explainable related-record scoring
-src/lib/ai/                 # AI tools, agent loop, research-inbox parsing
-src/app/(app)/              # all authenticated pages
-src/components/             # design system + client interactivity
-tests/core.test.ts          # the core product guarantees
+prisma/schema.prisma            # the knowledge-graph schema (start here)
+prisma/migrations/              # one folder per migration; each ships a down.sql from Phase 3 on
+prisma/seed.ts                  # fictional demo world
+scripts/vercel-build.mjs        # the Vercel build: resolve the DB URL, migrate, seed, build
+src/lib/taxonomy.ts             # every controlled vocabulary (roles, statuses, kinds)
+src/lib/ingest/registry.ts      # which fields each record type has — inline editing,
+                                #   the details panel, ingest and merge all read it
+src/lib/record-fields.ts        # field coercion/plain values shared by server and client
+src/lib/actions/                # all mutations (server actions, role-gated, audited)
+src/lib/actions/inline.ts       #   setField — the inline-edit write path
+src/lib/actions/bulk.ts         #   bulk changes with a batch id and one-shot undo
+src/lib/merge-records.ts        # merge two records; foreign keys found via Prisma's metadata
+src/lib/filters.ts, filter-where.ts  # the URL filter model and its Prisma translation
+src/lib/queries/talent.ts       # the talent directory's filter/sort engine
+src/lib/repo-search.ts, search-rank.ts  # trigram search over the digest + ranking
+src/lib/prefs.ts                # per-person preferences (density, columns, templates…)
+src/lib/db-model.ts             # the one place a model name becomes a Prisma delegate
+src/lib/ai/                     # AI tools, agent loop, research-inbox parsing
+src/app/(app)/                  # all authenticated pages; [slug] routes are record pages
+src/app/api/                    # lookup, peek, command, attachments, cron endpoints
+src/components/                 # the design system + client interactivity
+src/components/record-*.tsx     #   record page chrome: header, layout, tabs, activity, footer
+src/components/inline-field.tsx #   click-to-edit for any registry field
+src/components/combobox.tsx     #   the one typeahead
+tests/                          # vitest against a live Postgres (serial)
+docs/                           # airtable.md, hq.md, changes-file.md
 ```
 
+## Migrations and the production database
 
-## How to add a new category
+Production is Postgres on Neon, connected to the Vercel project. **Migrations run on
+every deploy**: `scripts/vercel-build.mjs` runs `prisma migrate deploy` before `next build`,
+so anything merged to `main` reaches the production schema on the next deploy.
 
-1. Add the vocabulary or record fields in `src/lib/taxonomy.ts` (statuses, roles, kinds).
-2. If it is a new record type: add the Prisma model, then one entry in
-   `src/lib/ingest/registry.ts` (fields, link participation, digest recipe, path).
+- Locally: `npm run db:migrate` (`prisma migrate dev`) creates and applies a migration
+  from schema changes; `npm run db:reset` rebuilds from scratch with demo data.
+- Every migration is additive first: new tables and nullable columns, a backfill, then the
+  app switches over; old columns are dropped only in a later migration once the new path
+  has run in production. Nothing in the app deletes records — Archive is the only way out.
+- Before a schema migration ships to production, take a Neon branch of the database from
+  the Neon console (Branches → Create branch from `main`) so the state before the change
+  is one click away. The refresh pass keeps schema changes on the working branch until that
+  branch exists (see `AUDIT.md`).
+- Rolling back: restore the Neon branch, or apply the migration's `down.sql` by hand with
+  `psql` against the direct (unpooled) connection string.
+
+## Options, custom fields, verification and history
+
+- **Options today** live in `src/lib/taxonomy.ts` — statuses, roles, types, relationship
+  kinds — and are referenced by their stable snake_case value everywhere (`in_production`,
+  never a label). Adding a value there is all it takes; labels derive from the value. Every
+  select in the app (the Details panel, quick-create, the filter picker, bulk "Set field…",
+  ingest's review forms) reads the same list through the registry. Phase 3 of the refresh
+  moves these lists into an `Option` table with rename/reorder/archive/merge under
+  Settings → Options and "Create ‘X’" inside every select; it is built on the working branch
+  behind the migration rule above.
+- **Custom fields** arrive with the same migration (`FieldDefinition` + a `custom` JSONB
+  column per record type); until then the registry's field list is the field list.
+- **Verification**: talent carries `lastVerifiedAt` and a Verify button; a profile not
+  verified in six months shows "Needs review". Phase 3 extends owner / verified-at /
+  verified-by to every record type, with a Health page.
+- **History**: every mutation writes one `AuditLog` row (who, what, field, before, after,
+  when) through `logAudit`, which also refreshes the Knowledge Digest. A record's Activity
+  tab, the Activity page, the "changed by … just now" conflict message, the record footer
+  and merge all read from it. Bulk changes share a batch id and undo as one; inline edits
+  undo from their toast.
+
+## How to add a new category or record type
+
+1. Add the vocabulary in `src/lib/taxonomy.ts` (statuses, roles, kinds) — pickers,
+   filters, bulk edit and ingest pick it up at once.
+2. For a new record type: add the Prisma model and a migration, then one entry in
+   `src/lib/ingest/registry.ts` (fields, name field, path, link participation). The
+   record page chrome, inline editing, the details panel, quick-create, merge, search and
+   ingest all derive from that entry.
 3. Run the tests — coverage checks fail until backups (`src/lib/backup.ts`), the
-   registry, and link specs all know about it. That is the entire wiring: the ingest op
-   schema, validation, digest, and review UI derive from the registry at runtime.
+   registry and link specs all know about it.
 
 ## Testing
 
-`npm test` covers the product's core guarantees: name-only talent creation, canonical
-(non-duplicating) interests, bidirectional creator↔format and creator↔project-role links,
-project↔organization symmetry, derived hosting experience, combined AND filtering,
-duplicate suggestion scoring, entity merges preserving relationships, dynamic saved views,
-role gating, optimistic-concurrency conflict rejection, and AI tool safety (read-only
-surface, schema-validated inputs, clamped result sizes).
+`npm test` runs against a live Postgres (serially) and covers the product's core
+guarantees: name-only talent creation, canonical (non-duplicating) interests, bidirectional
+links, derived hosting experience, filters and their URL model, search ranking, inline
+field coercion and version conflicts, merges re-pointing every relationship and archiving
+the loser with a pointer, bulk changes, the quiet timer, the Airtable mirror against a fake
+Airtable, ingest parsing and apply, backups, and AI tool safety.
 
 ## Backups
 

@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ignore } from "@/lib/errors";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { requireRole } from "@/lib/auth";
 import { applyIngestChangesCore, type ApplyOutcome } from "@/lib/ingest/apply";
 import { logAudit } from "@/lib/audit";
@@ -195,16 +197,6 @@ export async function markIrrelevant(itemId: string): Promise<Result> {
   }
 }
 
-export async function deleteIngestItem(itemId: string): Promise<Result> {
-  try {
-    await requireRole("EDITOR");
-    await db.ingestItem.delete({ where: { id: itemId } }); // cascades to children + changes
-    revalidatePath("/ingest");
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Failed." };
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Undo and retry
@@ -269,11 +261,9 @@ export async function revertIngestChanges(itemId: string): Promise<IngestUndoOut
             skipped.push(`${change.group} (created before undo was recorded — remove it by hand)`);
             continue;
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const exists = await (db as any)[model].findUnique({ where: { id } });
+          const exists = await modelFor(model).findUnique({ where: { id } });
           if (exists) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (db as any)[model].delete({ where: { id } });
+            await modelFor(model).delete({ where: { id } });
             await db.knowledgeDigest.deleteMany({ where: { targetType: type!, targetId: id } });
             await db.favorite.deleteMany({ where: { targetType: type!, targetId: id } });
             await db.recentView.deleteMany({ where: { targetType: type!, targetId: id } });
@@ -317,8 +307,7 @@ export async function revertIngestChanges(itemId: string): Promise<IngestUndoOut
           // `before` is JSON null both when the field was empty and when it
           // wasn't captured; either way restoring null is the correct undo.
           const previous = change.before === undefined ? null : change.before;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (db as any)[model].update({
+          await modelFor(model).update({
             where: { id: dest.targetId },
             data: { [dest.field]: previous },
           });
@@ -343,7 +332,7 @@ export async function revertIngestChanges(itemId: string): Promise<IngestUndoOut
     const source = await db.source.findFirst({ where: { url: `/ingest/${itemId}` } });
     if (source) {
       await db.recordSource.deleteMany({ where: { sourceId: source.id } });
-      await db.source.delete({ where: { id: source.id } }).catch(() => {});
+      await db.source.delete({ where: { id: source.id } }).catch(ignore("ingest"));
     }
 
     await db.ingestItem.update({ where: { id: itemId }, data: { status: "proposed" } });

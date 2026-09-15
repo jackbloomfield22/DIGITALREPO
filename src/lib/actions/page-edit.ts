@@ -7,6 +7,7 @@
 // else. Nothing is written until you say so.
 
 import { revalidatePath } from "next/cache";
+import { ignore } from "@/lib/errors";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { applyIngestChangesCore } from "@/lib/ingest/apply";
@@ -100,7 +101,7 @@ export async function keepAsNoteOnly(itemId: string): Promise<PageEditResult> {
 export async function discardPageEdit(itemId: string): Promise<PageEditResult> {
   try {
     await requireRole("EDITOR");
-    await db.ingestItem.delete({ where: { id: itemId } }).catch(() => {});
+    await db.ingestItem.delete({ where: { id: itemId } }).catch(ignore("page-edit"));
     revalidatePath("/uploads");
     return { ok: true };
   } catch (e) {

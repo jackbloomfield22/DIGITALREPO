@@ -73,6 +73,7 @@ export default async function IngestItemPage({
     destinationPath: (c.destination as { path?: string | null }).path ?? null,
     destinationName: (c.destination as { name?: string }).name ?? "",
     field: (c.destination as { field?: string }).field ?? null,
+    targetType: (c.destination as { targetType?: string | null }).targetType ?? null,
     before: c.before != null ? String(c.before) : null,
     after: c.after,
     editedValue: (c.editedAfter as { value?: string } | null)?.value ?? null,

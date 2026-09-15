@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ignore } from "@/lib/errors";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -212,7 +213,7 @@ export async function updateSocialProfiles(
         if (countChanged && existing.followerCount != null) {
           await db.socialSnapshot.create({
             data: { socialProfileId: existing.id, followerCount: existing.followerCount, recordedAt: existing.countUpdatedAt ?? new Date() },
-          }).catch(() => {});
+          }).catch(ignore("talent"));
         }
       } else {
         await db.socialProfile.create({

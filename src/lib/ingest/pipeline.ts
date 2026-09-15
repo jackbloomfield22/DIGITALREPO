@@ -2,6 +2,7 @@
 // idempotent; the model runner is injected so tests never touch the API.
 
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import {
   PROPOSE_MODEL,
   PAGE_MODEL,
@@ -116,8 +117,7 @@ async function currentPageBlock(item: { metadata: unknown }): Promise<string> {
   const spec = RECORD_REGISTRY[page.type as IngestTargetType];
   if (!spec) return "";
   const hasTags = ["creator", "format", "project", "opportunity"].includes(page.type);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const record = await (db as any)[spec.prismaModel].findUnique({
+  const record = await modelFor(spec.prismaModel).findUnique({
     where: { id: page.id },
     ...(hasTags ? { include: { entityLinks: { include: { entity: { select: { kind: true, name: true } } } } } } : {}),
   });
@@ -391,8 +391,7 @@ const OP_ORDER: Record<string, number> = { restore: 0, create: 0, rename: 50, up
 /** Current DB value for an update op's field (before), plus record version. */
 async function captureBefore(op: Extract<ProposedOp, { op: "update" }>, targetId: string): Promise<{ before: unknown; version: number | null }> {
   const spec = RECORD_REGISTRY[op.targetType];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const record = await (db as any)[spec.prismaModel].findUnique({ where: { id: targetId } });
+  const record = await modelFor(spec.prismaModel).findUnique({ where: { id: targetId } });
   if (!record) return { before: null, version: null };
   return { before: record[op.field] ?? null, version: spec.hasVersion ? record.version : null };
 }
@@ -419,8 +418,7 @@ async function linkAlreadyExists(op: { kind: string; role?: string }, aId: strin
   if (!table) return false;
   if (spec.roleField === "role" && op.role) where.role = op.role;
   if (spec.roleField === "relationship" && op.role) where.relationship = op.role;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const existing = await (db as any)[table].findFirst({ where });
+  const existing = await modelFor(table).findFirst({ where });
   return !!existing;
 }
 

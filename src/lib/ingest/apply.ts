@@ -4,6 +4,7 @@
 // and Source attribution back to the ingest item.
 
 import { db } from "@/lib/db";
+import { modelFor, type DynamicRecord } from "@/lib/db-model";
 import { logAudit } from "@/lib/audit";
 import { clearDigestMemo, refreshDigest } from "@/lib/ingest/digest";
 import { resolveByType, resolveEntity } from "@/lib/ingest/resolve";
@@ -43,8 +44,7 @@ function touch(touched: Touched, targetType: IngestTargetType, targetId: string,
 
 async function recordSlug(targetType: IngestTargetType, targetId: string): Promise<{ name: string; slug: string } | null> {
   const spec = RECORD_REGISTRY[targetType];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const record = await (db as any)[spec.prismaModel].findUnique({ where: { id: targetId } });
+  const record = await modelFor(spec.prismaModel).findUnique({ where: { id: targetId } });
   if (!record) return null;
   return { name: record[spec.nameField], slug: record.slug ?? "" };
 }
@@ -138,13 +138,11 @@ async function applyCreate(op: Extract<ProposedOp, { op: "create" }>, user: Sess
       continue;
     }
     if (!spec.createFields.includes(key) && !spec.fields.some((f) => f.name === key)) continue;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const current = (await (db as any)[spec.prismaModel].findUnique({ where: { id: resolved.id } }))?.[key];
+    const current = (await modelFor(spec.prismaModel).findUnique({ where: { id: resolved.id } }))?.[key];
     if (current == null || current === "") patch[key] = value;
   }
   if (Object.keys(patch).length) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db as any)[spec.prismaModel].update({ where: { id: resolved.id }, data: patch });
+    await modelFor(spec.prismaModel).update({ where: { id: resolved.id }, data: patch });
   }
   touch(touched, op.targetType, resolved.id, resolved.name, record?.slug);
 }
@@ -185,8 +183,7 @@ async function applyUpdate(
   if (field.kind === "date") value = new Date(String(value));
   if (field.kind === "list" || field.kind === "vocablist") value = Array.isArray(value) ? value : splitList(String(value));
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const model = (db as any)[spec.prismaModel];
+  const model = modelFor(spec.prismaModel);
   const current = await model.findUnique({ where: { id: targetId } });
   if (!current) throw new Error("Record disappeared before apply.");
 
@@ -237,8 +234,7 @@ async function applyLink(op: Extract<ProposedOp, { op: "link" }>, user: SessionU
 async function applyArchive(op: Extract<ProposedOp, { op: "archive" }>, user: SessionUser, touched: Touched, itemId: string) {
   const spec = RECORD_REGISTRY[op.targetType];
   const targetId = await resolveRef(op.targetType, op.targetId, op.targetName, user, touched);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const model = (db as any)[spec.prismaModel];
+  const model = modelFor(spec.prismaModel);
   const current = await model.findUnique({ where: { id: targetId } });
   if (!current) throw new Error("Record not found.");
   await model.update({
@@ -260,11 +256,9 @@ async function applyArchive(op: Extract<ProposedOp, { op: "archive" }>, user: Se
  * Archive. Unlike resolveRef this never creates: renaming, restoring, moving
  * or unlinking something that isn't there is an error, not an invitation.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function findExisting(targetType: IngestTargetType, id: string | undefined, name: string): Promise<any> {
+async function findExisting(targetType: IngestTargetType, id: string | undefined, name: string): Promise<DynamicRecord> {
   const spec = RECORD_REGISTRY[targetType];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const model = (db as any)[spec.prismaModel];
+  const model = modelFor(spec.prismaModel);
   if (id) {
     const byId = await model.findUnique({ where: { id } });
     if (byId) return byId;
@@ -288,8 +282,7 @@ async function applyRename(op: Extract<ProposedOp, { op: "rename" }>, user: Sess
     if (!aliases.some((a) => a.toLowerCase() === oldName.toLowerCase())) data.aliases = [...aliases, oldName];
   }
   if (spec.hasVersion) data.version = { increment: 1 };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db as any)[spec.prismaModel].update({ where: { id: current.id }, data });
+  await modelFor(spec.prismaModel).update({ where: { id: current.id }, data });
   // The bump is this batch's own doing; later edits in it must not trip over it.
   if (spec.hasVersion) versions.set(`${op.targetType}:${current.id}`, current.version + 1);
   touch(touched, op.targetType, current.id, op.newName, current.slug);
@@ -330,8 +323,7 @@ async function applyRestore(op: Extract<ProposedOp, { op: "restore" }>, user: Se
   // "archived" was once a status too; a restored record needs a live one.
   if (current.status === "archived" && REVIVE[op.targetType]) data.status = REVIVE[op.targetType];
   if (spec.hasVersion) data.version = { increment: 1 };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db as any)[spec.prismaModel].update({ where: { id: current.id }, data });
+  await modelFor(spec.prismaModel).update({ where: { id: current.id }, data });
   if (spec.hasVersion) versions.set(`${op.targetType}:${current.id}`, current.version + 1);
   touch(touched, op.targetType, current.id, current[spec.nameField], current.slug);
   await logAudit(user, {
@@ -358,8 +350,7 @@ async function applyNote(op: Extract<ProposedOp, { op: "note" }>, user: SessionU
   const spec = RECORD_REGISTRY[op.aboutType];
   if (!spec.notesField) return;
   const targetId = await resolveRef(op.aboutType, op.aboutId, op.aboutName ?? op.text.slice(0, 60), user, touched);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const model = (db as any)[spec.prismaModel];
+  const model = modelFor(spec.prismaModel);
   const current = await model.findUnique({ where: { id: targetId } });
   if (!current) return;
   const stamp = new Date().toISOString().slice(0, 10);
@@ -432,8 +423,7 @@ export async function applyIngestChangesCore(itemId: string, user: SessionUser):
         if (outcome === "superseded") {
           // Refresh `before` from the live record and send it back to review.
           const spec = RECORD_REGISTRY[op.targetType];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const fresh = op.targetId ? await (db as any)[spec.prismaModel].findUnique({ where: { id: op.targetId } }) : null;
+          const fresh = op.targetId ? await modelFor(spec.prismaModel).findUnique({ where: { id: op.targetId } }) : null;
           await db.ingestChange.update({
             where: { id: change.id },
             data: {

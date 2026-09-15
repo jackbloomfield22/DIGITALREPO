@@ -4,6 +4,7 @@
 
 import "server-only";
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
 import { labelFor } from "@/lib/taxonomy";
 import { typeLabel } from "@/lib/record-types";
@@ -19,8 +20,7 @@ export type Peek = {
 export async function peekRecord(type: string, id: string): Promise<Peek | null> {
   const spec = RECORD_REGISTRY[type as IngestTargetType];
   if (!spec) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const record = await (db as any)[spec.prismaModel].findUnique({ where: { id } });
+  const record = await modelFor(spec.prismaModel).findUnique({ where: { id } });
   if (!record) return null;
   const digest = await db.knowledgeDigest.findUnique({ where: { targetType_targetId: { targetType: type, targetId: id } }, select: { summary: true } });
   const fields: Peek["fields"] = [];
@@ -50,7 +50,6 @@ export async function peekByHref(href: string): Promise<Peek | null> {
   if (parts.length !== 2) return null;
   const type = (Object.keys(RECORD_REGISTRY) as IngestTargetType[]).find((t) => RECORD_REGISTRY[t].path("x").startsWith(`/${parts[0]}/`));
   if (!type) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const record = await (db as any)[RECORD_REGISTRY[type].prismaModel].findUnique({ where: { slug: parts[1] }, select: { id: true } });
+  const record = await modelFor(RECORD_REGISTRY[type].prismaModel).findUnique({ where: { slug: parts[1] }, select: { id: true } });
   return record ? peekRecord(type, record.id) : null;
 }

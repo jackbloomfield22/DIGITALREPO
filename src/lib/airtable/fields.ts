@@ -116,10 +116,3 @@ export function airtableRecordUrl(baseId: string, tableId: string, recordId: str
   return `https://airtable.com/${baseId}/${tableId}/${recordId}`;
 }
 
-/** The repo key written on every row, and how to read it back. */
-export function parseRepoId(value: unknown): { type: MirrorType; id: string } | null {
-  if (typeof value !== "string") return null;
-  const [type, id] = value.split(":");
-  if ((type === "format" || type === "project") && id) return { type, id };
-  return null;
-}

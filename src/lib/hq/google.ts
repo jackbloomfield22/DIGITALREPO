@@ -1,4 +1,5 @@
 import "server-only";
+import { ignore } from "@/lib/errors";
 
 // Google Calendar and Gmail, read-only, for the owner's HQ. Built to be
 // switched on later: nothing here runs until GOOGLE_CLIENT_ID and
@@ -236,7 +237,7 @@ export async function runGoogleSync(ownerId: string): Promise<{ ok: boolean; sum
 export async function disconnectGoogle(ownerId: string): Promise<void> {
   const conn = await db.hqConnection.findUnique({ where: { ownerId_provider: { ownerId, provider: "google" } } });
   if (conn?.refreshToken) {
-    await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(conn.refreshToken)}`, { method: "POST" }).catch(() => {});
+    await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(conn.refreshToken)}`, { method: "POST" }).catch(ignore("google"));
   }
   await db.hqConnection.updateMany({
     where: { ownerId, provider: "google" },

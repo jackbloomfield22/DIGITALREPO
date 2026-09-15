@@ -61,14 +61,6 @@ export function orderForProjects(s: SortState): Record<string, unknown> | Record
   }
 }
 
-export function orderForTalent(s: SortState): Record<string, unknown> | Record<string, unknown>[] {
-  switch (s.key) {
-    case "name": return { name: d(s) };
-    case "status": return [{ status: d(s) }, { name: "asc" }];
-    case "created": return { createdAt: d(s) };
-    default: return { updatedAt: d(s) };
-  }
-}
 
 export function orderForOrganizations(s: SortState): Record<string, unknown> | Record<string, unknown>[] {
   switch (s.key) {

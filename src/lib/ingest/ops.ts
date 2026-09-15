@@ -147,10 +147,6 @@ export const proposedOpSchema = z.discriminatedUnion("op", [
 
 export type ProposedOp = z.infer<typeof proposedOpSchema>;
 
-export const proposalOutputSchema = z.object({
-  changes: clampArr(proposedOpSchema, 80),
-});
-
 const candidate = z.object({ targetType, name: clampMin(1, 300) });
 
 // The list fields are advisory context for the propose stage — a malformed

@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
 import path from "path";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 
-// Legacy location for files uploaded before storage moved into Postgres.
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+// Files stored in Postgres (the small-file path). Blob-stored files are
+// served from their own signed URLs; see src/lib/files.ts.
 
 const MIME: Record<string, string> = {
   ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
@@ -23,30 +22,19 @@ export async function GET(
   const { name } = await params;
   const safe = path.basename(name);
 
-  let bytes: Uint8Array | null = null;
-  let type: string | null = null;
   const stored = await db.storedFile.findUnique({ where: { key: safe } });
-  if (stored) {
-    // Backups keep the file record but not its contents, so a restored
-    // database has rows whose recorded size never arrived. Say that, rather
-    // than handing over a zero-byte download that looks like a corrupt file.
-    if (stored.data.byteLength === 0 && stored.sizeBytes > 0) {
-      return new NextResponse(
-        "This file's contents weren't included in the backup this database was restored from — the record is here, the file needs re-uploading.",
-        { status: 410, headers: { "Content-Type": "text/plain" } },
-      );
-    }
-    bytes = new Uint8Array(stored.data);
-    type = stored.mimeType;
-  } else {
-    try {
-      bytes = new Uint8Array(await readFile(path.join(UPLOAD_DIR, safe)));
-    } catch {
-      return new NextResponse("Not found", { status: 404 });
-    }
+  if (!stored) return new NextResponse("Not found", { status: 404 });
+  // Backups keep the file record but not its contents, so a restored
+  // database has rows whose recorded size never arrived. Say that, rather
+  // than handing over a zero-byte download that looks like a corrupt file.
+  if (stored.data.byteLength === 0 && stored.sizeBytes > 0) {
+    return new NextResponse(
+      "This file's contents weren't included in the backup this database was restored from — the record is here, the file needs re-uploading.",
+      { status: 410, headers: { "Content-Type": "text/plain" } },
+    );
   }
-
-  type = type ?? MIME[path.extname(safe).toLowerCase()] ?? "application/octet-stream";
+  const bytes = new Uint8Array(stored.data);
+  const type = stored.mimeType ?? MIME[path.extname(safe).toLowerCase()] ?? "application/octet-stream";
   const headers: Record<string, string> = {
     "Content-Type": type,
     "Cache-Control": "private, max-age=86400",

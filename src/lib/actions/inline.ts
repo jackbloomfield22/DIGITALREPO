@@ -8,6 +8,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { queueAirtableSync } from "@/lib/airtable/sync";
@@ -49,8 +50,7 @@ export async function setField(input: {
     if (isName && !coerced.plain) return { ok: false, error: "A name is required." };
     if (field.name === "status" && !coerced.plain) return { ok: false, error: "A status is required." };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = (db as any)[spec.prismaModel];
+    const model = modelFor(spec.prismaModel);
     const current = await model.findUnique({ where: { id: input.id } });
     if (!current) return { ok: false, error: "That record is no longer here." };
 

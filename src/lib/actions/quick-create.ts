@@ -5,6 +5,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { queueAirtableSync } from "@/lib/airtable/sync";
@@ -24,8 +25,7 @@ export async function createRecord(type: CreateType, values: Record<string, unkn
     const name = String(values[spec.nameField] ?? values.name ?? "").trim();
     if (!name) return { ok: false, error: "A name is required." };
     if (name.length > 300) return { ok: false, error: "That name is too long." };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model = (db as any)[spec.prismaModel];
+    const model = modelFor(spec.prismaModel);
 
     const norm = normalizeName(name);
     const existing: Record<string, string>[] = await model.findMany({ where: { archived: false }, select: { id: true, slug: true, [spec.nameField]: true } });
@@ -40,8 +40,8 @@ export async function createRecord(type: CreateType, values: Record<string, unkn
       data[field.name] = c.value;
     }
     const base = slugify(name);
-    const taken: { slug: string }[] = await model.findMany({ where: { slug: { startsWith: base } }, select: { slug: true } });
-    data.slug = uniqueSlug(name, new Set(taken.map((r) => r.slug)));
+    const taken = await model.findMany({ where: { slug: { startsWith: base } }, select: { slug: true } });
+    data.slug = uniqueSlug(name, new Set(taken.map((r) => String(r.slug))));
 
     const created = await model.create({ data });
     await logAudit(user, { targetType: type, targetId: created.id, targetLabel: name, action: "created" });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { requireRole } from "@/lib/auth";
 import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
 import { MERGEABLE_TYPES, compareValues, possibleDuplicates, type MergeableType } from "@/lib/merge-records";
@@ -16,8 +17,7 @@ export default async function MergePage({ searchParams }: { searchParams: Promis
   if (!type || !a || !(MERGEABLE_TYPES as readonly string[]).includes(type)) notFound();
   const mergeType = type as MergeableType;
   const spec = RECORD_REGISTRY[mergeType as IngestTargetType];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const model = (db as any)[spec.prismaModel];
+  const model = modelFor(spec.prismaModel);
   const recA = await model.findUnique({ where: { id: a } });
   if (!recA) notFound();
   const nameA = String(recA[spec.nameField]);

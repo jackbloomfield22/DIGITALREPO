@@ -14,6 +14,7 @@
 // Import twice) enriches instead of duplicating.
 
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { slugify } from "@/lib/slug";
 import { refreshDigest } from "@/lib/ingest/digest";
 
@@ -329,8 +330,7 @@ async function uniqueSlug(model: SlugModel, base: string): Promise<string> {
   let slug = base || "record";
   let i = 2;
   for (;;) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const hit = await (db as any)[model].findUnique({ where: { slug } });
+    const hit = await modelFor(model).findUnique({ where: { slug } });
     if (!hit) return slug;
     slug = `${base}-${i++}`;
   }

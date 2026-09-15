@@ -1,4 +1,5 @@
 import "server-only";
+import { ignore } from "@/lib/errors";
 
 // The page-by-page sweep: going through the Repo one record at a time and
 // bringing each up to date. Two things make that bearable across four hundred
@@ -7,6 +8,7 @@ import "server-only";
 // bookkeeping the reader has to keep.
 
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { logAudit } from "@/lib/audit";
 import { BROUGHT_UP_TO_DATE } from "@/lib/page-update";
 import type { SessionUser } from "@/lib/roles";
@@ -37,16 +39,15 @@ export async function sweepInfo(targetType: string, targetId: string): Promise<S
       orderBy: { createdAt: "desc" },
       select: { createdAt: true, userName: true },
     }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (db as any)[spec.model].findUnique({ where: { id: targetId }, select: { [spec.nameField]: true } }),
+    modelFor(spec.model).findUnique({ where: { id: targetId }, select: { [spec.nameField]: true } }),
   ]);
   const name: string | undefined = current?.[spec.nameField];
 
   // The next live record alphabetically, so the sweep runs A to Z and skips
   // whatever has already been put in the Archive.
   const next = name
-    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (db as any)[spec.model].findFirst({
+    ?
+      await modelFor(spec.model).findFirst({
         where: { archived: false, [spec.nameField]: { gt: name } },
         orderBy: { [spec.nameField]: "asc" },
         select: { slug: true, [spec.nameField]: true },
@@ -80,9 +81,8 @@ export async function markBroughtUpToDate(
   });
   const spec = SWEEP_MODELS[sweep.targetType];
   if (spec?.dated) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db as any)[spec.model]
+    await modelFor(spec.model)
       .update({ where: { id: sweep.targetId }, data: { lastActivityAt: new Date() } })
-      .catch(() => {});
+      .catch(ignore("sweep"));
   }
 }

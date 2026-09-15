@@ -1,4 +1,5 @@
 import "server-only";
+import { ignore } from "@/lib/errors";
 
 // Moving a record to a different part of the Repo.
 //
@@ -16,6 +17,7 @@ import "server-only";
 // than dropped, so nothing the old page knew is lost, only re-homed.
 
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { logAudit } from "@/lib/audit";
 import { refreshDigest } from "@/lib/ingest/digest";
 import { slugify, uniqueSlug } from "@/lib/slug";
@@ -54,8 +56,7 @@ const FOLLOWERS = ["attachment", "recordSource", "favorite", "recentView", "coll
 const has = (vocab: { value: string }[], v: string | null | undefined) => !!v && vocab.some((o) => o.value === v);
 
 async function freshSlug(model: string, name: string): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows: { slug: string }[] = await (db as any)[model].findMany({
+  const rows = await modelFor(model).findMany({
     where: { slug: { startsWith: slugify(name) } }, select: { slug: true },
   });
   return uniqueSlug(name, new Set(rows.map((r) => r.slug)));
@@ -94,7 +95,7 @@ export async function convertRecord(
   // Load the source with everything hanging off it.
   // -------------------------------------------------------------------------
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const src: any = await (db as any)[MODELS[fromType]].findUnique({
+  const src: any = await modelFor(MODELS[fromType]).findUnique({
     where: { id: from.id },
     include:
       fromType === "format"
@@ -140,22 +141,22 @@ export async function convertRecord(
       const role = has(PROJECT_ROLES, str("role")) ? str("role")! : "other";
       await db.creatorProjectCredit.create({
         data: { creatorId: cf.creatorId, projectId: toId, role, note: cf.isPrimary ? "Primary talent on the format this came from" : null },
-      }).catch(() => {});
+      }).catch(ignore("convert"));
     }
     const orgMap: Record<string, string> = { partner: "production_company", sponsor_target: "sponsor", target: "network" };
     for (const fo of src.organizations ?? []) {
       const rel = has(PROJECT_ORG_RELATIONSHIPS, fo.relationship) ? fo.relationship : orgMap[fo.relationship] ?? "production_company";
       const note = rel === fo.relationship ? fo.note ?? null : `Was "${labelFor(fo.relationship)}" on the format this came from`;
-      await db.projectOrganization.create({ data: { projectId: toId, organizationId: fo.organizationId, relationship: rel, note } }).catch(() => {});
+      await db.projectOrganization.create({ data: { projectId: toId, organizationId: fo.organizationId, relationship: rel, note } }).catch(ignore("convert"));
     }
     for (const el of src.entityLinks ?? []) {
-      await db.projectEntityLink.create({ data: { projectId: toId, entityId: el.entityId } }).catch(() => {});
+      await db.projectEntityLink.create({ data: { projectId: toId, entityId: el.entityId } }).catch(ignore("convert"));
     }
     for (const op of src.opportunities ?? []) {
-      await db.opportunityProject.create({ data: { opportunityId: op.opportunityId, projectId: toId } }).catch(() => {});
+      await db.opportunityProject.create({ data: { opportunityId: op.opportunityId, projectId: toId } }).catch(ignore("convert"));
     }
     for (const fp of src.people ?? []) {
-      await db.personProject.create({ data: { personId: fp.personId, projectId: toId, role: fp.role, note: fp.note ?? null } }).catch(() => {});
+      await db.personProject.create({ data: { personId: fp.personId, projectId: toId, role: fp.role, note: fp.note ?? null } }).catch(ignore("convert"));
     }
   } else if (to === "format") {
     toSlug = await freshSlug("format", toName);
@@ -176,7 +177,7 @@ export async function convertRecord(
     for (const c of src.credits ?? []) {
       await db.creatorFormat.create({
         data: { creatorId: c.creatorId, formatId: toId, isPrimary: false, note: `Was ${labelFor(c.role)} on the project this came from` },
-      }).catch(() => {});
+      }).catch(ignore("convert"));
     }
     const orgMap: Record<string, string> = {
       sponsor: "sponsor_target", brand_partner: "sponsor_target",
@@ -187,16 +188,16 @@ export async function convertRecord(
       const rel = orgMap[po.relationship] ?? "associated";
       await db.formatOrganization.create({
         data: { formatId: toId, organizationId: po.organizationId, relationship: rel, note: `Was "${labelFor(po.relationship)}" on the project this came from` },
-      }).catch(() => {});
+      }).catch(ignore("convert"));
     }
     for (const el of src.entityLinks ?? []) {
-      await db.formatEntityLink.create({ data: { formatId: toId, entityId: el.entityId } }).catch(() => {});
+      await db.formatEntityLink.create({ data: { formatId: toId, entityId: el.entityId } }).catch(ignore("convert"));
     }
     for (const op of src.opportunities ?? []) {
-      await db.opportunityFormat.create({ data: { opportunityId: op.opportunityId, formatId: toId } }).catch(() => {});
+      await db.opportunityFormat.create({ data: { opportunityId: op.opportunityId, formatId: toId } }).catch(ignore("convert"));
     }
     for (const pp of src.people ?? []) {
-      await db.formatPerson.create({ data: { personId: pp.personId, formatId: toId, role: pp.role, note: pp.note ?? null } }).catch(() => {});
+      await db.formatPerson.create({ data: { personId: pp.personId, formatId: toId, role: pp.role, note: pp.note ?? null } }).catch(ignore("convert"));
     }
   } else if (to === "person") {
     toSlug = await freshSlug("industryPerson", toName);
@@ -229,11 +230,11 @@ export async function convertRecord(
     toId = created.id;
     for (const co of src.organizations ?? []) {
       const role = has(PERSON_ROLE_TYPES, co.relationship) ? co.relationship : "other";
-      await db.personOrganization.create({ data: { personId: toId, organizationId: co.organizationId, role, current: true } }).catch(() => {});
+      await db.personOrganization.create({ data: { personId: toId, organizationId: co.organizationId, role, current: true } }).catch(ignore("convert"));
     }
     for (const c of src.credits ?? []) {
       const role = has(PERSON_PROJECT_ROLES, c.role) ? c.role : "other";
-      await db.personProject.create({ data: { personId: toId, projectId: c.projectId, role, note: role === c.role ? null : `Was ${labelFor(c.role)} on the talent record` } }).catch(() => {});
+      await db.personProject.create({ data: { personId: toId, projectId: c.projectId, role, note: role === c.role ? null : `Was ${labelFor(c.role)} on the talent record` } }).catch(ignore("convert"));
     }
   } else if (to === "creator") {
     toSlug = await freshSlug("creator", toName);
@@ -260,11 +261,11 @@ export async function convertRecord(
     for (const po of src.organizations ?? []) {
       await db.creatorOrganization.create({
         data: { creatorId: toId, organizationId: po.organizationId, relationship: "team_member", status: po.current ? "active" : "past" },
-      }).catch(() => {});
+      }).catch(ignore("convert"));
     }
     for (const pp of src.projects ?? []) {
       const role = has(PROJECT_ROLES, pp.role) ? pp.role : "other";
-      await db.creatorProjectCredit.create({ data: { creatorId: toId, projectId: pp.projectId, role, note: pp.note ?? null } }).catch(() => {});
+      await db.creatorProjectCredit.create({ data: { creatorId: toId, projectId: pp.projectId, role, note: pp.note ?? null } }).catch(ignore("convert"));
     }
   } else if (to === "channel") {
     toSlug = await freshSlug("channel", toName);
@@ -300,7 +301,7 @@ export async function convertRecord(
     for (const o of src.organizations ?? []) {
       await db.channelOrganization.create({
         data: { channelId: toId, organizationId: o.organizationId, relationship: orgMap[o.relationship] ?? "partner" },
-      }).catch(() => {});
+      }).catch(ignore("convert"));
     }
   }
 
@@ -308,19 +309,17 @@ export async function convertRecord(
   // Everything keyed by (type, id) follows the record to its new home.
   // -------------------------------------------------------------------------
   for (const table of FOLLOWERS) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db as any)[table].updateMany({
+    await modelFor(table).updateMany({
       where: { targetType: fromType, targetId: from.id },
       data: { targetType: to, targetId: toId },
-    }).catch(() => {});
+    }).catch(ignore("convert"));
   }
 
   // -------------------------------------------------------------------------
   // The old page steps aside, and says where it went.
   // -------------------------------------------------------------------------
   const toPath = `${PATHS[to]}/${toSlug}`;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db as any)[MODELS[fromType]].update({
+  await modelFor(MODELS[fromType]).update({
     where: { id: from.id },
     data: { archived: true, archivedReason: `${MOVED_PREFIX}${toPath}`, archivedAt: carried },
   });
@@ -352,25 +351,22 @@ export async function revertConversion(
   to: { type: string; id: string },
 ): Promise<void> {
   for (const table of FOLLOWERS) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db as any)[table].updateMany({
+    await modelFor(table).updateMany({
       where: { targetType: to.type, targetId: to.id },
       data: { targetType: from.type, targetId: from.id },
-    }).catch(() => {});
+    }).catch(ignore("convert"));
   }
   const toModel = MODELS[to.type as ConvertibleType];
   const fromModel = MODELS[from.type as ConvertibleType];
   if (toModel) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db as any)[toModel].delete({ where: { id: to.id } }).catch(() => {});
+    await modelFor(toModel).delete({ where: { id: to.id } }).catch(ignore("convert"));
     await db.knowledgeDigest.deleteMany({ where: { targetType: to.type, targetId: to.id } });
   }
   if (fromModel) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db as any)[fromModel].update({
+    await modelFor(fromModel).update({
       where: { id: from.id },
       data: { archived: false, archivedReason: null, archivedAt: null },
-    }).catch(() => {});
+    }).catch(ignore("convert"));
     await refreshDigest(from.type, from.id);
   }
 }

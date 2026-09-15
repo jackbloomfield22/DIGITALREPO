@@ -7,7 +7,9 @@
 // covered the day it is added.
 
 import { Prisma } from "@prisma/client";
+import { ignore } from "@/lib/errors";
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { logAudit } from "@/lib/audit";
 import { clearDigestMemo, refreshDigest } from "@/lib/ingest/digest";
 import { queueAirtableSync } from "@/lib/airtable/sync";
@@ -72,8 +74,7 @@ export async function mergeRecordsCore(input: MergeInput, user: SessionUser | nu
   if (!MERGEABLE_TYPES.includes(type)) throw new Error("This record type cannot be merged.");
   if (winnerId === loserId) throw new Error("Pick two different records.");
   const spec = RECORD_REGISTRY[type as IngestTargetType];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const model = (db as any)[spec.prismaModel];
+  const model = modelFor(spec.prismaModel);
   const [winner, loser] = await Promise.all([model.findUnique({ where: { id: winnerId } }), model.findUnique({ where: { id: loserId } })]);
   if (!winner || !loser) throw new Error("One of those records is no longer here.");
   const winnerName = String(winner[spec.nameField]);
@@ -146,7 +147,7 @@ export async function mergeRecordsCore(input: MergeInput, user: SessionUser | nu
   // memo that can skip a second refresh in the same moment — and this one
   // must land, because it is what takes the loser out of search.
   clearDigestMemo();
-  await Promise.all([refreshDigest(type, winnerId), refreshDigest(type, loserId)]).catch(() => {});
+  await Promise.all([refreshDigest(type, winnerId), refreshDigest(type, loserId)]).catch(ignore("merge-records"));
   await queueAirtableSync(type, winnerId);
   await queueAirtableSync(type, loserId);
   return { winnerId, loserId, relinked, dropped, copied };
@@ -166,8 +167,7 @@ export async function mergedInto(type: string, id: string): Promise<MergedInto |
   const value = row?.value as Omit<MergedInto, "href"> | null;
   if (!value) return null;
   const spec = RECORD_REGISTRY[type as IngestTargetType];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const winner = spec ? await (db as any)[spec.prismaModel].findUnique({ where: { id: value.into }, select: { slug: true } }) : null;
+  const winner = spec ? await modelFor(spec.prismaModel).findUnique({ where: { id: value.into }, select: { slug: true } }) : null;
   return { ...value, href: winner?.slug ? spec.path(String(winner.slug)) : null };
 }
 

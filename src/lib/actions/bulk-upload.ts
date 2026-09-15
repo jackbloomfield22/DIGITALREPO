@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ignore } from "@/lib/errors";
 import { db } from "@/lib/db";
+import { modelFor } from "@/lib/db-model";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { createSnapshot } from "@/lib/backup";
@@ -294,8 +296,7 @@ export async function revertImportChunk(input: {
     for (const link of links) {
       const model = REVERTABLE[link.targetType];
       if (model) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const exists = await (db as any)[model].findUnique({ where: { id: link.targetId } });
+        const exists = await modelFor(model).findUnique({ where: { id: link.targetId } });
         if (exists) {
           const attachments = await db.attachment.findMany({
             where: { targetType: link.targetType, targetId: link.targetId },
@@ -304,8 +305,7 @@ export async function revertImportChunk(input: {
             await db.storedFile.deleteMany({ where: { key: { in: attachments.map((a) => a.storedPath) } } });
             await db.attachment.deleteMany({ where: { targetType: link.targetType, targetId: link.targetId } });
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (db as any)[model].delete({ where: { id: link.targetId } });
+          await modelFor(model).delete({ where: { id: link.targetId } });
           await db.knowledgeDigest.deleteMany({ where: { targetType: link.targetType, targetId: link.targetId } });
           await db.favorite.deleteMany({ where: { targetType: link.targetType, targetId: link.targetId } });
           await db.recentView.deleteMany({ where: { targetType: link.targetType, targetId: link.targetId } });
@@ -322,7 +322,7 @@ export async function revertImportChunk(input: {
     });
 
     if (remaining === 0) {
-      await db.source.delete({ where: { id: input.sourceId } }).catch(() => {});
+      await db.source.delete({ where: { id: input.sourceId } }).catch(ignore("bulk-upload"));
       await logAudit(user, {
         targetType: "source",
         targetId: input.sourceId,

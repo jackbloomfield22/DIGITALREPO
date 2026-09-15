@@ -303,13 +303,6 @@ export const LOCATION_RELATIONSHIPS = mk([
 
 // --- Confidence --------------------------------------------------------------
 
-export const CONFIDENCE_LEVELS = mk([
-  "confirmed",
-  "reported",
-  "internal",
-  "unverified",
-]);
-
 // --- Source types ------------------------------------------------------------
 
 export const SOURCE_TYPES = mk([
