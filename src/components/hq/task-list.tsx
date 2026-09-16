@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteTask, saveTask, setTaskStatus } from "@/lib/actions/hq";
+import { Button } from "@/components/button";
 
 export type TaskRow = {
   id: string; title: string; kind: string; status: string; priority: number; dueAt: string | null; notes: string | null; waitingSince?: string | null; nudgeAfterDays?: number | null;
@@ -72,7 +73,7 @@ export function TaskList({ tasks, emptyText = "Nothing here.", allowAdd, default
       {allowAdd && (
         <div className="mt-2 flex gap-2">
           <input value={adding} onChange={(e) => setAdding(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder={defaults?.kind === "follow_up" ? "Add a follow-up…" : "Add a task…"} className="flex-1 text-sm" />
-          <button className="btn btn-secondary btn-sm" disabled={!adding.trim() || pending} onClick={add}>Add</button>
+          <Button variant="secondary" size="sm" loading={pending} disabled={!adding.trim()} onClick={add}>Add</Button>
         </div>
       )}
     </div>

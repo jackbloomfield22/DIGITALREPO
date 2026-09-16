@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { movePipeline, savePipeline } from "@/lib/actions/hq";
 import { BOARD_STAGES, STAGES, hqLabel } from "@/lib/hq/vocab";
+import { Button } from "@/components/button";
 
 export type CardVM = {
   id: string; title: string; stage: string; heat: number; nextStep: string | null; nextStepDue: string | null;
@@ -93,8 +94,8 @@ export function PipelineBoard({ cards }: { cards: CardVM[] }) {
                 <div className="mt-2">
                   <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(stage); if (e.key === "Escape") setAdding(null); }} placeholder="Title…" className="w-full text-sm" />
                   <div className="mt-1 flex gap-1">
-                    <button className="btn btn-primary btn-sm" disabled={pending || !title.trim()} onClick={() => add(stage)}>Add</button>
-                    <button className="btn btn-secondary btn-sm" onClick={() => setAdding(null)}>Cancel</button>
+                    <Button variant="primary" size="sm" loading={pending} disabled={!title.trim()} onClick={() => add(stage)}>Add</Button>
+                    <Button variant="secondary" size="sm" onClick={() => setAdding(null)}>Cancel</Button>
                   </div>
                 </div>
               ) : (

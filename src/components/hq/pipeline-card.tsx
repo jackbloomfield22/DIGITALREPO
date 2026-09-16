@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/confirm";
 import { deletePipeline, removePipelineContact, savePipeline, setPipelineContact, ensureRelationship } from "@/lib/actions/hq";
 import { AutoDate, AutoSelect, AutoText } from "@/components/hq/fields";
 import { PersonPicker } from "@/components/hq/pickers";
@@ -17,6 +18,7 @@ export type CardDetail = {
 export function PipelineCardEditor({ card }: { card: CardDetail }) {
   const router = useRouter();
   const [, start] = useTransition();
+  const confirm = useConfirm();
   const [addingRole, setAddingRole] = useState("decision_maker");
   const save = (patch: Record<string, unknown>) => savePipeline({ id: card.id, title: card.title, ...patch }).then(() => router.refresh());
 
@@ -82,7 +84,7 @@ export function PipelineCardEditor({ card }: { card: CardDetail }) {
 
         <button
           className="text-xs text-faint hover:text-danger"
-          onClick={() => { if (confirm("Delete this card? Tasks and notes stay, unlinked.")) start(async () => { await deletePipeline(card.id); router.push("/hq/pipeline"); }); }}
+          onClick={() => void (async () => { if (!(await confirm({ title: `Delete “${card.title}”?`, message: "Tasks and notes attached to it stay, just unlinked. The card itself cannot be brought back.", tone: "danger", action: "Delete" }))) return; start(async () => { await deletePipeline(card.id); router.push("/hq/pipeline"); }); })()}
         >
           Delete card
         </button>

@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/confirm";
 import { googleDisconnect, googleSyncNow, importBrain, rebuildConnections, saveHqSettings, seedHq } from "@/lib/actions/hq";
+import { Button } from "@/components/button";
 
 export function AiSettings({ aiEnabled, capCents, keyPresent, spentToday, spentMonth }: { aiEnabled: boolean; capCents: number; keyPresent: boolean; spentToday: number; spentMonth: number }) {
   const router = useRouter();
@@ -30,6 +32,7 @@ export function AiSettings({ aiEnabled, capCents, keyPresent, spentToday, spentM
 export function GoogleSettings({ configured, status, email, lastSyncAt, lastError, notice, origin }: { configured: boolean; status: string | null; email: string | null; lastSyncAt: string | null; lastError: string | null; notice?: string; origin: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const [msg, setMsg] = useState<string | null>(notice ?? null);
   const connected = status === "connected" || status === "error";
   return (
@@ -39,8 +42,8 @@ export function GoogleSettings({ configured, status, email, lastSyncAt, lastErro
         <>
           <div>Connected as <span className="font-medium">{email ?? "Google account"}</span>{lastSyncAt ? ` · last sync ${new Date(lastSyncAt).toLocaleString()}` : ""}{status === "error" && <span className="text-danger"> · last sync failed: {lastError}</span>}</div>
           <div className="flex gap-2">
-            <button className="btn btn-secondary btn-sm" disabled={pending} onClick={() => start(async () => { const r = await googleSyncNow(); setMsg(r.ok ? `Synced: ${r.summary}` : r.error); router.refresh(); })}>Sync now</button>
-            <button className="btn btn-secondary btn-sm" disabled={pending} onClick={() => { if (confirm("Disconnect Google? Synced events are removed; logged conversations stay.")) start(async () => { await googleDisconnect(); router.refresh(); }); }}>Disconnect</button>
+            <Button variant="secondary" size="sm" loading={pending} onClick={() => start(async () => { const r = await googleSyncNow(); setMsg(r.ok ? `Synced: ${r.summary}` : r.error); router.refresh(); })}>Sync now</Button>
+            <Button variant="secondary" size="sm" loading={pending} onClick={() => void (async () => { if (!(await confirm({ title: "Disconnect Google?", message: "Synced calendar events are removed. Conversations already logged against your people stay.", tone: "danger", action: "Disconnect" }))) return; start(async () => { await googleDisconnect(); router.refresh(); }); })()}>Disconnect</Button>
           </div>
           <p className="text-xs text-muted">Calendar: the next 45 days and the past week, refreshed on each sync. Gmail: mail to or from anyone in your People with an email on file becomes a logged conversation (subject only) and moves their last-contact date. Nothing else from your mail is stored.</p>
         </>
@@ -72,9 +75,9 @@ export function SeedAndData({ seededAt, counts }: { seededAt: string | null; cou
   return (
     <div className="space-y-4 text-sm">
       <div>
-        <button className="btn btn-primary btn-sm" disabled={pending} onClick={() => start(async () => { const r = await seedHq(); setMsg(r.ok ? `Seeded: ${r.pipelines} pipeline cards, ${r.relationships} people, ${r.contacts} card contacts added.` : r.error); router.refresh(); })}>
-          {pending ? "Seeding…" : seededAt ? "Seed again (adds what's new)" : "Seed from the Repo"}
-        </button>
+        <Button variant="primary" size="sm" loading={pending} onClick={() => start(async () => { const r = await seedHq(); setMsg(r.ok ? `Seeded: ${r.pipelines} pipeline cards, ${r.relationships} people, ${r.contacts} card contacts added.` : r.error); router.refresh(); })}>
+          {seededAt ? "Seed again (adds what's new)" : "Seed from the Repo"}
+        </Button>
         <p className="mt-1 text-xs text-muted">Every live format, channel, production and opportunity becomes a pipeline card at the matching stage with its talent and people attached; every industry person and talent becomes a relationship. Only creates what is missing — nothing you&rsquo;ve written is touched.{seededAt ? ` Last seeded ${new Date(seededAt).toLocaleString()}.` : ""}</p>
         {msg && <div className="mt-1 text-xs">{msg}</div>}
       </div>
@@ -91,7 +94,7 @@ export function SeedAndData({ seededAt, counts }: { seededAt: string | null; cou
         <p className="mt-1 text-xs text-muted">A .json of ideas, notes, people, conversations, cards and tasks prepared outside the site (kind “44forty-brain”). Names resolve against your People and the Repo.</p>
       </div>
       <div>
-        <button className="btn btn-secondary btn-sm" disabled={pending} onClick={() => start(async () => { const r = await rebuildConnections(); setMsg(r.ok ? `Connections rebuilt: ${r.links} links between your notes, people, cards and the Repo.` : r.error); router.refresh(); })}>Rebuild connections</button>
+        <Button variant="secondary" size="sm" loading={pending} onClick={() => start(async () => { const r = await rebuildConnections(); setMsg(r.ok ? `Connections rebuilt: ${r.links} links between your notes, people, cards and the Repo.` : r.error); router.refresh(); })}>Rebuild connections</Button>
         <p className="mt-1 text-xs text-muted">Every name in every note, idea, conversation, card and task links to the person, card or Repo record it names, in both directions. This rebuilds the whole graph; it also happens after a seed or an import. Currently {counts.links.toLocaleString()} links.</p>
       </div>
       <div>

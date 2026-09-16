@@ -51,6 +51,8 @@ export function CreateSheet({ isEditor }: { isEditor: boolean }) {
   const spec = RECORD_REGISTRY[type];
   const fields = useMemo(() => essentialFields(type), [type]);
   const templates: RecordTemplate[] = prefs.templates?.[type] ?? [];
+  const [naming, setNaming] = useState(false);
+  const [templateName, setTemplateName] = useState("");
 
   useEffect(() => {
     if (!isEditor) return;
@@ -90,12 +92,14 @@ export function CreateSheet({ isEditor }: { isEditor: boolean }) {
 
   const applyTemplate = (t: RecordTemplate) => setValues((cur) => ({ ...t.values, [spec.nameField]: cur[spec.nameField] ?? "" }));
   const saveTemplate = () => {
-    const label = window.prompt("Name this template");
-    if (!label?.trim()) return;
+    const label = templateName.trim();
+    if (!label) return;
     const picked = keepSelects(values, fields);
-    const next = [...templates.filter((t) => t.name !== label.trim()), { name: label.trim(), values: picked }];
+    const next = [...templates.filter((t) => t.name !== label), { name: label, values: picked }];
     update({ templates: { [type]: next } });
-    toast(`Saved template “${label.trim()}”`);
+    toast(`Saved template “${label}”`);
+    setNaming(false);
+    setTemplateName("");
   };
   const removeTemplate = (name: string) => update({ templates: { [type]: templates.filter((t) => t.name !== name) } });
 
@@ -158,7 +162,27 @@ export function CreateSheet({ isEditor }: { isEditor: boolean }) {
         )}
         <p className="mt-3 text-xs text-faint">Everything else is filled in on the record page. Fields save when you leave them.</p>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <button type="button" className="text-xs text-muted underline decoration-dotted underline-offset-2 hover:text-ink" onClick={saveTemplate}>Save selects as a template</button>
+          {naming ? (
+            <span className="flex items-center gap-1">
+              <input
+                autoFocus
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Name this template"
+                aria-label="Template name"
+                className="!min-h-8 !w-48 text-xs"
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === "Enter") { e.preventDefault(); saveTemplate(); }
+                  if (e.key === "Escape") { e.preventDefault(); setNaming(false); setTemplateName(""); }
+                }}
+              />
+              <button type="button" className="btn btn-primary btn-sm" disabled={!templateName.trim()} onClick={saveTemplate}>Save</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setNaming(false); setTemplateName(""); }}>Cancel</button>
+            </span>
+          ) : (
+            <button type="button" className="text-xs text-muted underline decoration-dotted underline-offset-2 hover:text-ink" onClick={() => setNaming(true)}>Save selects as a template</button>
+          )}
           <div className="flex gap-2">
             <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
             <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void save("another")} title="⌘⇧↩">Save &amp; add another</button>

@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/confirm";
 import { deleteIdea, promoteIdea, saveIdea } from "@/lib/actions/hq";
 import { AutoSelect, AutoText, Stars, TagsField } from "@/components/hq/fields";
 import { IDEA_KINDS, IDEA_STATUSES, hqLabel } from "@/lib/hq/vocab";
+import { Button } from "@/components/button";
 
 export type IdeaVM = { id: string; title: string; body: string | null; kind: string; status: string; rating: number; tags: string[]; lastTouchedAt: string; createdAt: string; promotedToId: string | null };
 
@@ -19,7 +21,7 @@ export function IdeaQuickAdd() {
     <div className="mb-4 flex gap-2">
       <select value={kind} onChange={(e) => setKind(e.target.value)} className="!w-auto text-sm">{IDEA_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}</select>
       <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="A title, a mechanic, a pairing, a rabbit hole — one line is enough for now" className="flex-1 text-sm" />
-      <button className="btn btn-primary btn-sm" disabled={pending || !title.trim()} onClick={add}>Save</button>
+      <Button variant="primary" size="sm" loading={pending} disabled={!title.trim()} onClick={add}>Save</Button>
     </div>
   );
 }
@@ -48,6 +50,7 @@ export function IdeaCard({ idea }: { idea: IdeaVM }) {
 export function IdeaEditor({ idea }: { idea: IdeaVM }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const save = (patch: Record<string, unknown>) => saveIdea({ id: idea.id, title: idea.title, ...patch }).then(() => router.refresh());
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
@@ -67,13 +70,13 @@ export function IdeaEditor({ idea }: { idea: IdeaVM }) {
             <div className="text-sm">Promoted to a pipeline card: <Link href={`/hq/pipeline/${idea.promotedToId}`} className="font-medium underline hover:text-accent">open it →</Link></div>
           ) : (
             <>
-              <button className="btn btn-primary btn-sm w-full" disabled={pending} onClick={() => start(async () => { const r = await promoteIdea(idea.id); if (r.ok) router.push(`/hq/pipeline/${r.pipelineId}`); })}>Promote to the pipeline</button>
+              <Button variant="primary" size="sm" className="w-full" loading={pending} onClick={() => start(async () => { const r = await promoteIdea(idea.id); if (r.ok) router.push(`/hq/pipeline/${r.pipelineId}`); })}>Promote to the pipeline</Button>
               <p className="mt-1.5 text-xs text-faint">Makes a card at the Idea stage with this text as “why it matters”, and marks the idea promoted.</p>
             </>
           )}
         </div>
         <div className="text-xs text-faint">Saved {new Date(idea.createdAt).toLocaleDateString()} · last touched {new Date(idea.lastTouchedAt).toLocaleDateString()}</div>
-        <button className="text-xs text-faint hover:text-danger" onClick={() => { if (confirm("Delete this idea?")) start(async () => { await deleteIdea(idea.id); router.push("/hq/ideas"); }); }}>Delete idea</button>
+        <button className="text-xs text-faint hover:text-danger" onClick={() => void (async () => { if (!(await confirm({ title: `Delete “${idea.title}”?`, message: "This one cannot be undone.", tone: "danger", action: "Delete" }))) return; start(async () => { await deleteIdea(idea.id); router.push("/hq/ideas"); }); })()}>Delete idea</button>
       </div>
     </div>
   );

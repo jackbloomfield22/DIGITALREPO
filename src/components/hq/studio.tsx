@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/toast";
 import { addStyleExample, deleteStyleExample, saveStyleGuide } from "@/lib/actions/hq";
 import { AutoText } from "@/components/hq/fields";
 import { CardPicker, PersonPicker } from "@/components/hq/pickers";
 import { STYLE_KINDS, hqLabel } from "@/lib/hq/vocab";
+import { Button } from "@/components/button";
 
 export function StyleGuideEditor({ value }: { value: string }) {
   return <AutoText value={value} multiline rows={18} onSave={(v) => saveStyleGuide(v)} className="[&_textarea]:font-mono [&_textarea]:text-sm [&_textarea]:leading-relaxed" />;
@@ -14,6 +16,7 @@ export function StyleGuideEditor({ value }: { value: string }) {
 export function ExamplesLibrary({ examples }: { examples: { id: string; kind: string; title: string; body: string; notes: string | null; createdAt: string }[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState("logline");
   const [title, setTitle] = useState("");
@@ -27,7 +30,7 @@ export function ExamplesLibrary({ examples }: { examples: { id: string; kind: st
     const form = new FormData(); form.set("file", file);
     const r = await fetch("/api/hq/style-upload", { method: "POST", body: form }).then((x) => x.json()).catch(() => null);
     setBusy(false);
-    if (!r || r.error) { alert(r?.error ?? "Could not read that file."); return; }
+    if (!r || r.error) { toast(r?.error ?? "Could not read that file.", { tone: "error" }); return; }
     setTitle((t) => t || r.title); setBody(r.text); setOpen(true);
     if (/deck|pitch/i.test(file.name) || file.name.endsWith(".pptx")) setKind("deck");
   };
@@ -39,7 +42,7 @@ export function ExamplesLibrary({ examples }: { examples: { id: string; kind: st
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <button className="btn btn-secondary btn-sm" onClick={() => setOpen((o) => !o)}>{open ? "Close" : "+ Paste an example"}</button>
+        <Button variant="secondary" size="sm" onClick={() => setOpen((o) => !o)}>{open ? "Close" : "+ Paste an example"}</Button>
         <label className="btn btn-secondary btn-sm cursor-pointer">
           {busy ? "Reading…" : "Upload a deck or doc"}
           <input type="file" className="hidden" accept=".pdf,.docx,.pptx,.txt,.md,.eml" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
@@ -54,7 +57,7 @@ export function ExamplesLibrary({ examples }: { examples: { id: string; kind: st
           </div>
           <textarea rows={10} value={body} onChange={(e) => setBody(e.target.value)} placeholder="The text itself." className="w-full text-sm" />
           <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Why this one works (optional) — the writer reads this too" className="w-full text-sm" />
-          <div className="flex justify-end"><button className="btn btn-primary btn-sm" disabled={pending || !body.trim()} onClick={save}>Save example</button></div>
+          <div className="flex justify-end"><Button variant="primary" size="sm" loading={pending} disabled={!body.trim()} onClick={save}>Save example</Button></div>
         </div>
       )}
       {examples.length === 0 ? (
@@ -88,6 +91,7 @@ export function BriefBuilder({ outputs, aiOn }: { outputs: { value: string; labe
   const [draft, setDraft] = useState<{ text: string; cents: number } | null>(null);
   const [busy, setBusy] = useState<"brief" | "draft" | null>(null);
   const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
 
   const build = async () => {
     setBusy("brief"); setDraft(null);
@@ -99,7 +103,7 @@ export function BriefBuilder({ outputs, aiOn }: { outputs: { value: string; labe
     setBusy("draft");
     const r = await fetch("/api/hq/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief }) }).then((x) => x.json()).catch(() => null);
     setBusy(null);
-    if (r?.ok) setDraft({ text: r.text, cents: r.costCents }); else alert(r?.error ?? "Drafting failed.");
+    if (r?.ok) setDraft({ text: r.text, cents: r.costCents }); else toast(r?.error ?? "Drafting failed.", { tone: "error" });
   };
 
   return (
@@ -117,7 +121,7 @@ export function BriefBuilder({ outputs, aiOn }: { outputs: { value: string; labe
         <label className="block"><span className="overline mb-1 block">Anything else</span>
           <textarea rows={3} value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="Angle, length, what to avoid, what they said last time…" className="w-full text-sm" />
         </label>
-        <button className="btn btn-primary w-full" disabled={busy !== null} onClick={build}>{busy === "brief" ? "Building…" : "Build the brief"}</button>
+        <Button variant="primary" className="w-full" loading={busy === "brief"} disabled={busy !== null} onClick={build}>Build the brief</Button>
         <p className="text-xs text-faint">The brief carries your style guide, the best-fit examples, and everything HQ knows about the project and the person. Paste it to Claude in chat and the draft costs nothing.</p>
       </div>
       <div>
@@ -126,8 +130,8 @@ export function BriefBuilder({ outputs, aiOn }: { outputs: { value: string; labe
             <div className="mb-1 flex items-center justify-between">
               <span className="overline">Brief</span>
               <div className="flex gap-2">
-                <button className="btn btn-secondary btn-sm" onClick={copy}>{copied ? "Copied" : "Copy for Claude"}</button>
-                {aiOn && <button className="btn btn-primary btn-sm" disabled={busy !== null} onClick={run}>{busy === "draft" ? "Drafting…" : "Draft here (costs a few cents)"}</button>}
+                <Button variant="secondary" size="sm" onClick={copy}>{copied ? "Copied" : "Copy for Claude"}</Button>
+                {aiOn && <Button variant="primary" size="sm" loading={busy === "draft"} disabled={busy !== null} onClick={run}>Draft here (costs a few cents)</Button>}
               </div>
             </div>
             <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={18} className="w-full font-mono text-xs leading-relaxed" />
