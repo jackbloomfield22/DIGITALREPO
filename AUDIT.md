@@ -181,19 +181,44 @@ fields, verification and history work.
 3. **Rotate the Neon `neondb_owner` password.** It was shared in chat during
    this work, and this repository is public.
 
+### Done after the phases, in a finishing pass
+
+- **No browser dialogs anywhere.** HQ was the last part still using the
+  browser's own confirm and alert boxes, and one prompt survived in the
+  quick-create sheet. All of them are the app's own dialogs and toasts now,
+  and each confirmation says what is left alone rather than just "are you
+  sure".
+- **HQ is on the shared button.** Twenty-seven of its buttons keep their label
+  and show a spinner while they work instead of greying out or swapping the
+  label mid-action. Its pickers were already on the shared one.
+- **Every control has a name a screen reader can read.** Swept every list,
+  every record page and every HQ page for controls with no name, images with
+  no alt text, inputs with no label, duplicate ids and console errors. HQ's
+  inline fields drew their labels as styled text rather than real labels, six
+  file pickers hidden behind buttons had no name, and the column menu on a
+  column with no heading had none either. All fixed; every page reports clean.
+- **A required custom field can no longer be skipped.** Quick create showed
+  only the built-in essentials, so a record could be made without a field you
+  had marked required. It asks for them now, and the create path refuses
+  without them even for a caller that does not use the sheet.
+- **Lint reports nothing at all**, on both the shipped app and the held branch.
+
 ### A short list for a follow-up pass
 
-- HQ's buttons and pickers still use their own classes; bring them onto the
-  shared Button and Combobox.
 - The remaining 45 `as any` casts are mostly form values and JSON shapes in
   `record-form.tsx` and `convert.ts`.
 - Ingest's AI stages could not be exercised here — no API key and no outbound
   network in this sandbox — so they are covered by tests with fakes only.
-- Quick-create does not yet offer custom fields; it deliberately shows only the
-  essentials, but a required custom field should probably appear there.
+- HQ still deletes outright in five places (a note, an idea, a pipeline card, a
+  person, a logged conversation). Everywhere else in the app, archive is the
+  only way out. Making HQ match needs an `archivedAt` column on those tables,
+  which is a schema change, so it waits behind the same database question as
+  phase 3.
 - Two undo paths still delete rows they created (a bulk upload's undo and
   ingest's undo). They undo an import rather than a person's work, which is why
-  they were left, but they are the last places anything is deleted.
+  they were left, but they are the last places anything else is deleted.
+- Optional custom fields still do not appear in quick create, on purpose. If
+  that starts to bite, the sheet could grow a "more fields" disclosure.
 - `prisma` sits in `dependencies` rather than `devDependencies` because the
   Vercel build needs the CLI; worth revisiting if the build changes.
 
