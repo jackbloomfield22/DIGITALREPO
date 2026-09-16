@@ -206,6 +206,7 @@ export function DocEditor({
                 type="file"
                 accept=".pdf,.docx,.txt,.md"
                 className="hidden"
+                aria-label="Choose a document to replace this one"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   e.target.value = "";

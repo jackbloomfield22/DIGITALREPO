@@ -258,6 +258,7 @@ export function AttachmentList({
             type="file"
             multiple
             className="hidden"
+            aria-label="Choose files to attach"
             onChange={async (e) => {
               const files = [...(e.target.files ?? [])];
               e.target.value = "";

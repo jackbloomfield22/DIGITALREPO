@@ -10,7 +10,7 @@ import { STYLE_KINDS, hqLabel } from "@/lib/hq/vocab";
 import { Button } from "@/components/button";
 
 export function StyleGuideEditor({ value }: { value: string }) {
-  return <AutoText value={value} multiline rows={18} onSave={(v) => saveStyleGuide(v)} className="[&_textarea]:font-mono [&_textarea]:text-sm [&_textarea]:leading-relaxed" />;
+  return <AutoText ariaLabel="House style guide" value={value} multiline rows={18} onSave={(v) => saveStyleGuide(v)} className="[&_textarea]:font-mono [&_textarea]:text-sm [&_textarea]:leading-relaxed" />;
 }
 
 export function ExamplesLibrary({ examples }: { examples: { id: string; kind: string; title: string; body: string; notes: string | null; createdAt: string }[] }) {
@@ -45,7 +45,7 @@ export function ExamplesLibrary({ examples }: { examples: { id: string; kind: st
         <Button variant="secondary" size="sm" onClick={() => setOpen((o) => !o)}>{open ? "Close" : "+ Paste an example"}</Button>
         <label className="btn btn-secondary btn-sm cursor-pointer">
           {busy ? "Reading…" : "Upload a deck or doc"}
-          <input type="file" className="hidden" accept=".pdf,.docx,.pptx,.txt,.md,.eml" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
+          <input type="file" className="hidden" aria-label="Choose an example file to read" accept=".pdf,.docx,.pptx,.txt,.md,.eml" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
         </label>
         <span className="text-xs text-faint">Decks, one-sheets, loglines you&rsquo;re proud of, emails that landed. The brief builder quotes the best fit.</span>
       </div>

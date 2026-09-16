@@ -194,6 +194,7 @@ export function UploadZone({ aiAvailable, pendingIds, blobReady = false }: { aiA
             type="file"
             multiple
             className="hidden"
+            aria-label="Choose files to upload"
             accept=".eml,.msg,.mbox,.zip,.pdf,.docx,.pptx,.xlsx,.csv,.txt,.md,.html,.htm,.json"
             onChange={(e) => {
               const files = [...(e.target.files ?? [])];
