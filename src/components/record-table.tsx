@@ -191,7 +191,7 @@ export function RecordTable({ columns, rows, sort, empty = "Nothing here yet.", 
                   <th key={k} scope="col" style={width ? { width } : c.width ? { width: c.width } : undefined}
                     className={`group/th relative px-3 py-2 text-xs font-semibold uppercase tracking-wide ${c.align === "right" ? "text-right" : "text-left"} ${i === 0 ? "sticky left-0 z-10 bg-wash" : c.showAt ?? ""}`}
                     aria-sort={active ? (sort.desc ? "descending" : "ascending") : undefined}>
-                    <button type="button" className={`inline-flex max-w-full items-center gap-1 hover:text-accent ${active ? "text-accent" : "text-muted"}`} aria-haspopup="menu" aria-expanded={menu === k} onClick={() => setMenu(menu === k ? null : k)}>
+                    <button type="button" className={`inline-flex max-w-full items-center gap-1 hover:text-accent ${active ? "text-accent" : "text-muted"}`} aria-haspopup="menu" aria-expanded={menu === k} aria-label={c.label ? undefined : "Column options"} onClick={() => setMenu(menu === k ? null : k)}>
                       <span className="truncate">{c.label}</span>
                       {c.sortKey && <span aria-hidden className={active ? "" : "opacity-0 group-hover/th:opacity-100"}>{active ? (sort.desc ? "↓" : "↑") : "↕"}</span>}
                     </button>

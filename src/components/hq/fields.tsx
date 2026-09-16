@@ -1,17 +1,18 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 
 // Inline, autosaving fields. Click to edit, blur or pause to save; the
 // status word next to the label says what happened. Used across HQ so every
 // page edits the same way and nothing needs a form.
 
 export function AutoText({
-  label, value, onSave, multiline, placeholder, rows = 3, className = "",
+  label, ariaLabel, value, onSave, multiline, placeholder, rows = 3, className = "",
 }: {
-  label?: string; value: string | null | undefined; onSave: (v: string) => Promise<unknown>;
+  label?: string; ariaLabel?: string; value: string | null | undefined; onSave: (v: string) => Promise<unknown>;
   multiline?: boolean; placeholder?: string; rows?: number; className?: string;
 }) {
+  const id = useId();
   const [text, setText] = useState(value ?? "");
   const [saved, setSaved] = useState(value ?? "");
   const [state, setState] = useState<"idle" | "dirty" | "saving" | "saved" | "failed">("idle");
@@ -40,11 +41,13 @@ export function AutoText({
     <div className={className}>
       {label && (
         <div className="mb-1 flex items-baseline justify-between">
-          <span className="overline">{label}</span>
+          <label htmlFor={id} className="overline">{label}</label>
           <span className="text-xs text-faint">{state === "saving" ? "saving…" : state === "saved" ? "saved" : state === "failed" ? "not saved" : state === "dirty" ? "…" : ""}</span>
         </div>
       )}
       <Tag
+        id={id}
+        aria-label={label ? undefined : ariaLabel}
         value={text}
         onChange={(e) => change(e.target.value)}
         onBlur={() => { if (timer.current) clearTimeout(timer.current); void save(text); }}
@@ -80,6 +83,7 @@ export function AutoDate({ label, value, onSave }: { label?: string; value: stri
 }
 
 export function TagsField({ label, value, onSave, placeholder = "Add and press Enter" }: { label?: string; value: string[]; onSave: (v: string[]) => Promise<unknown>; placeholder?: string }) {
+  const id = useId();
   const [tags, setTags] = useState(value);
   const [draft, setDraft] = useState("");
   const [seen, setSeen] = useState(value);
@@ -87,7 +91,7 @@ export function TagsField({ label, value, onSave, placeholder = "Add and press E
   const commit = (next: string[]) => { setTags(next); void onSave(next); };
   return (
     <div>
-      {label && <span className="overline mb-1 block">{label}</span>}
+      {label && <label htmlFor={id} className="overline mb-1 block">{label}</label>}
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((t) => (
           <span key={t} className="chip">
@@ -96,6 +100,7 @@ export function TagsField({ label, value, onSave, placeholder = "Add and press E
           </span>
         ))}
         <input
+          id={id}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

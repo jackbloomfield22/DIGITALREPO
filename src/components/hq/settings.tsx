@@ -19,11 +19,11 @@ export function AiSettings({ aiEnabled, capCents, keyPresent, spentToday, spentM
           <span className="block text-xs text-muted">{keyPresent ? "Off by default. Everything else in HQ works without it; these two read the live brain, which a chat outside the site cannot." : "No ANTHROPIC_API_KEY on the site, so this stays off."}</span>
         </span>
       </label>
-      <div className="flex items-center gap-2">
+      <label className="flex items-center gap-2">
         <span>Daily cap $</span>
         <input value={cap} onChange={(e) => setCap(e.target.value)} onBlur={() => start(async () => { const n = Math.round(Number(cap) * 100); if (!isNaN(n)) { await saveHqSettings({ aiDailyCapCents: Math.max(0, n) }); router.refresh(); } })} className="!w-24 text-sm" />
         <span className="text-xs text-faint">0 = no cap</span>
-      </div>
+      </label>
       <div className="text-xs text-muted">Spent today ${(spentToday / 100).toFixed(2)} · this month ${(spentMonth / 100).toFixed(2)}. Estimates from token counts; the invoice is the truth.</div>
     </div>
   );
@@ -84,7 +84,7 @@ export function SeedAndData({ seededAt, counts }: { seededAt: string | null; cou
       <div>
         <label className="btn btn-secondary btn-sm cursor-pointer">
           Import a brain bundle
-          <input type="file" accept=".json" className="hidden" onChange={async (e) => {
+          <input type="file" accept=".json" className="hidden" aria-label="Choose a brain export to import" onChange={async (e) => {
             const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
             const r = await importBrain(await f.text());
             setMsg(r.ok ? `Imported: ${r.summary}.${r.unresolved.length ? ` Not found in the Repo: ${r.unresolved.slice(0, 8).join(", ")}${r.unresolved.length > 8 ? "…" : ""}` : ""}` : r.error);
