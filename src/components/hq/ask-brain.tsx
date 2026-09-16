@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AiAnswer } from "@/components/ai-answer";
+import { Button } from "@/components/button";
 
 // The one model-backed feature in HQ: a question over the live brain. Shown
 // only when AI is switched on in Settings; every answer shows what it cost.
@@ -42,7 +43,7 @@ export function AskBrain({ initial, capCents, spentCents }: { initial?: string; 
       {error && <div className="mt-2 text-sm text-danger">{error}</div>}
       <div className="mt-2 flex gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask()} placeholder="A question only the live brain can answer — who, what, when, across everything." className="flex-1 text-sm" />
-        <button className="btn btn-primary btn-sm" disabled={busy || !q.trim()} onClick={ask}>{busy ? "Thinking…" : "Ask"}</button>
+        <Button variant="primary" size="sm" loading={busy} disabled={!q.trim()} onClick={ask}>Ask</Button>
       </div>
     </div>
   );

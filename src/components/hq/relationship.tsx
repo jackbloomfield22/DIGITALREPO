@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/confirm";
 import { deleteInteraction, deleteRelationship, logInteraction, saveRelationship } from "@/lib/actions/hq";
 import { AutoDate, AutoSelect, AutoText, TagsField } from "@/components/hq/fields";
 import { INTERACTION_KINDS, TIERS, TIER_CADENCE } from "@/lib/hq/vocab";
+import { Button } from "@/components/button";
 
 export type RelationshipVM = {
   id: string; name: string; tier: string; interests: string[]; howWeMet: string | null; notes: string | null; opportunities: string | null;
@@ -15,6 +17,7 @@ export type RelationshipVM = {
 export function RelationshipEditor({ rel }: { rel: RelationshipVM }) {
   const router = useRouter();
   const [, start] = useTransition();
+  const confirm = useConfirm();
   const save = (patch: Record<string, unknown>) => saveRelationship({ id: rel.id, ...patch }).then(() => router.refresh());
   const cadence = rel.cadenceDays ?? TIER_CADENCE[rel.tier];
   return (
@@ -35,7 +38,7 @@ export function RelationshipEditor({ rel }: { rel: RelationshipVM }) {
       <AutoText label="How we met" value={rel.howWeMet} placeholder="Where, when, who introduced you." onSave={(v) => save({ howWeMet: v })} />
       <AutoText label="Potential opportunities" value={rel.opportunities} multiline rows={3} placeholder="What could you do together? What do they need?" onSave={(v) => save({ opportunities: v })} />
       <AutoText label="Notes" value={rel.notes} multiline rows={8} placeholder="Everything worth remembering about them." onSave={(v) => save({ notes: v })} />
-      <button className="text-xs text-faint hover:text-danger" onClick={() => { if (confirm("Remove this person from HQ? Their Repo record stays.")) start(async () => { await deleteRelationship(rel.id); router.push("/hq/people"); }); }}>
+      <button className="text-xs text-faint hover:text-danger" onClick={() => void (async () => { if (!(await confirm({ title: "Remove this person from HQ?", message: "Their record in the Repo stays exactly as it is. Only the HQ side goes.", tone: "danger", action: "Remove" }))) return; start(async () => { await deleteRelationship(rel.id); router.push("/hq/people"); }); })()}>
         Remove from HQ
       </button>
     </div>
@@ -79,7 +82,7 @@ export function InteractionLog({ relationshipId, name, interactions }: { relatio
         <textarea rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) log(); }} placeholder={`What happened with ${name}? What did they want? What did you promise?`} className="mt-2 w-full text-sm" />
         <div className="mt-2 flex items-center justify-between">
           <span className="text-xs text-faint">⌘/Ctrl+Enter to log. Logging moves their last-contact date.</span>
-          <button className="btn btn-primary btn-sm" disabled={pending || !summary.trim()} onClick={log}>Log</button>
+          <Button variant="primary" size="sm" loading={pending} disabled={!summary.trim()} onClick={log}>Log</Button>
         </div>
       </div>
       <ul className="mt-3 divide-y divide-line">

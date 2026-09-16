@@ -2,16 +2,19 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/confirm";
 import { deleteNote, saveNote } from "@/lib/actions/hq";
 import { AutoSelect, AutoText, TagsField } from "@/components/hq/fields";
 import { PersonPicker, CardPicker } from "@/components/hq/pickers";
 import { NOTE_KINDS } from "@/lib/hq/vocab";
+import { Button } from "@/components/button";
 
 export type NoteVM = { id: string; title: string; body: string; kind: string; tags: string[]; pinned: boolean; relationship: { id: string; name: string } | null; pipeline: { id: string; title: string } | null };
 
 export function NoteEditor({ note }: { note: NoteVM }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const save = (patch: Record<string, unknown>) => saveNote({ id: note.id, title: note.title, ...patch }).then(() => router.refresh());
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
@@ -36,7 +39,7 @@ export function NoteEditor({ note }: { note: NoteVM }) {
             {note.pipeline ? <span>Card: <a href={`/hq/pipeline/${note.pipeline.id}`} className="font-medium hover:text-accent">{note.pipeline.title}</a> <button aria-label="Remove" title="Remove" className="text-xs text-faint hover:text-danger" onClick={() => void save({ pipelineId: null })}>×</button></span> : <CardPicker placeholder="Link a pipeline card…" onPick={(c) => void save({ pipelineId: c.id })} />}
           </div>
         </div>
-        <button className="text-xs text-faint hover:text-danger" disabled={pending} onClick={() => { if (confirm("Delete this note?")) start(async () => { await deleteNote(note.id); router.push("/hq/brain"); }); }}>Delete note</button>
+        <button className="text-xs text-faint hover:text-danger" disabled={pending} onClick={() => void (async () => { if (!(await confirm({ title: `Delete “${note.title || "this note"}”?`, message: "This one cannot be undone.", tone: "danger", action: "Delete" }))) return; start(async () => { await deleteNote(note.id); router.push("/hq/brain"); }); })()}>Delete note</button>
       </div>
     </div>
   );
@@ -46,6 +49,6 @@ export function NewNoteButton({ kind = "note", label = "+ New note" }: { kind?: 
   const router = useRouter();
   const [pending, start] = useTransition();
   return (
-    <button className="btn btn-primary btn-sm" disabled={pending} onClick={() => start(async () => { const r = await saveNote({ title: "Untitled", kind, body: "" }); if (r.ok) router.push(`/hq/brain/${r.id}`); })}>{label}</button>
+    <Button variant="primary" size="sm" loading={pending} onClick={() => start(async () => { const r = await saveNote({ title: "Untitled", kind, body: "" }); if (r.ok) router.push(`/hq/brain/${r.id}`); })}>{label}</Button>
   );
 }

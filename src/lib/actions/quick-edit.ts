@@ -7,7 +7,6 @@
 // there is.
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
 import { modelFor } from "@/lib/db-model";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";

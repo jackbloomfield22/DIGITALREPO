@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteEvent, importIcs, saveEvent } from "@/lib/actions/hq";
 import { CardPicker, PersonPicker } from "@/components/hq/pickers";
+import { Button } from "@/components/button";
 
 export type EventVM = { id: string; title: string; startsAt: string; endsAt: string | null; allDay: boolean; location: string | null; source: string; relationship: { id: string; name: string } | null; pipeline: { id: string; title: string } | null; attendees: string[] };
 
@@ -96,7 +97,7 @@ export function AddEvent() {
       <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Where (optional)" className="w-full text-sm" />
       {person ? <div className="text-sm">With {person.name} <button aria-label="Remove" title="Remove" className="text-xs text-faint" onClick={() => setPerson(null)}>×</button></div> : <PersonPicker placeholder="With whom (optional)" onPick={(p) => { if (p.relationshipId) setPerson({ id: p.relationshipId, name: p.name }); }} />}
       {card ? <div className="text-sm">About {card.title} <button aria-label="Remove" title="Remove" className="text-xs text-faint" onClick={() => setCard(null)}>×</button></div> : <CardPicker placeholder="About which card (optional)" onPick={setCard} />}
-      <button className="btn btn-primary btn-sm w-full" disabled={pending || !title.trim()} onClick={add}>Add to calendar</button>
+      <Button variant="primary" size="sm" className="w-full" loading={pending} disabled={!title.trim()} onClick={add}>Add to calendar</Button>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { captureQuick } from "@/lib/actions/hq";
+import { Button } from "@/components/button";
 
 // The one box. It reads what you type and files it: "call Alex tomorrow",
 // "idea: retired QBs prank format", "lunch w/ Sam Rivers thu 1pm #openwater".
@@ -54,9 +55,9 @@ export function CaptureBar() {
           className="min-h-[42px] flex-1 resize-y"
           aria-label="Capture"
         />
-        <button className="btn btn-primary" disabled={!text.trim() || pending} onClick={submit}>
-          {pending ? "Filing…" : "Capture"}
-        </button>
+        <Button variant="primary" loading={pending} disabled={!text.trim()} onClick={submit}>
+          Capture
+        </Button>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-faint">
         <span>Enter to file. Shift+Enter for a new line; a blank line starts the notes.</span>

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { debriefEvent, skipDebrief } from "@/lib/actions/hq";
+import { Button } from "@/components/button";
 
 // After the meeting: one box. What happened becomes a conversation on each
 // person, the card gets its next step, the follow-up is booked.
@@ -43,11 +44,11 @@ export function DebriefForm({ eventId, people, hasCard }: { eventId: string; peo
           <option value="14">Follow up in 2 weeks</option>
         </select>
         <div className="flex gap-2">
-          <button className="btn btn-secondary btn-sm" disabled={pending} onClick={() => start(async () => { await skipDebrief(eventId); router.push("/hq"); })}>Nothing to log</button>
-          <button className="btn btn-primary btn-sm" disabled={pending || !summary.trim()} onClick={() => start(async () => {
+          <Button variant="secondary" size="sm" loading={pending} onClick={() => start(async () => { await skipDebrief(eventId); router.push("/hq"); })}>Nothing to log</Button>
+          <Button variant="primary" size="sm" loading={pending} disabled={!summary.trim()} onClick={() => start(async () => {
             const r = await debriefEvent({ eventId, summary, nextStep: nextStep || null, nextStepDue: due ? new Date(due + "T12:00:00") : null, followUpInDays: followUp ? Number(followUp) : null, relationshipIds: who });
             if (r.ok) router.push("/hq");
-          })}>{pending ? "Saving…" : "Log it"}</button>
+          })}>Log it</Button>
         </div>
       </div>
     </div>

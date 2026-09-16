@@ -5,7 +5,7 @@
 // Filters stack with AND; tick "or" to put one in the OR group instead.
 // Select fields with more than fifteen options get a search box.
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { matchSorter } from "match-sorter";
 import { Modal } from "@/components/overlay";
 import { Combobox, lookupItems } from "@/components/combobox";

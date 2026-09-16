@@ -10,7 +10,7 @@ import { ChannelIdeas } from "@/components/channel-ideas";
 import { LINK_SPECS } from "@/lib/ingest/registry";
 import { AttachmentList } from "@/components/attachments";
 import { attachmentsFor, uploadLimit } from "@/lib/files";
-import { compactNumber, formatDate, relativeTime, isStale } from "@/lib/format";
+import { formatDate, relativeTime, isStale } from "@/lib/format";
 import { labelFor } from "@/lib/taxonomy";
 import { RecordStepper } from "@/components/record-stepper";
 import { RecordContext } from "@/components/record-context";
