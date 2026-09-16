@@ -12,8 +12,10 @@ import { useDialogFocus } from "@/components/overlay";
 import { useToast } from "@/components/toast";
 import { usePrefs } from "@/components/prefs-provider";
 import { OptionSelect } from "@/components/option-select";
+import { Combobox, lookupItems } from "@/components/combobox";
 import { createRecord } from "@/lib/actions/quick-create";
-import type { CreateType } from "@/lib/record-fields";
+import { requiredCustomFields } from "@/lib/actions/fields";
+import type { CreateType, DetailField } from "@/lib/record-fields";
 import { RECORD_REGISTRY, type EditableField } from "@/lib/ingest/registry";
 import type { RecordTemplate } from "@/lib/prefs";
 
@@ -34,7 +36,11 @@ function essentialFields(type: CreateType): EditableField[] {
   return names.map((n) => spec.fields.find((f) => f.name === n)).filter((f): f is EditableField => !!f && f.kind !== "longtext" || (!!f && names.length <= 2));
 }
 
-type Values = Record<string, string | string[]>;
+type Values = Record<string, string | string[] | boolean | { id: string; name: string }>;
+
+/** A picked relation, or null for anything else. */
+const relValue = (v: Values[string] | undefined): { id: string; name: string } | null =>
+  v && typeof v === "object" && !Array.isArray(v) && "id" in v ? v : null;
 
 export function CreateSheet({ isEditor }: { isEditor: boolean }) {
   const [open, setOpen] = useState(false);
@@ -53,6 +59,16 @@ export function CreateSheet({ isEditor }: { isEditor: boolean }) {
   const templates: RecordTemplate[] = prefs.templates?.[type] ?? [];
   const [naming, setNaming] = useState(false);
   const [templateName, setTemplateName] = useState("");
+  // Fields added under Settings → Fields. Only the required ones appear here:
+  // quick create stays the essentials, but a field you marked required is one
+  // of them, and the server refuses a record without it either way.
+  const [required, setRequired] = useState<DetailField[]>([]);
+  useEffect(() => {
+    if (!open || !isEditor) return;
+    let live = true;
+    requiredCustomFields(type).then((r) => { if (live) setRequired(r); }).catch(() => { if (live) setRequired([]); });
+    return () => { live = false; };
+  }, [type, open, isEditor]);
 
   useEffect(() => {
     if (!isEditor) return;
@@ -70,7 +86,7 @@ export function CreateSheet({ isEditor }: { isEditor: boolean }) {
 
   useEffect(() => { if (open) setTimeout(() => nameRef.current?.focus(), 30); }, [open, type]);
 
-  const set = (name: string, v: string | string[]) => setValues((cur) => ({ ...cur, [name]: v }));
+  const set = (name: string, v: Values[string]) => setValues((cur) => ({ ...cur, [name]: v }));
 
   const save = useCallback(async (then: "open" | "another") => {
     if (busy) return;
@@ -153,6 +169,31 @@ export function CreateSheet({ isEditor }: { isEditor: boolean }) {
               )}
             </label>
           ))}
+          {required.map((f) => (
+            <label key={f.name} className={`block text-sm ${f.kind === "longtext" ? "sm:col-span-2" : ""}`}>
+              <span className="mb-1 block text-xs font-semibold text-muted">{f.label} <span className="text-accent" aria-hidden>*</span><span className="sr-only">(required)</span></span>
+              {f.kind === "vocab" && (
+                <OptionSelect setKey={f.set} options={(f.options ?? []).filter((o) => o.value)} value={String(values[f.name] ?? "")} onChange={(v) => set(f.name, v)} />
+              )}
+              {f.kind === "vocablist" && (
+                <select multiple value={Array.isArray(values[f.name]) ? (values[f.name] as string[]) : []} onChange={(e) => set(f.name, [...e.target.selectedOptions].map((o) => o.value))} className="min-h-24">
+                  {(f.options ?? []).filter((o) => o.value).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              )}
+              {f.kind === "longtext" && <textarea rows={3} value={String(values[f.name] ?? "")} onChange={(e) => set(f.name, e.target.value)} />}
+              {f.kind === "boolean" && (
+                <input type="checkbox" className="!w-auto" checked={values[f.name] === true} onChange={(e) => set(f.name, e.target.checked)} />
+              )}
+              {f.kind === "relation" && (
+                relValue(values[f.name])
+                  ? <span className="flex items-center gap-1 text-sm">{relValue(values[f.name])!.name}<button type="button" aria-label={`Clear ${f.label}`} className="text-faint hover:text-accent" onClick={() => set(f.name, "")}>×</button></span>
+                  : <Combobox aria-label={f.label} placeholder={`Find a ${f.lookupType ?? "record"}…`} fetchItems={lookupItems(f.lookupType ?? "creator")} onPick={(i) => set(f.name, { id: i.id, name: i.name })} />
+              )}
+              {(f.kind === "text" || f.kind === "number" || f.kind === "date" || f.kind === "url") && (
+                <input type={f.kind === "number" ? "number" : f.kind === "date" ? "date" : f.kind === "url" ? "url" : "text"} value={String(values[f.name] ?? "")} onChange={(e) => set(f.name, e.target.value)} maxLength={f.maxLength} />
+              )}
+            </label>
+          ))}
         </div>
         {error && (
           <p role="alert" className="mt-3 text-sm text-accent-deep">
@@ -195,8 +236,12 @@ export function CreateSheet({ isEditor }: { isEditor: boolean }) {
 }
 
 /** Keep the select-type values (and tags) — that is what a template pre-fills; names and free text do not carry over. */
-function keepSelects(values: Values, fields: EditableField[]): Values {
-  const out: Values = {};
-  for (const f of fields) if ((f.kind === "vocab" || f.kind === "vocablist") && values[f.name]) out[f.name] = values[f.name];
+function keepSelects(values: Values, fields: EditableField[]): RecordTemplate["values"] {
+  const out: RecordTemplate["values"] = {};
+  for (const f of fields) {
+    if (f.kind !== "vocab" && f.kind !== "vocablist") continue;
+    const v = values[f.name];
+    if (typeof v === "string" ? v : Array.isArray(v) && v.length) out[f.name] = v as string | string[];
+  }
   return out;
 }

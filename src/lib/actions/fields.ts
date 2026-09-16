@@ -8,9 +8,9 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { slugify } from "@/lib/slug";
-import { bustFieldDefinitions, FIELD_TYPES, type FieldType } from "@/lib/custom-fields";
+import { bustFieldDefinitions, customDetailField, fieldDefinitions, FIELD_TYPES, type FieldType } from "@/lib/custom-fields";
 import { modelForType, OPTION_SETS, bustOptions } from "@/lib/options";
-import { DETAIL_TYPES } from "@/lib/record-fields";
+import { DETAIL_TYPES, type DetailField } from "@/lib/record-fields";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 const fail = (e: unknown): Result => ({ ok: false, error: e instanceof Error ? e.message : "Could not save." });
@@ -100,4 +100,16 @@ export async function optionSetChoicesPublic(): Promise<{ value: string; label: 
   const extra = await db.option.findMany({ distinct: ["setKey"], select: { setKey: true } });
   for (const e of extra) if (!known.some((k) => k.value === e.setKey)) known.push({ value: e.setKey, label: e.setKey.replace(/_/g, " ") });
   return known.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
+ * The custom fields the quick-create sheet has to show: the ones marked
+ * required. Anything optional stays off the sheet — quick create is meant to
+ * be the essentials — but a field you said was required cannot be skipped on
+ * the one path that makes new records.
+ */
+export async function requiredCustomFields(recordType: string): Promise<DetailField[]> {
+  await requireRole("EDITOR");
+  const defs = (await fieldDefinitions(recordType)).filter((d) => d.required);
+  return Promise.all(defs.map((d) => customDetailField(d, {})));
 }

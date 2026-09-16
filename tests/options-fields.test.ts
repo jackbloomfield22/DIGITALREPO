@@ -29,8 +29,12 @@ const SET = "zzopt_set";
 
 async function cleanup() {
   await db.format.deleteMany({ where: { title: { startsWith: P } } });
+  await db.organization.deleteMany({ where: { name: { startsWith: P } } });
   await db.creator.deleteMany({ where: { name: { startsWith: P } } });
-  await db.option.deleteMany({ where: { setKey: { startsWith: "zzopt" } } });
+  // Some of these tests add options to a real set (a status picker), so the
+  // value prefix matters as much as the set key: without this the suite
+  // leaves test statuses in the picker every time it runs.
+  await db.option.deleteMany({ where: { OR: [{ setKey: { startsWith: "zzopt" } }, { value: { startsWith: "zzopt" } }] } });
   await db.fieldDefinition.deleteMany({ where: { key: { startsWith: "zzopt" } } });
   await db.auditLog.deleteMany({ where: { targetLabel: { contains: P } } });
   await db.knowledgeDigest.deleteMany({ where: { name: { startsWith: P } } });
@@ -238,5 +242,55 @@ describe("the option set map", () => {
         expect(model!.fields.some((f) => f.name === col.column), `${key} → ${col.model}.${col.column}`).toBe(true);
       }
     }
+  });
+});
+
+describe("quick create and a required custom field", () => {
+  // Organizations, because an earlier test in this file leaves a required
+  // format field in place and this has to stand on its own.
+  const KEY = "zzopt_org_note";
+  const TYPE = "organization";
+
+  it("refuses a record without it, and stores it when given", async () => {
+    const { createRecord } = await import("@/lib/actions/quick-create");
+    const { requiredCustomFields } = await import("@/lib/actions/fields");
+
+    await db.fieldDefinition.create({
+      data: { recordType: TYPE, key: KEY, name: "Owner sign-off", type: "text", required: true, position: 900 },
+    });
+    bustFieldDefinitions();
+
+    // It reaches the sheet, marked required.
+    const shown = await requiredCustomFields(TYPE);
+    expect(shown.map((f) => f.name)).toContain(`custom.${KEY}`);
+    expect(shown.find((f) => f.name === `custom.${KEY}`)?.required).toBe(true);
+
+    // Creating without it is refused, and nothing is written.
+    const refused = await createRecord(TYPE, { name: `${P} needs sign-off` });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error).toContain("Owner sign-off");
+    expect(await db.organization.count({ where: { name: `${P} needs sign-off` } })).toBe(0);
+
+    // Creating with it works, and the value lands in `custom`.
+    const made = await createRecord(TYPE, { name: `${P} has sign-off`, [`custom.${KEY}`]: "Jack asked for this" });
+    expect(made.ok).toBe(true);
+    const row = await db.organization.findFirst({ where: { name: `${P} has sign-off` } });
+    expect((row?.custom as Record<string, unknown>)?.[KEY]).toBe("Jack asked for this");
+
+    await db.fieldDefinition.deleteMany({ where: { key: KEY } });
+    bustFieldDefinitions();
+  });
+
+  it("leaves an optional field off the sheet and lets a record be made without it", async () => {
+    const { createRecord } = await import("@/lib/actions/quick-create");
+    const { requiredCustomFields } = await import("@/lib/actions/fields");
+    await db.fieldDefinition.create({
+      data: { recordType: TYPE, key: "zzopt_org_optional", name: "Optional note", type: "text", required: false, position: 901 },
+    });
+    bustFieldDefinitions();
+    expect((await requiredCustomFields(TYPE)).map((f) => f.name)).not.toContain("custom.zzopt_org_optional");
+    expect((await createRecord(TYPE, { name: `${P} no optional` })).ok).toBe(true);
+    await db.fieldDefinition.deleteMany({ where: { key: "zzopt_org_optional" } });
+    bustFieldDefinitions();
   });
 });

@@ -11,6 +11,7 @@ import { queueAirtableSync } from "@/lib/airtable/sync";
 import { normalizeName, slugify, uniqueSlug } from "@/lib/slug";
 import { RECORD_REGISTRY, type IngestTargetType } from "@/lib/ingest/registry";
 import { coerceField, CREATE_TYPES, type CreateType } from "@/lib/record-fields";
+import { coerceCustom, fieldDefinitions, isCustomFieldName } from "@/lib/custom-fields";
 
 export type CreateResult =
   | { ok: true; id: string; name: string; href: string }
@@ -38,6 +39,24 @@ export async function createRecord(type: CreateType, values: Record<string, unkn
       if (!c.ok) return { ok: false, error: c.error };
       data[field.name] = c.value;
     }
+    // Fields added under Settings → Fields. Only the required ones reach the
+    // sheet, but every one of those has to be valid before the record exists:
+    // a field you marked required cannot be skipped by creating from here.
+    const defs = await fieldDefinitions(type);
+    const custom: Record<string, unknown> = {};
+    for (const def of defs) {
+      const key = `custom.${def.key}`;
+      const raw = isCustomFieldName(key) && key in values ? values[key] : values[def.key];
+      if (raw == null || raw === "") {
+        if (def.required) return { ok: false, error: `${def.name} is required.` };
+        continue;
+      }
+      const c = await coerceCustom(def, raw);
+      if (!c.ok) return { ok: false, error: c.error };
+      if (c.value != null) custom[def.key] = c.value;
+    }
+    if (Object.keys(custom).length) data.custom = custom;
+
     data.ownerId = user.id;
     const base = slugify(name);
     const taken = await model.findMany({ where: { slug: { startsWith: base } }, select: { slug: true } });
