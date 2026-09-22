@@ -4,17 +4,38 @@ import { getSessionUser, hasRole } from "@/lib/auth";
 import { storeRawBytes } from "@/lib/ingest/storage";
 import { classifyKind } from "@/lib/ingest/parse";
 import { loadChangesFile, parseChangesFile } from "@/lib/ingest/changes-file";
-import { verifyUpload } from "@/lib/files";
+import { BLOB_SETUP_HINT, INLINE_INGEST_BYTES, blobConfigured, verifyUpload } from "@/lib/files";
+import { RAW_CAP_BYTES } from "@/lib/ingest/storage";
 
 export const maxDuration = 60;
 
-const ACCEPTED = new Set(["eml", "msg", "mbox", "zip", "pdf", "docx", "pptx", "xlsx", "csv", "txt", "md", "html", "htm"]);
 const MAX_FILES = 50;
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
+const mb = (n: number) => `${(n / 1024 / 1024).toFixed(n >= 10 * 1024 * 1024 ? 0 : 1)}MB`;
+
 // Upload stage: create one IngestItem per file (plus one for pasted text) and
-// return immediately — parsing happens in its own short request.
+// return immediately — parsing happens in its own short request. Ingest is
+// the front door for anything: there is no list of accepted types here. What
+// the parser can read becomes proposals; what it cannot still lands, as a
+// file, on the page it was for.
 export async function POST(request: Request) {
+  try {
+    return await handle(request);
+  } catch (e) {
+    // Always JSON. A thrown error would come back as an HTML page and the
+    // uploader would see "Upload failed" with no reason.
+    console.error("Ingest upload failed:", e);
+    const message = e instanceof Error ? e.message : "Upload failed.";
+    const tooBig = /body|size|large|limit/i.test(message);
+    return NextResponse.json(
+      { error: tooBig ? `The upload was too big for this site to take in one request. ${BLOB_SETUP_HINT}` : `The upload could not be read: ${message}` },
+      { status: tooBig ? 413 : 500 },
+    );
+  }
+}
+
+async function handle(request: Request) {
   const user = await getSessionUser();
   if (!user || !hasRole(user, "EDITOR")) {
     return NextResponse.json({ error: "Editor access required" }, { status: 403 });
@@ -71,6 +92,25 @@ export async function POST(request: Request) {
   if (totalBytes > MAX_UPLOAD_BYTES) {
     return NextResponse.json({ error: "Upload exceeds 100MB — split it into smaller batches." }, { status: 400 });
   }
+  // Without a Blob store every file travels through this function, which has
+  // a hard ceiling on Vercel. Refuse with the reason rather than let a file
+  // arrive with its bytes dropped and fail later at parse.
+  if (!blobConfigured()) {
+    const cap = Math.min(INLINE_INGEST_BYTES, RAW_CAP_BYTES);
+    const big = files.find((f) => f.size > cap);
+    if (big) {
+      return NextResponse.json(
+        { error: `${big.name} is ${mb(big.size)}. Without file storage connected, this site can take ${mb(cap)} per file through Ingest. ${BLOB_SETUP_HINT}` },
+        { status: 413 },
+      );
+    }
+    if (totalBytes > cap) {
+      return NextResponse.json(
+        { error: `These files add up to ${mb(totalBytes)}. Without file storage connected, one Ingest upload can carry ${mb(cap)}; send them in smaller batches. ${BLOB_SETUP_HINT}` },
+        { status: 413 },
+      );
+    }
+  }
 
   const created: {
     id: string; filename: string | null; skipped?: string;
@@ -93,10 +133,6 @@ export async function POST(request: Request) {
       });
       continue;
     }
-    if (!ACCEPTED.has(extension)) {
-      created.push({ id: "", filename: file.name, skipped: `Unsupported type .${extension}` });
-      continue;
-    }
     const item = await db.ingestItem.create({
       data: {
         kind: classifyKind(file.name, file.type || null),
@@ -116,11 +152,6 @@ export async function POST(request: Request) {
   }
 
   for (const b of blobs) {
-    const extension = b.filename.toLowerCase().split(".").pop() ?? "";
-    if (!ACCEPTED.has(extension)) {
-      created.push({ id: "", filename: b.filename, skipped: `Unsupported type .${extension}` });
-      continue;
-    }
     const info = await verifyUpload(b.url);
     if (!info) {
       created.push({ id: "", filename: b.filename, skipped: "That upload didn't arrive — try it again" });

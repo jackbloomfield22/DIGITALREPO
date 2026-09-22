@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { requireUser, hasRole } from "@/lib/auth";
 import { ingestAiAvailable } from "@/lib/ingest/ai";
 import { UploadZone } from "@/components/ingest/upload-zone";
-import { blobConfigured } from "@/lib/files";
+import { BLOB_SETUP_HINT, blobConfigured, ingestUploadLimit } from "@/lib/files";
 import { StatusPill } from "@/components/ui";
 import { labelFor } from "@/lib/taxonomy";
 import { relativeTime } from "@/lib/format";
@@ -67,11 +67,12 @@ export default async function IngestQueuePage({
         )}
       </div>
       <p className="mb-5 max-w-2xl text-sm text-muted">
-        Feed the Repo emails, documents, and notes. Everything becomes reviewable proposals —
-        nothing touches the knowledge base until you approve it.
+        The front door for anything new. Paste an email thread, drop a deck, a spreadsheet, a photo, a
+        zip of everything. What can be read is read, matched to what the Repo already knows and turned
+        into proposals — new pages, updates, links. Nothing touches the Repo until you approve it.
       </p>
 
-      {canEdit && <UploadZone aiAvailable={ingestAiAvailable()} pendingIds={pendingIds} blobReady={blobConfigured()} />}
+      {canEdit && <UploadZone aiAvailable={ingestAiAvailable()} pendingIds={pendingIds} blobReady={blobConfigured()} maxInlineBytes={ingestUploadLimit().bytes} blobHint={BLOB_SETUP_HINT} />}
 
       <div className="mb-4 flex flex-wrap gap-1.5">
         {STATUS_FILTERS.map((s) => (

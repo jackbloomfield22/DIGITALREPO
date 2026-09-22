@@ -166,19 +166,31 @@ export async function triageItemCore(
       ? { ok: true, status: item.status }
       : { ok: false, error: `Cannot triage an item in status "${item.status}".` };
   }
-  if (runner === anthropicRunner && !ingestAiAvailable()) {
-    return { ok: false, error: "AI triage needs ANTHROPIC_API_KEY. The document is parsed and stored — configure a key to generate proposals." };
-  }
   const text = (item.extractedText ?? "").trim();
   if (item.status === "failed" && !text) {
     return { ok: false, error: "This item failed before any text was extracted — run the parse stage again." };
   }
+  // Nothing to read needs no model to say so.
   if (!text) {
+    const unreadable = !!(item.metadata as { unreadable?: boolean } | null)?.unreadable;
     await db.ingestItem.update({
       where: { id: itemId },
-      data: { status: "irrelevant", relevance: { score: 0, reasons: ["No text content"] } },
+      data: {
+        status: "irrelevant",
+        relevance: {
+          score: 0,
+          reasons: [
+            unreadable
+              ? "Nothing readable in this file. Upload it again with a page chosen under “This file is for” and it will be added to that page as a file."
+              : "No text content",
+          ],
+        },
+      },
     });
     return { ok: true, status: "irrelevant" };
+  }
+  if (runner === anthropicRunner && !ingestAiAvailable()) {
+    return { ok: false, error: "AI triage needs ANTHROPIC_API_KEY. The document is parsed and stored — configure a key to generate proposals." };
   }
 
   try {

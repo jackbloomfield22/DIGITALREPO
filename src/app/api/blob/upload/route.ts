@@ -26,8 +26,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     const result = await handleUpload({
       request,
       body: (await request.json()) as HandleUploadBody,
-      onBeforeGenerateToken: async () => ({
-        allowedContentTypes: ALLOWED_UPLOAD_TYPES,
+      onBeforeGenerateToken: async (pathname) => ({
+        // Ingest takes anything: a type the parser cannot read still lands on
+        // the page it was for. Attachments keep the media-and-documents list.
+        allowedContentTypes: pathname.startsWith("ingest/") ? undefined : ALLOWED_UPLOAD_TYPES,
         maximumSizeInBytes: MAX_UPLOAD_BYTES,
         // Two people attaching "cut_v3.mp4" on the same day must not collide,
         // and a guessed pathname must not resolve to someone else's file.
