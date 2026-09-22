@@ -259,8 +259,14 @@ clickable result cards back into the normal UI, and follow-up questions keep thr
 
 ### Ingest (`/ingest`) — how the Repo stays current
 
-Drop in emails (`.eml`, `.mbox`), documents (`.pdf`, `.docx`, `.pptx`, `.xlsx`), archives
-(`.zip`), or pasted text. A staged pipeline — each stage a short serverless request —
+The front door for anything new. Paste text of any length, or drop in any file: emails
+(`.eml`, `.mbox`), documents, decks, spreadsheets, notes, web pages, a `.zip` of any of it.
+What the parser can read goes through the pipeline below; a picture, video, audio file
+or unknown format has nothing to read, so it lands straight on the page named under
+"This file is for" as a file, and if no page was named the review page says so. There
+is no list of accepted types. Without a Blob store, a file travels through the app and
+the platform caps that at 4.5MB per request; the page checks sizes first and says which
+file, how big, and how to connect storage. A staged pipeline — each stage a short serverless request —
 parses deterministically (headers, quote-stripping, thread ids, attachments as child
 items), **triages** with a cheap model (pure logistics gets filtered out), and
 **proposes** structured changes grounded in the **Knowledge Digest**: a compact,

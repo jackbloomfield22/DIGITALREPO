@@ -178,7 +178,12 @@ fields, verification and history work.
    that branch were failing on a build-script problem; that is found, fixed and
    covered by a test, and the whole production build now runs clean against a
    database built from nothing by the migrations.
-3. **Rotate the Neon `neondb_owner` password.** It was shared in chat during
+3. **Connect file storage in Vercel.** Open the project → Storage → Create
+   Database → Blob, connect it to the project, redeploy. Until then anything
+   over 4MB cannot go through Ingest or be attached to a page, and the app now
+   says exactly that when it happens. With it, uploads go straight from the
+   browser to storage, up to 2GB each.
+4. **Rotate the Neon `neondb_owner` password.** It was shared in chat during
    this work, and this repository is public.
 
 ### Done after the phases, in a finishing pass
@@ -202,6 +207,18 @@ fields, verification and history work.
   had marked required. It asks for them now, and the create path refuses
   without them even for a caller that does not use the sheet.
 - **Lint reports nothing at all**, on both the shipped app and the held branch.
+- **Ingest is the front door for anything.** It refused every file type outside
+  a short list, dropped the bytes of anything over 4MB without saying so, and
+  when the platform refused a request the page could only say "Upload failed".
+  Now any file goes in: what the parser can read (email, documents, decks,
+  spreadsheets, notes, web pages, zips of any of it) becomes proposals; a
+  picture, video, audio file or unknown format lands straight on the page you
+  name as a file, and if you named none the review page says so. Every refusal
+  says which file, how big, what the limit is and how to lift it. The limit
+  itself is the real finding: with no Blob store connected, a file has to travel
+  through the app, and the platform stops that at 4.5MB with a bare 413. The
+  paste box is bigger and says what happens to what you paste, and a site with
+  no AI key now says so instead of quietly proposing nothing.
 
 ### A short list for a follow-up pass
 

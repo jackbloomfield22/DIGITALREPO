@@ -17,9 +17,10 @@ type ItemLike = {
   raw: Uint8Array | Buffer | null; rawRetained: boolean; blobPath: string | null; blobUrl: string | null; metadata: unknown;
 };
 
-/** Files worth putting on a page: decks and documents, not emails or archives. */
-const ATTACHABLE = new Set(["pdf", "pptx", "ppt", "docx", "doc", "xlsx", "xls", "key", "png", "jpg", "jpeg"]);
-const PAGES = new Set(["format", "project"]);
+/** Containers and mail are read for what is inside them; everything else is worth keeping as a file. */
+const NOT_ATTACHABLE = new Set(["eml", "msg", "mbox", "zip", "json"]);
+/** The record types with a Files section on their page. */
+export const PAGES = new Set(["format", "project", "creator", "channel"]);
 
 /** The record the uploader chose in Add Info, if any. */
 export function attachTargets(item: { metadata: unknown }): Target[] {
@@ -31,7 +32,7 @@ export function attachTargets(item: { metadata: unknown }): Target[] {
 export async function attachSourceFile(item: ItemLike, user: SessionUser, targets: Target[]): Promise<number> {
   if (!item.filename) return 0;
   const ext = item.filename.toLowerCase().split(".").pop() ?? "";
-  if (!ATTACHABLE.has(ext)) return 0;
+  if (NOT_ATTACHABLE.has(ext)) return 0;
   const wanted = new Map<string, Target>();
   for (const t of targets) if (PAGES.has(t.targetType)) wanted.set(`${t.targetType}:${t.targetId}`, t);
   if (!wanted.size) return 0;

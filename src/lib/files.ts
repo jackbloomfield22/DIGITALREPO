@@ -36,6 +36,23 @@ export const MAX_UPLOAD_BYTES = 2_000_000_000;
 /** What the Postgres fallback will take when no Blob store is connected. */
 export const MAX_DB_UPLOAD_BYTES = 15 * 1024 * 1024;
 
+/**
+ * What one Ingest upload can carry through the app when no Blob store is
+ * connected. A serverless request body stops at 4.5MB on Vercel, and the
+ * failure it gives is a bare 413 with no JSON, so the ceiling has to be
+ * checked here, before the request, and said in words.
+ */
+export const INLINE_INGEST_BYTES = 4 * 1024 * 1024;
+
+/** What connecting storage takes, said once and reused wherever a limit bites. */
+export const BLOB_SETUP_HINT =
+  "To lift this, connect file storage: in Vercel open the project → Storage → Create Database → Blob, connect it, and redeploy. Uploads then go straight to storage, up to 2GB each.";
+
+/** How much an Ingest upload can carry, and why. */
+export function ingestUploadLimit(): { bytes: number; blob: boolean } {
+  return blobConfigured() ? { bytes: MAX_UPLOAD_BYTES, blob: true } : { bytes: INLINE_INGEST_BYTES, blob: false };
+}
+
 export const ALLOWED_UPLOAD_TYPES = [
   // Documents and decks
   "application/pdf",
